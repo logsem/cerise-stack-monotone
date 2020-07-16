@@ -179,7 +179,7 @@ Next Obligation.
 Defined.
 Next Obligation.
   intros. apply Z.leb_le; auto.
-Defined. 
+Defined.
 Notation "a1 + z" := (incr_addr a1 z): Addr_scope.
 
 Definition max (a1 a2: Addr): Addr :=
@@ -233,7 +233,7 @@ Lemma incr_addr_spec (a: Addr) (z: Z) :
 Proof.
   unfold incr_addr.
   destruct (Z_le_dec (a + z)%Z MemNum),(Z_le_dec 0 (a + z)%Z); [ left | right; split; auto; try lia..].
-  eexists. repeat split; lia. 
+  eexists. repeat split; lia.
 Qed.
 
 Ltac incr_addr_as_spec a x :=
@@ -382,7 +382,7 @@ Goal forall a : Addr,
     (a + -(a + 3))%a = None.
 Proof.
   intros. solve_addr.
-Qed. 
+Qed.
 
 Goal forall (a a' b b' : Addr),
   (a + 1)%a = Some a' ->
@@ -405,23 +405,23 @@ Qed.
    been fixed upstream starting from Coq 8.11.
 *)
 
-Lemma Z_of_nat_zify : forall x, Z.of_nat (Z.to_nat x) = Z.max 0 x.
-Proof.
-  intros x. destruct x.
-  - rewrite Z2Nat.id; reflexivity.
-  - rewrite Z2Nat.inj_pos. lia.
-  - rewrite Z2Nat.inj_neg. lia.
-Qed.
+(* Lemma Z_of_nat_zify : forall x, Z.of_nat (Z.to_nat x) = Z.max 0 x. *)
+(* Proof. *)
+(*   intros x. destruct x. *)
+(*   - rewrite Z2Nat.id; reflexivity. *)
+(*   - rewrite Z2Nat.inj_pos. lia. *)
+(*   - rewrite Z2Nat.inj_neg. lia. *)
+(* Qed. *)
 
-Ltac zify_nat_op_extended :=
-  match goal with
-  | H : context [ Z.of_nat (Z.to_nat ?a) ] |- _ => rewrite (Z_of_nat_zify a) in H
-  | |- context [ Z.of_nat (Z.to_nat ?a) ] => rewrite (Z_of_nat_zify a)
-  | _ => zify_nat_op
-  end.
+(* Ltac zify_nat_op_extended := *)
+(*   match goal with *)
+(*   | H : context [ Z.of_nat (Z.to_nat ?a) ] |- _ => rewrite (Z_of_nat_zify a) in H *)
+(*   | |- context [ Z.of_nat (Z.to_nat ?a) ] => rewrite (Z_of_nat_zify a) *)
+(*   | _ => zify_nat_op *)
+(*   end. *)
 
-Global Ltac zify_nat ::=
-  repeat zify_nat_rel; repeat zify_nat_op_extended; unfold Z_of_nat' in *.
+(* Global Ltac zify_nat ::= *)
+(*   repeat zify_nat_rel; repeat zify_nat_op_extended; unfold Z_of_nat' in *. *)
 
 (* --------------------------- BASIC LEMMAS --------------------------------- *)
 

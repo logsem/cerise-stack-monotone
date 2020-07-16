@@ -5,7 +5,7 @@ From cap_machine Require Import stdpp_extra.
 Import uPred.
 
 (** The CMRA for the heap of STS.
-    We distinguish between the standard and owned sts. *) 
+    We distinguish between the standard and owned sts. *)
 
 (** For shared resources, we register the state. *)
 
@@ -62,9 +62,9 @@ Section definitionsS.
           {eqd : EqDecision D} {countD: Countable D} {stsg : STSG A B Σ}.
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states A B)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
-  
+
   Program Definition sts_state_std (i : A) (x : B) : iProp Σ
     := own (γs_std (A:=A)) (◯ {[ i := Excl x ]}).
 
@@ -73,7 +73,7 @@ Section definitionsS.
 
   Definition convert_rel {D : Type} `{Countable D} (R : D → D → Prop) : positive → positive → Prop :=
     λ x y, ∃ a b, x = encode a ∧ y = encode b ∧ R a b.
-  
+
   Definition sts_rel_loc (i : positive) (R : D → D → Prop) (P : D → D → Prop) : iProp Σ :=
     own (γr_loc (A:=A)) (◯ {[ i := to_agree ((convert_rel R,convert_rel P)) ]}).
 
@@ -117,20 +117,20 @@ Section definitionsS.
 
   Global Instance sts_rel_loc_Persistent i R P : Persistent (sts_rel_loc i R P).
   Proof. apply _. Qed.
-  
+
   Global Instance sts_rel_loc_Timeless i R P : Timeless (sts_rel_loc i R P).
   Proof. apply _. Qed.
-  
+
   Global Instance sts_state_std_Timeless i x : Timeless (sts_state_std i x).
   Proof. apply _. Qed.
   Global Instance sts_state_loc_Timeless i x : Timeless (sts_state_loc i x).
   Proof. apply _. Qed.
-  
+
   Global Instance sts_full_Timeless γs γr fs fr : Timeless (sts_full γs γr fs fr).
   Proof. apply _. Qed.
-  Global Instance sts_full_world_Timeless W : Timeless (sts_full_world W). 
-  Proof. apply _. Qed. 
-  
+  Global Instance sts_full_world_Timeless W : Timeless (sts_full_world W).
+  Proof. apply _. Qed.
+
 End definitionsS.
 
 Typeclasses Opaque sts_state_std sts_state_loc sts_rel_loc sts_full
@@ -158,7 +158,7 @@ Section pre_STS.
   Notation WORLD := (prodO STS_STD STS).
 
   Lemma gen_sts_init :
-    (|==> ∃ (stsg : STSG A B Σ), sts_full_world ((∅, (∅, ∅)) : WORLD))%I.
+    ⊢ |==> ∃ (stsg : STSG A B Σ), sts_full_world ((∅, (∅, ∅)) : WORLD).
   Proof.
     iMod (own_alloc (A:=sts_std_stateUR A B) (● ∅)) as (γsstd) "Hstd". by apply auth_auth_valid.
     iMod (own_alloc (A:=sts_stateUR) (● ∅)) as (γs) "Hs". by apply auth_auth_valid.
@@ -183,12 +183,12 @@ Section STS.
   Implicit Types fsd gsd : STS_std_states A B.
   Implicit Types fr_pub fr_priv gr_pub gr_priv : STS_rels.
   Implicit Types R : C → C → Prop.
-  Implicit Types Q : D → D → Prop. 
+  Implicit Types Q : D → D → Prop.
   Implicit Types Rp : positive → positive → Prop.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states A B)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
 
   Lemma related_sts_pub_refl fs fr : related_sts_pub fs fs fr fr.
@@ -225,35 +225,35 @@ Section STS.
   Lemma related_sts_pub_refl_world W : related_sts_pub_world W W.
   Proof. split;[apply related_sts_std_pub_refl|apply related_sts_pub_refl]. Qed.
   Lemma related_sts_priv_refl_world W : related_sts_priv_world W W.
-  Proof. split;[apply related_sts_std_priv_refl|apply related_sts_priv_refl]. Qed. 
-  
+  Proof. split;[apply related_sts_std_priv_refl|apply related_sts_priv_refl]. Qed.
+
   Lemma related_sts_pub_priv fs fr gs gr :
     related_sts_pub fs gs fr gr → related_sts_priv fs gs fr gr.
   Proof.
-    rewrite /related_sts_pub /related_sts_priv. 
+    rewrite /related_sts_pub /related_sts_priv.
     intros [Hf1 [Hf2 Hf3]].
-    do 2 (split; auto). intros. 
+    do 2 (split; auto). intros.
     specialize (Hf3 i r1 r2 r1' r2' H H0) as (Hr1 & Hr2 & Hrtc); auto.
     subst. repeat (split;auto). intros.
-    specialize (Hrtc x y H1 H2). 
+    specialize (Hrtc x y H1 H2).
     inversion Hrtc.
     - left.
     - right with y0; auto.
-      apply rtc_or_intro. apply H4. 
+      apply rtc_or_intro. apply H4.
   Qed.
 
   Lemma related_sts_std_pub_priv fsd gsd :
     related_sts_std_pub fsd gsd → related_sts_std_priv fsd gsd.
   Proof.
-    rewrite /related_sts_pub /related_sts_priv. 
+    rewrite /related_sts_pub /related_sts_priv.
     intros [Hf1 Hf2].
-    repeat (split; auto). intros. 
+    repeat (split; auto). intros.
     specialize (Hf2 i _ _ H H0) as Hrtc; auto.
     inversion Hrtc.
     - left.
     - right with y0; auto.
-      apply rtc_or_intro. subst. auto. 
-  Qed. 
+      apply rtc_or_intro. subst. auto.
+  Qed.
 
   Lemma related_sts_pub_trans fs fr gs gr hs hr :
     related_sts_pub fs gs fr gr → related_sts_pub gs hs gr hr →
@@ -264,12 +264,12 @@ Section STS.
     specialize (Hf1 i); specialize (Hf2 i);
       revert Hf1 Hf2; rewrite !elem_of_dom; intros Hf1 Hf2.
     destruct Hf2; eauto. destruct x as [x1 x2].
-    edestruct Hf3 as [Heq1 [Heq2 Hrtc] ] ; eauto; simplify_eq. 
-    edestruct Hg3 as [Heq1 [Heq2 Hrtc'] ] ; eauto; simplify_eq. 
+    edestruct Hf3 as [Heq1 [Heq2 Hrtc] ] ; eauto; simplify_eq.
+    edestruct Hg3 as [Heq1 [Heq2 Hrtc'] ] ; eauto; simplify_eq.
     repeat (split;auto).
-    intros x y Hx Hy. 
+    intros x y Hx Hy.
     destruct Hf1;eauto.
-    etrans;eauto. 
+    etrans;eauto.
   Qed.
 
   Lemma related_sts_std_pub_trans fsd gsd hsd :
@@ -283,9 +283,9 @@ Section STS.
     destruct Hf1 as [x0 Hx0]; eauto.
     specialize (Hf2 i x x0 Hx Hx0); simplify_eq.
     specialize (Hg2 i x0 y Hx0 Hy); simplify_eq.
-    etrans;eauto. 
+    etrans;eauto.
   Qed.
-  
+
   Lemma related_sts_priv_pub_trans fs fr gs gr hs hr :
     related_sts_priv fs gs fr gr → related_sts_pub gs hs gr hr →
     related_sts_priv fs hs fr hr.
@@ -295,13 +295,13 @@ Section STS.
     specialize (Hf1 i); specialize (Hf2 i);
       revert Hf1 Hf2; rewrite !elem_of_dom; intros Hf1 Hf2.
     destruct Hf2; eauto. destruct x as [x1 x2].
-    edestruct Hf3 as [Heq1 [Heq2 Hrtc] ] ; eauto; simplify_eq. 
-    edestruct Hg3 as [Heq1 [Heq2 Hrtc'] ] ; eauto; simplify_eq. 
+    edestruct Hf3 as [Heq1 [Heq2 Hrtc] ] ; eauto; simplify_eq.
+    edestruct Hg3 as [Heq1 [Heq2 Hrtc'] ] ; eauto; simplify_eq.
     repeat (split;auto).
-    intros x y Hx Hy. 
+    intros x y Hx Hy.
     destruct Hf1;eauto.
-    etrans;eauto. 
-    apply rtc_or_intro; auto. 
+    etrans;eauto.
+    apply rtc_or_intro; auto.
   Qed.
 
   Lemma related_sts_std_priv_pub_trans fsd gsd hsd :
@@ -315,9 +315,9 @@ Section STS.
     destruct Hf1 as [x0 Hx0]; eauto.
     specialize (Hf2 i x x0 Hx Hx0); simplify_eq.
     specialize (Hg2 i x0 y Hx0 Hy); simplify_eq.
-    etrans;eauto. 
+    etrans;eauto.
     apply rtc_or_intro; auto.
-  Qed. 
+  Qed.
 
   Lemma related_sts_pub_priv_trans fs fr gs gr hs hr :
     related_sts_pub fs gs fr gr → related_sts_priv gs hs gr hr →
@@ -328,13 +328,13 @@ Section STS.
     specialize (Hf1 i); specialize (Hf2 i);
       revert Hf1 Hf2; rewrite !elem_of_dom; intros Hf1 Hf2.
     destruct Hf2; eauto. destruct x as [x1 x2].
-    edestruct Hf3 as [Heq1 [Heq2 Hrtc] ] ; eauto; simplify_eq. 
-    edestruct Hg3 as [Heq1 [Heq2 Hrtc'] ] ; eauto; simplify_eq. 
+    edestruct Hf3 as [Heq1 [Heq2 Hrtc] ] ; eauto; simplify_eq.
+    edestruct Hg3 as [Heq1 [Heq2 Hrtc'] ] ; eauto; simplify_eq.
     repeat (split;auto).
-    intros x y Hx Hy. 
+    intros x y Hx Hy.
     destruct Hf1;eauto.
-    etrans;eauto. 
-    apply rtc_or_intro; auto. 
+    etrans;eauto.
+    apply rtc_or_intro; auto.
   Qed.
 
   Lemma related_sts_std_pub_priv_trans fsd gsd hsd :
@@ -348,9 +348,9 @@ Section STS.
     destruct Hf1 as [x0 Hx0]; eauto.
     specialize (Hf2 i x x0 Hx Hx0); simplify_eq.
     specialize (Hg2 i x0 y Hx0 Hy); simplify_eq.
-    etrans;eauto. 
+    etrans;eauto.
     apply rtc_or_intro; auto.
-  Qed. 
+  Qed.
 
   Lemma related_sts_priv_trans fs fr gs gr hs hr :
     related_sts_priv fs gs fr gr → related_sts_priv gs hs gr hr →
@@ -361,12 +361,12 @@ Section STS.
     specialize (Hf1 i); specialize (Hf2 i);
       revert Hf1 Hf2; rewrite !elem_of_dom; intros Hf1 Hf2.
     destruct Hf2; eauto. destruct x as [x1 x2].
-    edestruct Hf3 as [Heq1 [Heq2 Hrtc] ] ; eauto; simplify_eq. 
-    edestruct Hg3 as [Heq1 [Heq2 Hrtc'] ] ; eauto; simplify_eq. 
+    edestruct Hf3 as [Heq1 [Heq2 Hrtc] ] ; eauto; simplify_eq.
+    edestruct Hg3 as [Heq1 [Heq2 Hrtc'] ] ; eauto; simplify_eq.
     repeat (split;auto).
-    intros x y Hx Hy. 
+    intros x y Hx Hy.
     destruct Hf1;eauto.
-    etrans;eauto. 
+    etrans;eauto.
   Qed.
 
   Lemma related_sts_std_priv_trans fsd gsd hsd :
@@ -382,14 +382,14 @@ Section STS.
     specialize (Hg2 i x0 y Hx0 Hy); simplify_eq.
     etrans;eauto.
   Qed.
-  
+
   (* Helper functions for transitivity of sts pairs *)
   Lemma related_sts_pub_priv_trans_world W W' W'' :
     related_sts_pub_world W W' -> related_sts_priv_world W' W'' ->
     related_sts_priv_world W W''.
   Proof.
     intros [Hpub_std Hpub_loc] [Hpriv_std Hpriv_loc].
-    split. 
+    split.
     - apply related_sts_std_pub_priv_trans with W'.1; auto.
     - apply related_sts_pub_priv_trans with W'.2.1 W'.2.2; auto.
   Qed.
@@ -399,7 +399,7 @@ Section STS.
     related_sts_priv_world W W''.
   Proof.
     intros [Hpub_std Hpub_loc] [Hpriv_std Hpriv_loc].
-    split. 
+    split.
     - apply related_sts_std_priv_pub_trans with W'.1; auto.
     - apply related_sts_priv_pub_trans with W'.2.1 W'.2.2; auto.
   Qed.
@@ -409,7 +409,7 @@ Section STS.
     related_sts_priv_world W W''.
   Proof.
     intros [Hpub_std Hpub_loc] [Hpriv_std Hpriv_loc].
-    split. 
+    split.
     - apply related_sts_std_priv_trans with W'.1; auto.
     - apply related_sts_priv_trans with W'.2.1 W'.2.2; auto.
   Qed.
@@ -419,7 +419,7 @@ Section STS.
     related_sts_pub_world W W''.
   Proof.
     intros [Hpub_std Hpub_loc] [Hpriv_std Hpriv_loc].
-    split. 
+    split.
     - apply related_sts_std_pub_trans with W'.1; auto.
     - apply related_sts_pub_trans with W'.2.1 W'.2.2; auto.
   Qed.
@@ -449,10 +449,10 @@ Section STS.
     assert (is_Some ((W'.1) !! i)) as [x Hx].
     { apply related_sts_priv_world_std_sta_is_Some with W; eauto. }
     destruct Hrelated as [ [Hdom1 Hrevoked ] _].
-    specialize (Hrevoked _ _ _ Hρ Hx). simplify_eq. 
-    eauto. 
+    specialize (Hrevoked _ _ _ Hρ Hx). simplify_eq.
+    eauto.
   Qed.
-    
+
   Lemma sts_full_rel_loc W i Q P :
     sts_full_world W -∗ sts_rel_loc (A:=A) i Q P -∗ ⌜W.2.2 !! i = Some (convert_rel Q,convert_rel P)⌝.
   Proof.
@@ -470,16 +470,16 @@ Section STS.
     revert HR; rewrite -Hu; intros HR%to_agree_included%leibniz_equiv;
       simplify_eq.
     inversion Hz as [? ? Hz'|]; simplify_eq.
-    revert Hz'; rewrite -Hu. intros Hz'%(to_agree_inj (A:=leibnizO _) p _)%leibniz_equiv. 
-    by rewrite Hz'.  
+    revert Hz'; rewrite -Hu. intros Hz'%(to_agree_inj (A:=leibnizO _) p _)%leibniz_equiv.
+    by rewrite Hz'.
   Qed.
-      
+
   Lemma sts_full_state_std W a b :
     sts_full_world W -∗ sts_state_std a b -∗ ⌜W.1 !! a = Some b⌝.
   Proof.
     rewrite /sts_full_world /sts_full /sts_state_std.
-    destruct W as [Wsta Wloc]. 
-    iIntros "[H1 _] H2". 
+    destruct W as [Wsta Wloc].
+    iIntros "[H1 _] H2".
     iDestruct (own_valid_2 with "H1 H2") as %[HR Hv]%auth_both_valid;
       iPureIntro.
     specialize (Hv a).
@@ -496,8 +496,8 @@ Section STS.
     sts_full_world W -∗ sts_state_loc (A:=A) i d -∗ ⌜W.2.1 !! i = Some (encode d)⌝.
   Proof.
     rewrite /sts_full_world /sts_full /sts_state_loc.
-    destruct W as [Wstd [fs fr] ]. 
-    iIntros "[_ [H1 _]] H2". 
+    destruct W as [Wstd [fs fr] ].
+    iIntros "[_ [H1 _]] H2".
     iDestruct (own_valid_2 with "H1 H2") as %[HR Hv]%auth_both_valid;
       iPureIntro.
     specialize (Hv i).
@@ -511,12 +511,12 @@ Section STS.
   Qed.
 
   Lemma sts_dealloc_std W a b :
-    sts_full_world W ∗ sts_state_std a b ==∗ sts_full_world (delete a W.1,W.2). 
+    sts_full_world W ∗ sts_state_std a b ==∗ sts_full_world (delete a W.1,W.2).
   Proof.
     rewrite /sts_full_world /sts_full /sts_state_std.
-    destruct W as [fs Wloc]. 
-    iIntros "[ [Hsta Hloc] Hstate] /=". 
-    iCombine "Hsta" "Hstate" as "H1". 
+    destruct W as [fs Wloc].
+    iIntros "[ [Hsta Hloc] Hstate] /=".
+    iCombine "Hsta" "Hstate" as "H1".
     iMod (own_update
             (A := sts_std_stateUR A B)
             _ _
@@ -525,8 +525,8 @@ Section STS.
     { apply auth_update_dealloc.
       rewrite fmap_delete /=.
       apply: delete_singleton_local_update. }
-    iFrame. iModIntro. done. 
-  Qed. 
+    iFrame. iModIntro. done.
+  Qed.
 
   Lemma sts_alloc_std_i W a b :
     ⌜a ∉ dom (gset A) W.1⌝ -∗
@@ -534,7 +534,7 @@ Section STS.
     sts_full_world (<[a := b]>W.1,W.2) ∗ sts_state_std a b.
   Proof.
     rewrite /sts_full_world /sts_full /sts_state_std /=.
-    destruct W as [fsd Wloc]. rewrite /sts_full_std. 
+    destruct W as [fsd Wloc]. rewrite /sts_full_std.
     iIntros (Hfresh1) "[H1 Hloc] /=".
     iMod (own_update
             (A := sts_std_stateUR A B)
@@ -544,10 +544,10 @@ Section STS.
             with "H1") as "[H1 Hs]".
     { apply auth_update_alloc.
       rewrite fmap_insert /=.
-      apply: alloc_singleton_local_update; last done. 
+      apply: alloc_singleton_local_update; last done.
       apply (not_elem_of_dom (D := gset A)).
       rewrite dom_fmap. auto. }
-    iFrame. done. 
+    iFrame. done.
   Qed.
 
   Lemma sts_alloc_loc W d Q P:
@@ -559,12 +559,12 @@ Section STS.
     rewrite /sts_full_world /sts_full /sts_rel_loc /sts_state_loc.
     (* iIntros "[Hd [H1 H2]]". *)
     (* iDestruct "Hd" as %Hd. *)
-    destruct W as [Wstd [fs fr]]. 
+    destruct W as [Wstd [fs fr]].
     iIntros "[Hstd [H1 H2]] /=".
     assert (fresh (dom (gset positive) fs ∪ dom (gset positive) fr) ∉
                     (dom (gset positive) fs ∪ dom (gset positive) fr)) as Hfresh.
     { apply is_fresh. }
-    apply not_elem_of_union in Hfresh as [Hfs Hfr]. 
+    apply not_elem_of_union in Hfresh as [Hfs Hfr].
     iMod (own_update
             (A := sts_stateUR)
             _ _
@@ -593,7 +593,7 @@ Section STS.
       auto. }
     iModIntro.
     iExists _; iFrame.
-    repeat iSplit; auto. 
+    repeat iSplit; auto.
   Qed.
 
   Lemma sts_update_std W a b b' :
@@ -603,7 +603,7 @@ Section STS.
     iIntros "Hsf Hi".
     iDestruct (sts_full_state_std with "Hsf Hi") as %Hfs.
     rewrite /sts_full_world /sts_full /sts_state_std.
-    destruct W as [fsd Wloc]. 
+    destruct W as [fsd Wloc].
     iDestruct "Hsf" as "[H1 Hloc] /=".
     iCombine "H1" "Hi" as "H1".
     iMod (own_update (A := sts_std_stateUR A B)
@@ -616,7 +616,7 @@ Section STS.
       rewrite lookup_fmap Hfs //=.
       by apply exclusive_local_update. }
     iFrame. rewrite -fmap_insert;
-              first iModIntro; iFrame.  
+              first iModIntro; iFrame.
   Qed.
 
   Lemma sts_update_loc W i d d' :
@@ -626,7 +626,7 @@ Section STS.
     iIntros "Hsf Hi".
     iDestruct (sts_full_state_loc with "Hsf Hi") as %Hfs.
     rewrite /sts_full_world /sts_full /sts_rel_loc /sts_state_loc.
-    destruct W as [Wstd [fs fr]]. 
+    destruct W as [Wstd [fs fr]].
     iDestruct "Hsf" as "[Hdst [H1 H2]] /=".
     iCombine "H1" "Hi" as "H1".
     iMod (own_update (A := sts_stateUR)

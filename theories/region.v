@@ -1,6 +1,6 @@
 From cap_machine Require Export stdpp_extra cap_lang rules_base.
-From cap_machine Require Import addr_reg. (* Required because of a weird Coq bug related to imports *)
 From iris.proofmode Require Import tactics.
+From cap_machine Require Import addr_reg. (* Required because of a weird Coq bug related to imports *)
 
 Section region.
   Context `{MachineParameters, memG Σ, regG Σ, MonRef: MonRefG (leibnizO _) CapR_rtc Σ}.
@@ -145,7 +145,7 @@ Section region.
 
   Lemma region_addrs_lt_top (a: Addr) n i ai :
     (a + (Z.of_nat i) < MemNum)%Z →
-    region_addrs_aux a n !! i = Some ai → ai ≠ top.
+    (region_addrs_aux a n) !! i = Some ai → ai ≠ addr_reg.top.
   Proof.
     intros Ha Hai.
     assert (length (region_addrs_aux a n) = n) as Hlen.
@@ -438,7 +438,7 @@ Section region.
     forall l1 l2 p ws1 ws2,
       length l1 = length ws1 ->
       ([∗ list] k ↦ y1;y2 ∈ (l1 ++ l2);(ws1 ++ ws2), y1 ↦ₐ[p] y2)%I ⊣⊢
-      ([∗ list] k ↦ y1;y2 ∈ l1;ws1, y1 ↦ₐ[p] y2)%I ∗ ([∗ list] k ↦ y1;y2 ∈ l2;ws2, y1 ↦ₐ[p] y2)%I.
+      ([∗ list] k ↦ y1;y2 ∈ l1;ws1, y1 ↦ₐ[p] y2)%I ∗ ([∗ list] k ↦ y1;y2 ∈ l2;ws2, y1 ↦ₐ[p] y2).
   Proof. intros. rewrite big_sepL2_app' //. Qed.
 
   Lemma extract_from_region b e p a ws φ :
@@ -503,8 +503,8 @@ Section region.
 
   Lemma extract_from_region_inv b e a (φ : Addr → iProp Σ) `{!∀ x, Persistent (φ x)}:
     (b <= a ∧ a < e)%a →
-    (([∗ list] a' ∈ (region_addrs b e), φ a') →
-     φ a)%I.
+    ([∗ list] a' ∈ (region_addrs b e), φ a') -∗
+    φ a.
   Proof.
     iIntros (Ha) "#Hreg".
     generalize (region_addrs_decomposition _ _ _ Ha); intro HRA. rewrite HRA.
@@ -516,8 +516,8 @@ Section region.
         `{!∀ x y, Persistent (φ x y)}:
     let n := length (region_addrs b a) in
     (b <= a ∧ a < e)%a →
-    (([∗ list] a';w' ∈ (region_addrs b e);ws, φ a' w') →
-     ∃ w, φ a w ∗ ⌜ws = (take n ws) ++ w :: (drop (S n) ws)⌝)%I.
+    ([∗ list] a';w' ∈ (region_addrs b e);ws, φ a' w') -∗
+     ∃ w, φ a w ∗ ⌜ws = (take n ws) ++ w :: (drop (S n) ws)⌝.
   Proof.
     iIntros (n Ha) "#Hreg".
     iDestruct (big_sepL2_length with "Hreg") as %Hlen.

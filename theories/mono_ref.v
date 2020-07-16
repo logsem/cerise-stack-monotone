@@ -58,7 +58,7 @@ Section MonRef.
   Proof. rewrite atleast_eq /atleast_def; apply _. Qed.
 
   Lemma MonRef_alloc v :
-    (|==> ∃ γ, Exact γ v ∗ atleast γ v)%I.
+    ⊢ |==> ∃ γ, Exact γ v ∗ atleast γ v.
   Proof.
     setoid_rewrite atleast_eq. rewrite /atleast_def /Exact.
     iMod (own_alloc (● (principal R v) ⋅ ◯ (principal R v))) as (γ) "[HF Hf]".
