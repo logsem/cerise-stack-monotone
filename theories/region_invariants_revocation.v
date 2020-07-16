@@ -881,7 +881,7 @@ Section heap.
     iApply own_op. 
     iApply (own_update with "HR"). 
     apply auth_update_core_id; auto. apply gmap_core_id,agree_core_id. 
-    apply singleton_included. exists (to_agree r). split; auto.
+    apply singleton_included_l. exists (to_agree r). split; auto.
     (* apply leibniz_equiv_iff in Hlookup.  *)
     rewrite lookup_fmap. apply fmap_Some_equiv.
     exists r. split; auto. 

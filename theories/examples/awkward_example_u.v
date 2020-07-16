@@ -1262,7 +1262,7 @@ Section awkward_example.
   Proof.
     iIntros (Hvpc Hfl Hcont Hwb_table Hlink_table Hd Hrmap_dom Hne φ)
             "(Hr_stk & HPC & Hr_t0 & Hr_adv & Hr_env & Hgen_reg & #Hι & #Hrel & #Hstack_val & Hna & #Hadv_val & #Hcallback & #Hf4 & #Htable & Hsts & Hr) Hφ".
-    iMod (na_inv_open with "Hf4 Hna") as "(>Hprog & Hna & Hcls)";[auto..|]. 
+    iMod (na_inv_acc with "Hf4 Hna") as "(>Hprog & Hna & Hcls)";[auto..|]. 
     iDestruct (big_sepL2_length with "Hprog") as %Hprog_length.
     destruct (f4_addrs);[inversion Hprog_length|].
     iDestruct "Hι" as (ι) "Hinv".
@@ -2169,7 +2169,7 @@ Section awkward_example.
         
         (* we can now step through the rest of the program *)
         (* to do that wee need to open the non atomic invariant of the program *)
-        iMod (na_inv_open with "Hf4 Hna") as "(>Hprog & Hna & Hcls')";[solve_ndisj..|]. 
+        iMod (na_inv_acc with "Hf4 Hna") as "(>Hprog & Hna & Hcls')";[solve_ndisj..|]. 
         rewrite Heqapp Hrest_app. repeat rewrite app_assoc. repeat rewrite app_comm_cons. rewrite app_assoc.
         
         iDestruct (mapsto_decomposition _ _ pc_p' (take 85 (awkward_instrs f_a r_adv)) with "Hprog")
@@ -3058,7 +3058,7 @@ Section awkward_example.
             (* we don't want to close the stack invariant yet, as we will now need to pop it *)
             (* go through rest of the program. We will now need to open the invariant and destruct it into its done and prog part *)
             (* sub r_t1 0 7 *)
-            iMod (na_inv_open with "Hf4 Hna") as "(>Hprog & Hna & Hcls')";[solve_ndisj..|].
+            iMod (na_inv_acc with "Hf4 Hna") as "(>Hprog & Hna & Hcls')";[solve_ndisj..|].
             iClear "Hadv_val". 
             rewrite Hrest_app1. repeat rewrite app_comm_cons. rewrite app_assoc.
             rewrite /awkward_example.
@@ -3166,7 +3166,7 @@ Section awkward_example.
                                                                    "(Hfetch & Hprog & #Hcont)";[apply Hcont_rest2_weak|].
             iDestruct "Hcont" as %(Hcont_assert & Hcont_rest3' & Heqapp3' & Hlink3').
             iGet_genpur_reg_map r3 r_t3 "Hmreg'" "Hfull3" "[Hr_t3 Hmreg']".
-            iMod (na_inv_open with "Htable Hna") as "[ [>Hpc_b >Ha_entry] [Hna Hcls] ]";[revert Hne;clear;solve_ndisj..|].
+            iMod (na_inv_acc with "Htable Hna") as "[ [>Hpc_b >Ha_entry] [Hna Hcls] ]";[revert Hne;clear;solve_ndisj..|].
             iApply (assert_r_z_success with "[-]");[..|iFrame "HPC Hpc_b Ha_entry Hfetch Hr_adv"];
               [|apply Hfl|apply Hcont_assert|auto|auto|auto|..].
             { intros mid Hmid. apply isCorrectPC_inrange with a22 a_last; auto.

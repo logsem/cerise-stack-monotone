@@ -462,7 +462,7 @@ Section STS.
     iDestruct (own_valid_2 with "H1 H2") as %[HR Hv]%auth_both_valid;
       iPureIntro.
     specialize (Hv i).
-    revert HR. rewrite /= singleton_included;
+    revert HR. rewrite /= singleton_included_l;
       intros [z [Hz HR]]; revert HR; rewrite Some_included_total; intros HR.
     rewrite lookup_fmap in Hz, Hv.
     destruct (fr !! i) eqn:Heq; rewrite Heq /= in Hz, Hv; last by inversion Hz.
@@ -483,7 +483,7 @@ Section STS.
     iDestruct (own_valid_2 with "H1 H2") as %[HR Hv]%auth_both_valid;
       iPureIntro.
     specialize (Hv a).
-    revert HR; rewrite /= singleton_included;
+    revert HR; rewrite /= singleton_included_l;
       intros [z [Hz HR]].
     rewrite lookup_fmap in Hz Hv.
     destruct (Wsta !! a) eqn:Heq; rewrite Heq /= in Hz Hv; last by inversion Hz.
@@ -501,7 +501,7 @@ Section STS.
     iDestruct (own_valid_2 with "H1 H2") as %[HR Hv]%auth_both_valid;
       iPureIntro.
     specialize (Hv i).
-    revert HR; rewrite /= singleton_included;
+    revert HR; rewrite /= singleton_included_l;
       intros [z [Hz HR]].
     rewrite lookup_fmap in Hz Hv.
     destruct (fs !! i) eqn:Heq; rewrite Heq /= in Hz Hv; last by inversion Hz.

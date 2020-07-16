@@ -638,7 +638,7 @@ Section lse.
         { do 3 (rewrite lookup_delete_ne; auto).
           rewrite lookup_insert_ne; eauto. }
         (* open the na invariant for the local stack content *)
-        iMod (na_inv_open logrel_nais ⊤ ⊤ with "Hlocal Hna") as "(>Hframe & Hna & Hcls)";auto. 
+        iMod (na_inv_acc logrel_nais ⊤ ⊤ with "Hlocal Hna") as "(>Hframe & Hna & Hcls)";auto. 
         assert (PermFlows RX RWLX) as Hrx;[by rewrite /PermFlows /=|].
         (* prepare the continuation *)
         let a := fresh "a" in destruct rest as [|a rest];[inversion Hf2_length|].
@@ -665,7 +665,7 @@ Section lse.
         (* go through rest of the program. We will now need to open the invariant one instruction at a time *)
         (* sub r_t1 0 7 *)
         iPrologue_pre rest Hf2_length. 
-        iMod (na_inv_open with "Hprog Hna") as "[ [>Hinstr Hprog_rest] [Hna Hcls'] ]";[solve_ndisj..|].
+        iMod (na_inv_acc with "Hprog Hna") as "[ [>Hinstr Hprog_rest] [Hna Hcls'] ]";[solve_ndisj..|].
         iApply (wp_add_sub_lt_success_z_z with "[$HPC $Hr_t1 $Hinstr]");
           [apply decode_encode_instrW_inv|right;left;eauto|iContiguous_next Hcont_rest 1|apply Hfl|iCorrectPC s_last a_last|..]. 
         iNext. iIntros "(HPC & Hinstr & Hr_t1)".
@@ -673,7 +673,7 @@ Section lse.
         iApply wp_pure_step_later;auto;iNext.
         (* lea r_stk r_t1 *) 
         iPrologue_pre rest Hf2_length. 
-        iMod (na_inv_open with "Hprog Hna") as "[(Ha79 & >Ha80 & Hprog_rest) (Hna & Hcls')]";[solve_ndisj..|].
+        iMod (na_inv_acc with "Hprog Hna") as "[(Ha79 & >Ha80 & Hprog_rest) (Hna & Hcls')]";[solve_ndisj..|].
         assert ((stack_own_end + (0 - 6))%a = Some stack_own_b) as Hpop.
         { revert Hstack_own_bound' Hstack_new. clear. solve_addr. }
         iApply (wp_lea_success_reg with "[$HPC $Hr_t1 $Hr_stk $Ha80]");
@@ -683,8 +683,8 @@ Section lse.
         iMod ("Hcls'" with "[$Hna $Ha79 $Ha80 $Hprog_rest]") as "Hna".
         iApply wp_pure_step_later;auto;iNext.
         (* pop r_stk *)
-        iMod (na_inv_open with "Hprog Hna") as "[(Ha79 & Ha80 & >Hprog_rest) (Hna & Hcls')]";[solve_ndisj..|].
-        iMod (na_inv_open with "Hlocal_one Hna") as "[>Hb_r [Hna Hcls''] ]";[solve_ndisj..|].
+        iMod (na_inv_acc with "Hprog Hna") as "[(Ha79 & Ha80 & >Hprog_rest) (Hna & Hcls')]";[solve_ndisj..|].
+        iMod (na_inv_acc with "Hlocal_one Hna") as "[>Hb_r [Hna Hcls''] ]";[solve_ndisj..|].
         do 2 (destruct rest;[by inversion Hlength_f2|]). 
         iDestruct (mapsto_decomposition [a4;a5;a6] _ _ (popU_instrs r_stk r_t30) with "Hprog_rest") as "[Hpop Hprog_rest]";
           [auto|]. 
@@ -707,7 +707,7 @@ Section lse.
         iAssert (⌜∃ w, r' !! r_t3 = Some w⌝)%I as %[w3 Hr3]; first iApply "Hfull'".
         iDestruct (big_sepM_delete _ _ r_t3 with "Hmreg'") as "[Hr_t3 Hmreg']".
         { do 5 (rewrite lookup_delete_ne; auto). rewrite lookup_insert_ne; eauto. }
-        iMod (na_inv_open with "Hprog Hna") as "[(Ha79 & Ha80 & >Hprog_rest) (Hna & Hcls')]";[solve_ndisj..|].
+        iMod (na_inv_acc with "Hprog Hna") as "[(Ha79 & Ha80 & >Hprog_rest) (Hna & Hcls')]";[solve_ndisj..|].
         iDestruct (mapsto_decomposition [a4;a5;a6] _ _ (popU_instrs r_stk r_t30) with "Hprog_rest") as "[Hpop Hprog_rest]";
           [auto|].
         iDestruct (big_sepL2_length with "Hprog_rest") as %Hlength_rest.
@@ -719,7 +719,7 @@ Section lse.
         iDestruct (big_sepL2_length with "Hhalt") as %Hrest2.
         destruct rest2;[inversion Hrest2|].
         apply contiguous_between_cons_inv_first in Hcont_rest2 as Heq. subst a8. 
-        iMod (na_inv_open with "Hlink Hna") as "[ [>Hpc_b >Ha_entry] [Hna Hcls''] ]";[solve_ndisj..|]. 
+        iMod (na_inv_acc with "Hlink Hna") as "[ [>Hpc_b >Ha_entry] [Hna Hcls''] ]";[solve_ndisj..|]. 
         iApply (assert_r_z_success with "[-]");last iFrame "Hassert HPC Hr_t30 Hpc_b Ha_entry";auto;[|apply Hcont_rest1|].
         { intros mid Hmid. apply isCorrectPC_inrange with s_last a_last; auto.
           apply contiguous_between_middle_bounds with (i:=6) (ai:=a7) in Hcont_rest;auto.

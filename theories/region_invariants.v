@@ -231,7 +231,7 @@ Section heap.
     iPureIntro.
     apply auth_both_valid in Hv; destruct Hv as [Hv1 Hv2].
     specialize (Hv2 n).
-    apply singleton_included in Hv1.
+    apply singleton_included_l in Hv1.
     destruct Hv1 as (y & Heq & Hi).
     revert Hv2; rewrite Heq => Hv2.
     revert Hi; rewrite Some_included_total => Hi.
@@ -253,7 +253,7 @@ Section heap.
     iIntros "[Hγ1 Hγ2]".
     iDestruct (own_valid_2 with "Hγ1 Hγ2") as %Hval.
     iPureIntro.
-    rewrite -auth_frag_op op_singleton in Hval.
+    rewrite -auth_frag_op singleton_op in Hval.
     apply singleton_valid in Hval.
     apply (agree_op_invL' (A:=leibnizO _)) in Hval.
     by inversion Hval. 
