@@ -543,13 +543,13 @@ Section fundamental.
           + subst r0. rewrite lookup_insert in H2; inv H2.
             rewrite (fixpoint_interp1_eq W (inr _)) /=.
             iAssert (□ exec_cond W b e g p (fixpoint interp1))%I as "HinvPC".
-            { iAlways. rewrite /exec_cond.
+            { iModIntro. rewrite /exec_cond.
               iIntros (a'' r'' W'' Hin) "#Hfuture".
               iNext. rewrite /interp_expr /=.
               iIntros "[[Hmap Hreg'] [Hfull [Hx [Hsts Hown]]]]".
               iSplitR; eauto.
               iApply ("IH" with "[Hmap] [Hreg'] [Hfull] [Hx] [Hsts] [Hown]"); iFrame "#"; eauto.
-              iAlways. (* iExists p'. iSplitR; auto. *) simpl.
+              iModIntro. (* iExists p'. iSplitR; auto. *) simpl.
               iDestruct "Hfuture" as %Hfuture.
               iApply (big_sepL_mono with "Hinv"); intros; simpl.
               iIntros "H". iDestruct "H" as (? ?) "[HA %]". iExists _; iSplit;eauto. iFrame. iPureIntro. 
@@ -585,10 +585,10 @@ Section fundamental.
             { destruct ρ; auto; congruence. }
             { iFrame "#". iSplitR; auto.
               destruct (decide (ρ = Temporary ∧ pwl p' = true)).
-              - rewrite /future_pub_mono /=. iAlways.
+              - rewrite /future_pub_mono /=. iModIntro.
                 iIntros (W1 W2) "% #A".
                 iApply interp_monotone; auto.
-              - rewrite /future_priv_mono /=. iAlways.
+              - rewrite /future_priv_mono /=. iModIntro.
                 iIntros (W1 W2) "% #A". iApply interp_monotone_nl; auto.
                 destruct w0; auto.
                 eapply not_and_r in n. destruct_cap c.
@@ -666,10 +666,10 @@ Section fundamental.
               { eapply not_elem_of_cons; split; auto.
                 eapply not_elem_of_nil. }
               { iSplitR; auto. simpl. destruct (pwl p'0) eqn:Hpwl'.
-                - rewrite /future_pub_mono /=. iAlways.
+                - rewrite /future_pub_mono /=. iModIntro.
                   iIntros (W1 W2) "% #A".
                   iApply interp_monotone; auto.
-                - rewrite /future_priv_mono /=. iAlways.
+                - rewrite /future_priv_mono /=. iModIntro.
                   iIntros (W1 W2) "% #A". iApply interp_monotone_nl; auto.
                   destruct w0; auto.
                   destruct_cap c. simpl. destruct c3; auto.
@@ -736,17 +736,17 @@ Section fundamental.
               { iSplitR; auto. rewrite /monotonicity_guarantees_region.
                 destruct ρ'; auto.
                 - destruct (pwl p'0) eqn:Hpwl'.
-                  + rewrite /future_pub_mono /=. iAlways.
+                  + rewrite /future_pub_mono /=. iModIntro.
                     iIntros (W1 W2) "% #A".
                     iApply interp_monotone; auto.
-                  + rewrite /future_priv_mono /=. iAlways.
+                  + rewrite /future_priv_mono /=. iModIntro.
                     iIntros (W1 W2) "% #A". iApply interp_monotone_nl; auto.
                     destruct w0; auto.
                     destruct_cap c. simpl. destruct c3; auto.
                     simpl in H7. destruct (pwlU p0) eqn:HpwlU; try congruence; exfalso;
                     destruct p0; simpl in H,H4,HpwlU; try congruence; 
                       destruct p'0; simpl in *; inv H; congruence.
-                - simpl. rewrite /future_priv_mono /=. iAlways.
+                - simpl. rewrite /future_priv_mono /=. iModIntro.
                   iIntros (W1 W2) "% #A". iApply interp_monotone_nl; auto.
                   destruct w0; auto. destruct_cap c. simpl. destruct c3; auto.
                   simpl in H5. destruct p0; simpl in H4, H5; try (inv H4; inv H5; fail).
@@ -818,10 +818,10 @@ Section fundamental.
             { destruct ρ;auto;congruence. }
             { iSplitR;auto. iFrame "#". simpl.
               destruct (decide (ρ = Temporary ∧ pwl p' = true)).
-              - rewrite /future_pub_mono /=. iAlways.
+              - rewrite /future_pub_mono /=. iModIntro.
                  iIntros (W1 W2) "% #A".
                  iApply interp_monotone; auto.
-              - rewrite /future_priv_mono /=. iAlways.
+              - rewrite /future_priv_mono /=. iModIntro.
                  iIntros (W1 W2) "% #A". iApply interp_monotone_nl; auto.
                  destruct w0; auto.
                  eapply not_and_r in n0. destruct_cap c.
@@ -867,10 +867,10 @@ Section fundamental.
               rewrite !switch_monotonicity_formulation; auto.
               rewrite /monotonicity_guarantees_decide.
               destruct (decide (ρ' = Temporary ∧ pwl p'0 = true)).
-              + rewrite /future_pub_mono /=. iAlways.
+              + rewrite /future_pub_mono /=. iModIntro.
                 iIntros (W1 W2) "% #A".
                 iApply interp_monotone; auto.
-              + rewrite /future_priv_mono /=. iAlways.
+              + rewrite /future_priv_mono /=. iModIntro.
                 iIntros (W1 W2) "% #A". iApply interp_monotone_nl; auto.
                 destruct w0; auto.
                 eapply not_and_r in n1. destruct_cap c.
@@ -948,7 +948,7 @@ Section fundamental.
           destruct H10 as (?&?&?&?&?&?&?&?&?).
           subst r'. rewrite insert_insert.
           simplify_map_eq. rewrite insert_insert;auto. }
-      { iAlways. (* iExists p'; iSplitR; auto. *)
+      { iModIntro. (* iExists p'; iSplitR; auto. *)
         iApply (big_sepL_mono with "Hinv"); auto.
         intros. simpl. iIntros "Hw". iDestruct "Hw" as (pp ?) "Hw".
         iExists pp; iSplit;auto. 

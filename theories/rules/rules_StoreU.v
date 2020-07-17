@@ -9,10 +9,10 @@ Section cap_lang_rules.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
-  Implicit Types c : cap_lang.expr. 
+  Implicit Types c : cap_lang.expr.
   Implicit Types a b : Addr.
   Implicit Types r : RegName.
-  Implicit Types v : cap_lang.val. 
+  Implicit Types v : cap_lang.val.
   Implicit Types w : Word.
   Implicit Types reg : gmap RegName Word.
   Implicit Types ms : gmap Addr Word.
@@ -134,7 +134,7 @@ Section cap_lang_rules.
    Proof.
      iIntros (Hinstr Hfl Hvpc HPC Dregs Hmem_pc Hwsrc HaStore φ) "(>Hmem & >Hmap) Hφ".
      iApply wp_lift_atomic_head_step_no_fork; auto.
-     iIntros (σ1 l1 l2 n) "[Hr Hm] /=". destruct σ1; simpl.
+     iIntros (σ1 l1 l2 n) "[Hr Hm] /=". destruct σ1 as [r m]; simpl.
      iDestruct (gen_heap_valid_inclSepM with "Hr Hmap") as %Hregs.
 
      (* Derive necessary register values in r *)
@@ -144,7 +144,7 @@ Section cap_lang_rules.
      pose proof (regs_lookup_eq _ _ _ Hrdst') as Hrdst'''.
      (* Derive the PC in memory *)
      iDestruct (gen_mem_valid_inSepM pc_a _ _ _ _ mem _ m with "Hm Hmem") as %Hma; eauto.
-     
+
      iModIntro.
      iSplitR. by iPureIntro; apply normal_always_head_reducible.
      iNext. iIntros (e2 σ2 efs Hpstep).
@@ -194,7 +194,7 @@ Section cap_lang_rules.
      destruct (addr_eq_dec a a').
      { subst a'. destruct (a + 1)%a as [a'|] eqn:Hap1; cycle 1.
        { inv Hstep. iFailWP "Hφ" StoreU_fail_incrPC1. }
-       
+
        iMod ((gen_mem_update_inSepM _ _ a) with "Hm Hmem") as "[Hm Hmem]"; eauto.
        { instantiate (1 := wsrc). assert (Hpf1: PermFlows URW p).
          { destruct p; simpl in HisU; try congruence; auto. }
@@ -202,7 +202,7 @@ Section cap_lang_rules.
          destruct_cap c0. destruct c4; [eapply PermFlows_trans; eauto|].
          simpl in HcanStoreU. destruct (pwlU p) eqn:HpwlU; try congruence.
          eapply (PermFlows_trans _ p p'); eauto. }
-       
+
        destruct (incrementPC (<[rdst:=inr (p, g, b, e, a')]> regs)) eqn:Hincr; cycle 1.
        { assert _ as Hincr' by (eapply (incrementPC_overflow_mono (<[rdst:=_]> regs) (<[rdst:=_]> r) Hincr _ _)).
          rewrite incrementPC_fail_updatePC in Hstep; eauto.
@@ -229,14 +229,14 @@ Section cap_lang_rules.
        destruct_cap c0. destruct c4; [eapply PermFlows_trans; eauto|].
        simpl in HcanStoreU. destruct (pwlU p) eqn:HpwlU; try congruence.
        eapply (PermFlows_trans _ p p'); eauto. }
-     
+
      destruct (incrementPC regs) eqn:Hincr; cycle 1.
      { assert _ as Hincr' by (eapply (incrementPC_overflow_mono regs r Hincr _ _)).
        rewrite incrementPC_fail_updatePC in Hstep; eauto.
        inv Hstep. simpl.
        iFailWP "Hφ" StoreU_fail_incrPC3. }
 
-     destruct (incrementPC_success_updatePC regs (<[a':=wsrc]> m) r0 Hincr) as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & ->).
+     destruct (incrementPC_success_updatePC regs (<[a':=wsrc]> m) _ Hincr) as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & ->).
      eapply updatePC_success_incl in HuPC; eauto.
      instantiate (1 := <[a':=wsrc]> m) in HuPC.
      rewrite HuPC in Hstep.
@@ -255,4 +255,3 @@ Section cap_lang_rules.
    Qed.
 
 End cap_lang_rules.
-

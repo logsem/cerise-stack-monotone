@@ -34,7 +34,7 @@ Section cap_lang_rules.
       {{{ RET NextIV;
           PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
              ∗ pc_a ↦ₐ[pc_p'] w
-             ∗ r1 ↦ᵣ inr (promote_perm p, g, b, min a e, a) }}}.
+             ∗ r1 ↦ᵣ inr (promote_perm p, g, b, addr_reg.min a e, a) }}}.
   Proof.
     iIntros (Hinstr Hfl Hvpc HE Hpca' φ)
             "(>HPC & >Hi & >Hr1) Hφ".

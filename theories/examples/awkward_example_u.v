@@ -1727,9 +1727,9 @@ Section awkward_example.
     { rewrite (region_addrs_split2 a0 estk astk). rewrite big_sepL_app. iSplit.
       - iSplit.
         + iApply (big_sepL_impl with "Hstack_region").
-          iAlways. iIntros (k x) "% [$ _]".
+          iModIntro. iIntros (k x) "% [$ _]".
         + iApply (big_sepL_impl with "Hstack_end").
-          iAlways. iIntros (k x) "% [$ _]".
+          iModIntro. iIntros (k x) "% [$ _]".
       - rewrite Forall_app !Forall_forall. iSplit.
         + iIntros (x Hxin). iDestruct (big_sepL_elem_of with "Hstack_region") as "[HHH %]"; eauto.
         + iIntros (x Hxin). iDestruct (big_sepL_elem_of with "Hstack_end") as "[HHH %]"; eauto. }
@@ -1740,7 +1740,7 @@ Section awkward_example.
       rewrite HeqW' /revoke /=. iFrame. rewrite /region_mapsto.
       iApply (big_sepL2_to_static_region _ _ (λ a w, ∃ p φ, a ↦ₐ[p] w ∗ rel a p φ)%I with "[] [Hstack_own Hrest]").
       - auto.
-      - iAlways.
+      - iModIntro.
         iIntros (k y wy Hin1 Hin2) "Hy /=".
         iDestruct "Hy" as (p' φ') "[Hy #Hrely]". 
         destruct (decide (k < length (l_frame))). 
@@ -1967,7 +1967,7 @@ Section awkward_example.
         rewrite big_sepL_nil.
         rewrite Hstksplit. iDestruct (big_sepL_app with "Hstackallrel") as "[Hstackallrel1 Hstackallrel2]". iSplitR; auto.
         iApply (big_sepL_impl with "Hstackallrel2").
-        iAlways. iIntros. iExists RWLX. iSplit;auto. iSplit; auto. iPureIntro.
+        iModIntro. iIntros. iExists RWLX. iSplit;auto. iSplit; auto. iPureIntro.
         rewrite /region_state_U_pwl. right.
         eapply HrestpwlU. eapply elem_of_list_lookup. eauto.
       - (* continuation *)
@@ -1975,7 +1975,7 @@ Section awkward_example.
         assert (r !! r_t0 = Some (inr (E, Local, a0, stack_own_last, stack_own_b))) as Hr_t0; auto. 
         rewrite /RegLocate Hr_t0 !fixpoint_interp1_eq. iSimpl. 
         (* prove continuation *)
-        iAlways.
+        iModIntro.
         iIntros (r' W3 Hrelated3).
         iNext.
 
@@ -2050,7 +2050,7 @@ Section awkward_example.
           { iSimpl. 
             rewrite Hstksplit. iDestruct (big_sepL_app with "Hstackallrel") as "[H1 H2]".
             iApply (big_sepL_impl with "H1").
-            iAlways. iIntros. iExists RWLX. iSplit;auto. iSplit; auto.
+            iModIntro. iIntros. iExists RWLX. iSplit;auto. iSplit; auto.
             iPureIntro. left.
             (* we assert that the region is all in state temporary *)
             assert (x ∈ dom (gset Addr) m_static1) as Hk'.
@@ -2102,7 +2102,7 @@ Section awkward_example.
             + eapply NoDup_filter, region_addrs_NoDup.
             + eapply elem_of_list_filter.
           - iApply (big_sepL_impl with "Hstack_adv_tmp'").
-            iAlways. iIntros (k x Hxin) "[_ $]". iPureIntro.
+            iModIntro. iIntros (k x Hxin) "[_ $]". iPureIntro.
             assert (x ∈ ltempadv3) by (eapply elem_of_list_lookup; eauto).
             eapply elem_of_list_filter in H0. destruct H0; auto. }
 
@@ -2885,7 +2885,7 @@ Section awkward_example.
             assert (r2 !! r_t0 = Some (inr (E, Local, a0, stack_own_end, a3))) as Hr_t0; auto. 
             rewrite /RegLocate Hr_t0. repeat rewrite fixpoint_interp1_eq. iSimpl.
             (* prove continuation *)
-            iAlways.
+            iModIntro.
             iIntros (r3 W6 Hrelated6).
             iNext.
 
@@ -3015,7 +3015,7 @@ Section awkward_example.
             { iDestruct (static_region_to_big_sepL2 _ _ (λ a v, ∃ p φ, rel a p φ ∗ a ↦ₐ[p] v)%I with "[] Hframe")
                 as "Hframe";[auto|..]. 
               { repeat rewrite app_length. rewrite Hlength_rest Hlength_rest'';auto. }
-              { iAlways. auto. }
+              { iModIntro. auto. }
               iDestruct (big_sepL2_app' with "Hframe") as "[Hframe $]";[auto|].
               iAssert ([∗ list] y1;y2 ∈ region_addrs a0 stack_own_end;l_frame2, y1 ↦ₐ[RWLX] y2)%I
                 with "[Hframe]" as "Hframe".
@@ -3478,7 +3478,7 @@ Section awkward_example.
                                         elements (dom (gset Addr) (m_uninit2 ∪ m_uninit1))).
               iSplitL. 
               - iApply (big_sepL2_to_static_region _ _ ψ)%I;[auto|..]. 
-                { iAlways. iIntros (k a'' pw Hpw1 Hpw2) "Hr". iFrame "Hr". }
+                { iModIntro. iIntros (k a'' pw Hpw1 Hpw2) "Hr". iFrame "Hr". }
                 iApply (big_sepL2_app with "[Hstack]").
                 + iDestruct (region_addrs_zeroes_trans with "Hstack") as "Hstack".
                   rewrite (region_addrs_split a0 stack_own_end estk).
@@ -3491,7 +3491,7 @@ Section awkward_example.
                   iExists RWLX,(λ Wv : WORLD * Word, ((fixpoint interp1) Wv.1) Wv.2).
                   iSplit;[iPureIntro;apply _|]. iSplit;[auto|]. iFrame. iExists (inl 0%Z). iSimpl.
                   iSplit;[auto|]. iFrame. iSplit.
-                  { iAlways. iIntros (W0 W0'). iApply interp_monotone. }
+                  { iModIntro. iIntros (W0 W0'). iApply interp_monotone. }
                   rewrite fixpoint_interp1_eq /=. auto. iFrame. 
                   apply withinBounds_le_addr in Hwb3 as [Hb1 Hb2].
                   revert Hb1 Hb2;clear. solve_addr.
@@ -3536,7 +3536,7 @@ Section awkward_example.
                         with "[Hφ]" as "Hφ".
                       { iApply ("mono" with "[] Hφ"). iPureIntro. apply related_sts_pub_priv_world. auto. }
                       iFrame "∗ #". auto. }
-              - iAlways.
+              - iModIntro.
                 iAssert ([∗ map] a↦w ∈ (m_uninit2 ∪ m_uninit1), ▷ interp Wfinal w ∗ read_write_cond a RWLX interp)%I
                   as "#Hvalid".
                 { iApply big_sepM_forall. rewrite /m_uninit1 /m_uninit2. 
@@ -3575,7 +3575,7 @@ Section awkward_example.
                 iIntros (k x Hin) "#[Hinterp Hrel]".
                 iExists (λ Wv, interp Wv.1 Wv.2),RWLX. repeat iSplit;auto.
                 iPureIntro. intros Wv. apply interp_persistent.
-                simpl. iAlways. iIntros (W7 W8) "Hrelated Hinterp'".
+                simpl. iModIntro. iIntros (W7 W8) "Hrelated Hinterp'".
                 iApply (interp_monotone with "Hrelated Hinterp'").
             }
 

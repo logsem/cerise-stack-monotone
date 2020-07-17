@@ -28,14 +28,14 @@ Section cap_lang_rules.
 
   Definition denote (i: instr) (n1 n2: Z): Z :=
     match i with
-    | Add _ _ _ => (n1 + n2)%Z
+    | machine_base.Add _ _ _ => (n1 + n2)%Z
     | Sub _ _ _ => (n1 - n2)%Z
     | Lt _ _ _ => (Z.b2z (n1 <? n2)%Z)
     | _ => 0%Z
     end.
 
   Definition is_AddSubLt (i: instr) (r: RegName) (arg1 arg2: Z + RegName) :=
-    i = Add r arg1 arg2 ∨
+    i = machine_base.Add r arg1 arg2 ∨
     i = Sub r arg1 arg2 ∨
     i = Lt r arg1 arg2.
 
@@ -91,7 +91,7 @@ Section cap_lang_rules.
   Proof.
     iIntros (Hdecode Hinstr Hfl Hvpc HPC Dregs φ) "(>Hpc_a & >Hmap) Hφ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1; simpl.
+    iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [r m]; simpl.
     iDestruct "Hσ1" as "[Hr Hm]".
     assert (pc_p' ≠ O).
     { destruct pc_p'; auto. destruct pc_p; inversion Hfl. inversion Hvpc; naive_solver. }
@@ -506,7 +506,7 @@ End cap_lang_rules.
 
 (* Hints to automate proofs of is_AddSubLt *)
 Lemma is_AddSubLt_Add dst arg1 arg2 :
-  is_AddSubLt (Add dst arg1 arg2) dst arg1 arg2.
+  is_AddSubLt (machine_base.Add dst arg1 arg2) dst arg1 arg2.
 Proof. intros; unfold is_AddSubLt; eauto. Qed.
 Lemma is_AddSubLt_Sub dst arg1 arg2 :
   is_AddSubLt (Sub dst arg1 arg2) dst arg1 arg2.

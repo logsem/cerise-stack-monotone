@@ -173,7 +173,7 @@ Section fundamental.
     interp W (inr (p,g,b,e,a)) -∗ exec_cond W b e g p interp.
   Proof.
     iIntros (Hra) "#Hw".
-    iIntros (a0 r W' Hin) "#Hfuture". iAlways.
+    iIntros (a0 r W' Hin) "#Hfuture". iModIntro.
     destruct g.
     - iDestruct (interp_monotone_nl with "Hfuture [] Hw") as "Hw'";[auto|].
       iDestruct (readAllowed_implies_region_conditions with "Hw'") as "Hread_cond";[destruct Hra as [-> | [-> | ->] ];auto|].

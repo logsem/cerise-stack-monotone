@@ -9,10 +9,10 @@ Section cap_lang_rules.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
-  Implicit Types c : cap_lang.expr. 
+  Implicit Types c : cap_lang.expr.
   Implicit Types a b : Addr.
   Implicit Types r : RegName.
-  Implicit Types v : cap_lang.val. 
+  Implicit Types v : cap_lang.val.
   Implicit Types w : Word.
   Implicit Types reg : gmap RegName Word.
   Implicit Types ms : gmap Addr Word.
@@ -27,14 +27,14 @@ Section cap_lang_rules.
   | PromoteU_fail_incrementPC p g b e a:
       p <> E ->
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
-      incrementPC (<[ dst := inr (promote_perm p, g, b, min a e, a) ]> regs) = None ->
+      incrementPC (<[ dst := inr (promote_perm p, g, b, addr_reg.min a e, a) ]> regs) = None ->
       PromoteU_failure regs dst.
 
   Inductive PromoteU_spec (regs: Reg) (dst: RegName) (regs': Reg): cap_lang.val → Prop :=
   | PromoteU_spec_success p g b e a:
       p <> E ->
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
-      incrementPC (<[ dst := inr (promote_perm p, g, b, min a e, a) ]> regs) = Some regs' ->
+      incrementPC (<[ dst := inr (promote_perm p, g, b, addr_reg.min a e, a) ]> regs) = Some regs' ->
       PromoteU_spec regs dst regs' NextIV
   | PromoteU_spec_failure:
       PromoteU_failure regs dst ->
@@ -57,7 +57,7 @@ Section cap_lang_rules.
   Proof.
      iIntros (Hinstr Hfl Hvpc HPC Dregs φ) "(>Hpc_a & >Hmap) Hφ".
      iApply wp_lift_atomic_head_step_no_fork; auto.
-     iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1; simpl.
+     iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [r m]; simpl.
      iDestruct "Hσ1" as "[Hr Hm]".
      assert (pc_p' ≠ O).
      { destruct pc_p'; auto. destruct pc_p; inversion Hfl. inversion Hvpc; naive_solver. }
@@ -84,8 +84,8 @@ Section cap_lang_rules.
      { subst p. inv Hstep.
        iFailWP "Hφ" PromoteU_fail_E. }
 
-     destruct (incrementPC (<[ dst := inr ((promote_perm p, g), b, min a e, a) ]> regs)) as [ regs' |] eqn:Hregs'; cycle 1.
-     { assert (incrementPC (<[ dst := inr ((promote_perm p, g, b, min a e, a))]> r) = None).
+     destruct (incrementPC (<[ dst := inr ((promote_perm p, g), b, addr_reg.min a e, a) ]> regs)) as [ regs' |] eqn:Hregs'; cycle 1.
+     { assert (incrementPC (<[ dst := inr ((promote_perm p, g, b, addr_reg.min a e, a))]> r) = None).
        { eapply incrementPC_overflow_mono; first eapply Hregs'.
          by rewrite lookup_insert_is_Some'; eauto.
          by apply insert_mono; eauto. }

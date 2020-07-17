@@ -277,6 +277,8 @@ Ltac option_locate_m m :=
 Ltac option_locate_r m :=
   repeat option_locate_r_once m.
 
+(* Permission-carrying memory type, used to describe maps of locations and permissions in the load and store cases *)
+Notation PermMem := (gmap Addr (Perm * Word)).
 
 Section cap_lang_rules.
   Context `{MachineParameters}.
@@ -628,9 +630,6 @@ Section cap_lang_rules.
 
   (* -------------- predicates on memory maps -------------------------- *)
 
-  (* Permission-carrying memory type, used to describe maps of locations and permissions in the load and store cases *)
-  Definition PermMem := gmap Addr (Perm * Word).
-
   Lemma resource_exists a p' w:
     a ↦ₐ[p'] w ⊣⊢ (∃ (p : Perm) (w0 : Word), ⌜(p', w) = (p, w0)⌝ ∗ a ↦ₐ[p] w0).
   Proof.
@@ -824,7 +823,7 @@ Section cap_lang_rules.
     intros *. intros Hnpc.
     iIntros (ϕ) "HPC Hϕ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ1 l1 l2 n) "Hσ1 /="; destruct σ1; simpl;
+    iIntros (σ1 l1 l2 n) "Hσ1 /="; destruct σ1 as [r m]; simpl;
     iDestruct "Hσ1" as "[Hr Hm]".
     iDestruct (@gen_heap_valid with "Hr HPC") as %?.
     option_locate_mr m r.
@@ -879,7 +878,7 @@ Section cap_lang_rules.
     intros Hinstr Hfl Hvpc.
     iIntros (φ) "[Hpc Hpca] Hφ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1; simpl.
+    iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [r m]; simpl.
     iDestruct "Hσ1" as "[Hr Hm]".
     iDestruct (@gen_heap_valid with "Hr Hpc") as %?.
     iDestruct (@gen_heap_valid_cap with "Hm Hpca") as %?.
@@ -905,7 +904,7 @@ Section cap_lang_rules.
     intros Hinstr Hfl Hvpc.
     iIntros (φ) "[Hpc Hpca] Hφ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1; simpl.
+    iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [r m]; simpl.
     iDestruct "Hσ1" as "[Hr Hm]".
     iDestruct (@gen_heap_valid with "Hr Hpc") as %?.
     iDestruct (@gen_heap_valid_cap with "Hm Hpca") as %?.

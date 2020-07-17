@@ -3,17 +3,17 @@ From iris.base_logic Require Export invariants gen_heap.
 From iris.program_logic Require Export weakestpre ectx_lifting.
 From iris.proofmode Require Import tactics.
 From iris.algebra Require Import frac.
-From cap_machine.rules Require Import rules_LoadU. 
+From cap_machine.rules Require Import rules_LoadU.
 
 Section cap_lang_rules.
   Context `{memG Σ, regG Σ, MonRef: MonRefG (leibnizO _) CapR_rtc Σ}.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
-  Implicit Types c : cap_lang.expr. 
+  Implicit Types c : cap_lang.expr.
   Implicit Types a b : Addr.
   Implicit Types r : RegName.
-  Implicit Types v : cap_lang.val. 
+  Implicit Types v : cap_lang.val.
   Implicit Types w : Word.
   Implicit Types reg : gmap RegName Word.
   Implicit Types ms : gmap Addr Word.
@@ -25,7 +25,7 @@ Section cap_lang_rules.
   Qed.
 
   (* TODO: replace all the 1's by general z's in this file *)
-  
+
   Lemma wb_implies_verify_access p g:
     ∀ b e a a',
       (a' + 1)%a = Some a ->
@@ -55,7 +55,7 @@ Section cap_lang_rules.
 
     {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
           ∗ ▷ pc_a ↦ₐ[pc_p'] w
-          ∗ ▷ r1 ↦ᵣ w''  
+          ∗ ▷ r1 ↦ᵣ w''
           ∗ ▷ r2 ↦ᵣ inr ((p,g),b,e,a')
           ∗ ▷ a ↦ₐ[p'] w' }}}
       Instr Executable @ E
@@ -64,19 +64,19 @@ Section cap_lang_rules.
              ∗ r1 ↦ᵣ w'
              ∗ pc_a ↦ₐ[pc_p'] w
              ∗ r2 ↦ᵣ inr ((p,g),b,e,a')
-             ∗ a ↦ₐ[p'] w' }}}. 
+             ∗ a ↦ₐ[p'] w' }}}.
   Proof.
     iIntros (Hinstr Hfl Hfl' Hvpc HU Hwb Hpca' Hincr φ)
             "(>HPC & >Hi & >Hr1 & >Hr2 & >Ha) Hφ".
     pose proof (correctPC_nonO _ _ _ _ _ _ Hfl Hvpc) as Hpc_p'.
-    pose proof (isU_nonO _ _ Hfl' HU) as Hp'. 
+    pose proof (isU_nonO _ _ Hfl' HU) as Hp'.
     iDestruct (map_of_regs_3 with "HPC Hr1 Hr2") as "[Hmap (%&%&%) ]".
     iDestruct (memMap_resource_2ne_apply with "Hi Ha") as "[Hmem %]"; auto.
-    iApply (wp_loadU with "[$Hmap $Hmem]");[|apply Hpc_p'|apply Hvpc|..];simplify_map_eq; eauto.
+    iApply (wp_loadU with "[$Hmap $Hmem]");[apply Hinstr|apply Hpc_p'|apply Hvpc|..];simplify_map_eq; eauto.
     { by rewrite !dom_insert; set_solver+. }
     { rewrite HU. simplify_map_eq.
-      assert ((a' + -1)%a = Some a) as ->;[solve_addr|]. 
-      erewrite wb_implies_verify_access;eauto. 
+      assert ((a' + -1)%a = Some a) as ->;[solve_addr|].
+      erewrite wb_implies_verify_access;eauto.
         by simplify_map_eq. }
     iNext. iIntros (regs' retv) "(#Hspec & Hmem & Hmap)".
     iDestruct "Hspec" as %Hspec.
@@ -86,8 +86,8 @@ Section cap_lang_rules.
        iApply "Hφ".
        simplify_map_eq.
        assert ((a0 + -1)%a = Some a) as Heq;[solve_addr|]. rewrite Heq in H9.
-       erewrite  wb_implies_verify_access in H9;eauto. simplify_eq. 
-       simplify_map_eq. 
+       erewrite  wb_implies_verify_access in H9;eauto. simplify_eq.
+       simplify_map_eq.
        iDestruct (memMap_resource_2ne with "Hmem") as "[Hpc_a Ha]";auto.
        incrementPC_inv.
        simplify_map_eq.
@@ -98,9 +98,9 @@ Section cap_lang_rules.
        all: try congruence.
        assert ((a0 + -1)%a = Some a) as Heq;[solve_addr|]. rewrite Heq in e4.
        erewrite  wb_implies_verify_access in e4;eauto. simplify_eq.
-       Unshelve. all:auto. 
+       Unshelve. all:auto.
      }
-  Qed.  
+  Qed.
 
   (* load into PC from reg *)
   Lemma wp_loadU_success_reg_to_PC E r1 r2 pc_p pc_g pc_b pc_e pc_a w p g b e a a1 p' g' b' e' a' a'' pc_p' p'':
@@ -163,4 +163,4 @@ Section cap_lang_rules.
   Qed.
 
 
-End cap_lang_rules. 
+End cap_lang_rules.

@@ -55,7 +55,7 @@ Section region_macros.
          { simpl. iFrame. 
            iMod (extend_region_temp_pwl E _ a p (inl 0%Z) (λ Wv, interp Wv.1 Wv.2)
                  with "[] Hsts Hr Ha Hav") as "(Hr & Ha & Hsts)"; auto.
-           { iAlways. iIntros (W1 W2 Hrelated) "Hv /=". do 2 (rewrite fixpoint_interp1_eq /=). done. }
+           { iModIntro. iIntros (W1 W2 Hrelated) "Hv /=". do 2 (rewrite fixpoint_interp1_eq /=). done. }
            iFrame. done.
          }         
          iMod ("IHn" with "[] [] [] Hlist Hr Hsts") as "(Hlist & Hr & Hsts)"; auto.
@@ -64,7 +64,7 @@ Section region_macros.
          iMod (extend_region_temp_pwl E _ a p (inl 0%Z) (λ Wv, interp Wv.1 Wv.2)
                  with "[] Hsts Hr Ha Hav") as "(Hr & Ha & Hsts)"; auto.
          { apply (std_update_multiple_dom_sta_i _ (S n) _ _ 1); auto; lia. }
-         { iAlways. iIntros (W1 W2 Hrelated) "Hv /=". do 2 (rewrite fixpoint_interp1_eq /=). done. }
+         { iModIntro. iIntros (W1 W2 Hrelated) "Hv /=". do 2 (rewrite fixpoint_interp1_eq /=). done. }
          iFrame. done.
        + iAssert (∀ W, interp W (inl 0%Z))%I as "#Hav".
          { iIntros (W'). rewrite fixpoint_interp1_eq. eauto. }
@@ -73,7 +73,7 @@ Section region_macros.
          { simpl. iFrame. 
            iMod (extend_region_temp_nwl E _ a p (inl 0%Z) (λ Wv, interp Wv.1 Wv.2)
                  with "[] Hsts Hr Ha Hav") as "(Hr & Ha & Hsts)"; auto.
-           { iAlways. iIntros (W1 W2 Hrelated) "Hv /=". do 2 (rewrite fixpoint_interp1_eq /=). done. }
+           { iModIntro. iIntros (W1 W2 Hrelated) "Hv /=". do 2 (rewrite fixpoint_interp1_eq /=). done. }
            iFrame. done.
          }         
          iMod ("IHn" with "[] [] [] Hlist Hr Hsts") as "(Hlist & Hr & Hsts)"; auto.
@@ -82,7 +82,7 @@ Section region_macros.
          iMod (extend_region_temp_nwl E _ a p (inl 0%Z) (λ Wv, interp Wv.1 Wv.2)
                  with "[] Hsts Hr Ha Hav") as "(Hr & Ha & Hsts)"; auto.
          { apply (std_update_multiple_dom_sta_i _ (S n) _ _ 1); auto; lia. }
-         { iAlways. iIntros (W1 W2 Hrelated) "Hv /=". do 2 (rewrite fixpoint_interp1_eq /=). done. }
+         { iModIntro. iIntros (W1 W2 Hrelated) "Hv /=". do 2 (rewrite fixpoint_interp1_eq /=). done. }
          iFrame. done.
    Qed.
 

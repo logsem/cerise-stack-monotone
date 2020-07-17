@@ -312,7 +312,7 @@ Section fundamental.
            iPureIntro; do 2 right; auto.
          - simplify_map_eq. iPureIntro. naive_solver.
        }
-       { iAlways.
+       { iModIntro.
          destruct (decide (PC = dst)); simplify_eq.
          - simplify_map_eq. rewrite (fixpoint_interp1_eq W).
            iApply readAllowed_implies_region_conditions; auto. naive_solver.

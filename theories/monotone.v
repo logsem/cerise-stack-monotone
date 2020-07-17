@@ -168,7 +168,7 @@ Section monotone.
       iExists _. iSplit;eauto. iFrame "#". 
       iDestruct "Hrel" as %Hrel. 
       iPureIntro. apply region_state_nwl_monotone with W;auto. 
-    - iAlways. iIntros (r W'').
+    - iModIntro. iIntros (r W'').
       destruct l; simpl.
       + iIntros (Hrelated').
         iAssert (future_world Global W W'')%I as "Hrelated".
@@ -299,7 +299,7 @@ Section monotone.
       iDestruct "Hrel" as %Hrel. 
       iPureIntro. destruct l; try discriminate.
       apply region_state_nwl_monotone_nl with W;auto.
-    - iAlways. iIntros (r W'').
+    - iModIntro. iIntros (r W'').
       destruct l; simpl; try discriminate.
       iIntros (Hrelated').
       iAssert (future_world Global W W'')%I as "Hrelated".
@@ -411,7 +411,7 @@ Proof.
   unfold monotonicity_guarantees_region.
   iIntros (Hstd Hwb Hfl' Hconds) "#Hvdst".
   destruct ρ.
-  - destruct (pwl p1) eqn: HpwlP1 ; iAlways; simpl.
+  - destruct (pwl p1) eqn: HpwlP1 ; iModIntro; simpl.
     * iIntros (W0 W1) "% HIW0".
         by iApply interp_monotone.
     * iIntros (W0 W1) "% HIW0".
@@ -420,7 +420,7 @@ Proof.
     (*The below case is a contradiction, since if g is local,p0 must be WL and p0 flows into the non-WL p1*)
     + destruct p0 ; try (simpl in Hconds; by exfalso).
       all:destruct p1 eqn:Hp1v ; (by exfalso).
-  - iAlways. simpl. iIntros (W0 W1) "% HIW0".
+  - iModIntro. simpl. iIntros (W0 W1) "% HIW0".
     destruct g.
     + by iApply interp_monotone_nl.
     + (*Trick here: value relation leads to a contradiction if p0 is WL, since then its region cannot be permanent*)
@@ -441,12 +441,12 @@ Proof.
   unfold monotonicity_guarantees_region.
   iIntros (Hstd Hwb Hfl') "#Hvdst".
   destruct ρ.
-  - destruct (pwl p1) eqn: HpwlP1 ; iAlways; simpl.
+  - destruct (pwl p1) eqn: HpwlP1 ; iModIntro; simpl.
     * iIntros (W0 W1) "% HIW0".
         by iApply interp_monotone.
     * iIntros (W0 W1) "% HIW0".
         by iApply interp_monotone_nl.
-  - iAlways. simpl. iIntros (W0 W1) "% HIW0".
+  - iModIntro. simpl. iIntros (W0 W1) "% HIW0".
       by iApply interp_monotone_nl.
   - trivial.
   - auto.

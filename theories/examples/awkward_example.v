@@ -1127,7 +1127,7 @@ Section awkward_example.
     { rewrite HeqW' /revoke. iFrame. rewrite /region_mapsto. 
       iApply (big_sepL2_to_static_region _ _ (λ a w, ∃ p φ, a ↦ₐ[p] w ∗ rel a p φ)%I with "[] [Hstack_own Hrest]").
       - auto. 
-      - iAlways.
+      - iModIntro.
         iIntros (k y wy Hin1 Hin2) "Hy /=".
         iDestruct "Hy" as (p' φ') "[Hy #Hrely]". 
         destruct (decide (k < length (l_frame))). 
@@ -1168,7 +1168,7 @@ Section awkward_example.
       - iDestruct (region_addrs_zeroes_trans with "Hstack_adv") as "Hstack_adv".
         iApply (big_sepL_mono with "Hstack_adv"). iIntros (k y Hsome) "Hy".
         iExists (inl 0%Z). iSplitR;auto. iFrame. simpl. iSplit.
-        + iAlways. iIntros (W1 W2 Hrelated12) "HW1 /=". by repeat (rewrite fixpoint_interp1_eq /=).
+        + iModIntro. iIntros (W1 W2 Hrelated12) "HW1 /=". by repeat (rewrite fixpoint_interp1_eq /=).
         + by repeat (rewrite fixpoint_interp1_eq /=).
       - iDestruct (big_sepL_and with "Hstack_region") as "[Hstack_rel Hstack_pwl]".
         rewrite /read_write_cond.
@@ -1314,7 +1314,7 @@ Section awkward_example.
         assert (r !! r_t0 = Some (inr (E, Local, a0, e_r, stack_own_b))) as Hr_t0; auto. 
         rewrite /RegLocate Hr_t0 !fixpoint_interp1_eq. iSimpl. 
         (* prove continuation *)
-        iAlways.
+        iModIntro.
         iIntros (r' W3 Hrelated3).
         iNext.
 
@@ -1900,11 +1900,11 @@ Section awkward_example.
           iApply big_sepL_sep. iSplitL.
           - iApply big_sepL_app. iSplitL "Hs_last'". 
             + iSimpl. iSplit;[|auto]. iExists (inl 0%Z). iSplitR;auto. iFrame. iSplit.
-              * iAlways. iIntros (W1 W2 Hrelated12) "HW1". by repeat (rewrite fixpoint_interp1_eq).
+              * iModIntro. iIntros (W1 W2 Hrelated12) "HW1". by repeat (rewrite fixpoint_interp1_eq).
               * by repeat (rewrite fixpoint_interp1_eq).
             + iApply (big_sepL_mono with "Hstack_adv"). iIntros (k y Hsome) "Hy".
               iExists (inl 0%Z). iSplitR;auto. iFrame. iSplit.
-              * iAlways. iIntros (W1 W2 Hrelated12) "HW1". by repeat (rewrite fixpoint_interp1_eq).
+              * iModIntro. iIntros (W1 W2 Hrelated12) "HW1". by repeat (rewrite fixpoint_interp1_eq).
               * by repeat (rewrite fixpoint_interp1_eq).
           - iDestruct (big_sepL_and with "Hstack_val'") as "[Hstack_rel _]". 
             iApply big_sepL_sep; iFrame "#". iSplit;[auto|]. iApply big_sepL_forall. iPureIntro.
@@ -2038,7 +2038,7 @@ Section awkward_example.
             assert (r2 !! r_t0 = Some (inr (E, Local, a0, e_r, a3))) as Hr_t0; auto. 
             rewrite /RegLocate Hr_t0. repeat rewrite fixpoint_interp1_eq. iSimpl. 
             (* prove continuation *)
-            iAlways.
+            iModIntro.
             iIntros (r3 W6 Hrelated6).
             iNext.
 
@@ -2141,7 +2141,7 @@ Section awkward_example.
             { iDestruct (static_region_to_big_sepL2 _ _ (λ a v, ∃ p φ, rel a p φ ∗ a ↦ₐ[p] v)%I with "[] Hframe")
                 as "Hframe";[auto|..]. 
               { repeat rewrite app_length. rewrite Hlength_rest Hlength_rest'';auto. }
-              { iAlways. auto. }
+              { iModIntro. auto. }
               iDestruct (big_sepL2_app' with "Hframe") as "[Hframe $]";[auto|].
               iAssert ([∗ list] y1;y2 ∈ region_addrs a0 stack_own_end;l_frame2, y1 ↦ₐ[RWLX] y2)%I
                 with "[Hframe]" as "Hframe".
@@ -2499,7 +2499,7 @@ Section awkward_example.
                                       (std_update_multiple W6 (elements (dom (gset Addr) m_static2)) Temporary) φ0 a p'
                                       ∗ rel a p' φ0))%I.
               iApply (big_sepL2_to_static_region _ _ ψ)%I;[auto|..]. 
-              { iAlways. iIntros (k a'' pw Hpw1 Hpw2) "Hr". iFrame "Hr". }
+              { iModIntro. iIntros (k a'' pw Hpw1 Hpw2) "Hr". iFrame "Hr". }
               iApply (big_sepL2_app with "[Hstack]").
               - iDestruct (region_addrs_zeroes_trans with "Hstack") as "Hstack".
                 rewrite (region_addrs_split _ stack_own_end).
@@ -2512,7 +2512,7 @@ Section awkward_example.
                 iExists RWLX,(λ Wv : WORLD * Word, ((fixpoint interp1) Wv.1) Wv.2).
                 iSplit;[iPureIntro;apply _|]. iSplit;[auto|]. iFrame. iExists (inl 0%Z). iSimpl.
                 iSplit;[auto|]. iFrame. iSplit.
-                { iAlways. iIntros (W0 W'). iApply interp_monotone. }
+                { iModIntro. iIntros (W0 W'). iApply interp_monotone. }
                 rewrite fixpoint_interp1_eq /=. auto. iFrame. 
                 apply withinBounds_le_addr in Hwb3 as [Hb1 Hb2].
                 revert Hb1 Hb2;clear. solve_addr.

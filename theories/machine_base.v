@@ -56,8 +56,8 @@ Inductive instr: Type :=
 
 (* Registers and memory: maps from register names/addresses to words *)
 
-Definition Reg := gmap RegName Word.
-Definition Mem := gmap Addr Word.
+Notation Reg := (gmap RegName Word).
+Notation Mem := (gmap Addr Word).
 
 
 (* Auxiliary definitions for localities *)

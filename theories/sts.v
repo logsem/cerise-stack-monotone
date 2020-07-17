@@ -19,8 +19,8 @@ Definition sts_stateUR := authUR (gmapUR positive (exclR (leibnizO positive))).
 Definition sts_relUR :=
   authUR (gmapUR positive (agreeR (leibnizO ((positive → positive → Prop) * (positive → positive → Prop))))).
 
-Definition STS_states : Type := gmap positive positive.
-Definition STS_rels : Type := gmap positive ((positive → positive → Prop) * (positive → positive → Prop)).
+Notation STS_states := (gmap positive positive).
+Notation STS_rels := (gmap positive ((positive → positive → Prop) * (positive → positive → Prop))).
 
 (** Standard STS. *)
 Class STS_STD (B : Type) :=
@@ -465,7 +465,7 @@ Section STS.
     revert HR. rewrite /= singleton_included_l;
       intros [z [Hz HR]]; revert HR; rewrite Some_included_total; intros HR.
     rewrite lookup_fmap in Hz, Hv.
-    destruct (fr !! i) eqn:Heq; rewrite Heq /= in Hz, Hv; last by inversion Hz.
+    destruct (fr !! i) eqn:Heq; last by inversion Hz.
     revert Hv; rewrite Hz; intros [u Hu]%to_agree_uninj.
     revert HR; rewrite -Hu; intros HR%to_agree_included%leibniz_equiv;
       simplify_eq.
@@ -504,8 +504,8 @@ Section STS.
     revert HR; rewrite /= singleton_included_l;
       intros [z [Hz HR]].
     rewrite lookup_fmap in Hz Hv.
-    destruct (fs !! i) eqn:Heq; rewrite Heq /= in Hz Hv; last by inversion Hz.
-    apply leibniz_equiv in Hz; simplify_eq.
+    destruct (fs !! i) eqn:Heq; last by inversion Hz.
+    apply leibniz_equiv in Hz; simplify_eq. rewrite -Hz in HR.
     apply Some_included_exclusive in HR; auto; last by typeclasses eauto.
     apply leibniz_equiv in HR; simplify_eq; eauto.
   Qed.

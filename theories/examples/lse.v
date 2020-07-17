@@ -610,7 +610,7 @@ Section lse.
         rewrite /RegLocate Hr_t0 !fixpoint_interp1_eq. iSimpl. 
         (* prove continuation *)
         (* iExists _,_,_,_. iSplit;[eauto|]. *)
-        iAlways.
+        iModIntro.
         rewrite /enter_cond. 
         iIntros (r' W2 HWW2).
         iNext. iSimpl. 

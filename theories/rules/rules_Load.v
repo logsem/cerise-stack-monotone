@@ -9,7 +9,7 @@ Section cap_lang_rules.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
-  Implicit Types c : cap_lang.expr. 
+  Implicit Types c : cap_lang.expr.
   Implicit Types a b : Addr.
   Implicit Types r : RegName.
   Implicit Types v : cap_lang.val. 
@@ -164,7 +164,7 @@ Section cap_lang_rules.
    Proof.
      iIntros (Hinstr Hfl Hvpc HPC Dregs Hmem_pc HaLoad φ) "(>Hmem & >Hmap) Hφ".
      iApply wp_lift_atomic_head_step_no_fork; auto.
-     iIntros (σ1 l1 l2 n) "[Hr Hm] /=". destruct σ1; simpl.
+     iIntros (σ1 l1 l2 n) "[Hr Hm] /=". destruct σ1 as [r m]; simpl.
      iDestruct (gen_heap_valid_inclSepM with "Hr Hmap") as %Hregs.
 
      (* Derive necessary register values in r *)
@@ -368,13 +368,13 @@ Section cap_lang_rules.
     {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
           ∗ ▷ pc_a ↦ₐ[pc_p'] w
           ∗ ▷ r2 ↦ᵣ inr ((p,g),b,e,a)
-          ∗ ▷ a ↦ₐ[p''] inr ((p',g'),b',e',a') }}} 
+          ∗ ▷ a ↦ₐ[p''] inr ((p',g'),b',e',a') }}}
       Instr Executable @ E
       {{{ RET NextIV;
           PC ↦ᵣ inr ((p',g'),b',e',a'')
              ∗ pc_a ↦ₐ[pc_p'] w
              ∗ r2 ↦ᵣ inr ((p,g),b,e,a)
-             ∗ a ↦ₐ[p''] inr ((p',g'),b',e',a') }}}. 
+             ∗ a ↦ₐ[p''] inr ((p',g'),b',e',a') }}}.
   Proof.
     iIntros (Hinstr Hfl Hfl' Hvpc [Hra Hwb] Hpca' φ)
             "(>HPC & >Hi & >Hr2 & >Hr2a) Hφ".
@@ -410,12 +410,12 @@ Section cap_lang_rules.
 
     {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
           ∗ ▷ pc_a ↦ₐ[pc_p'] w
-          ∗ ▷ r1 ↦ᵣ w'' }}} 
+          ∗ ▷ r1 ↦ᵣ w'' }}}
       Instr Executable @ E
       {{{ RET NextIV;
           PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
              ∗ pc_a ↦ₐ[pc_p'] w
-             ∗ r1 ↦ᵣ w }}}. 
+             ∗ r1 ↦ᵣ w }}}.
   Proof.
     iIntros (Hinstr Hfl Hvpc Hpca' φ)
             "(>HPC & >Hi & >Hr1) Hφ".
@@ -434,9 +434,8 @@ Section cap_lang_rules.
        iApply "Hφ".
        destruct H3 as [Hrr2 _]. simplify_map_eq.
        rewrite -memMap_resource_1.
-       incrementPC_inv.
-       simplify_map_eq.
-       rewrite insert_commute //= insert_insert insert_commute //= insert_insert.
+       incrementPC_inv. simplify_map_eq.
+       rewrite insert_commute //= insert_insert insert_insert insert_commute //=.
        iDestruct (regs_of_map_2 with "[$Hmap]") as "[HPC Hr1]"; eauto. iFrame. }
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.

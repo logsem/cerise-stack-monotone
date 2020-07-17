@@ -117,7 +117,7 @@ Section fundamental.
             destruct Hp as [Hp | [Hp | [Hp Hg] ] ]; try discriminate.
             subst g0; destruct g''; simpl in H4; auto; discriminate. }
           rewrite H5. iApply ("IH" $! _ r with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); try iClear "IH"; eauto.
-          iAlways. iApply (big_sepL_mono with "Hinv"); simpl; intros.
+          iModIntro. iApply (big_sepL_mono with "Hinv"); simpl; intros.
           iIntros "H". iDestruct "H" as (? ?) "[H %]". iExists H4. iSplitR; auto.
           { destruct (andb_true_eq _ _ ltac:(naive_solver)).
             iPureIntro. eapply PermFlows_trans with p0; auto. naive_solver. }

@@ -2,6 +2,8 @@
 *.v.d
 *.vo
 *.vo.aux
+*.vok
+*.vos
 .*.aux
 *.bak
 .[ln]ia.cache
@@ -288,5 +290,6 @@ TSWLatexianTemp*
 
 # Compilation artifacts
 .coqdeps.d
+.Makefile.coq.d
 Makefile.coq
 Makefile.coq.conf

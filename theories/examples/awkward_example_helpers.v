@@ -148,18 +148,18 @@ Section awkward_helpers.
       destruct w;inversion H. destruct c,p0,p0,p0; inversion H.
       destruct H1 as [-> | [-> | ->] ]. 
       + destruct p0; simpl in H; simplify_eq.
-        * iExists _,_,_,_,_; iSplit;[eauto|]. iAlways.
+        * iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
           iDestruct (interp_exec_cond with "Hw") as "Hexec";[auto|]. 
           iApply exec_wp;auto.
-        * iExists _,_,_,_,_; iSplit;[eauto|]. iAlways.
+        * iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
           rewrite /= fixpoint_interp1_eq /=.
           iExact "Hw". 
       + destruct p0; simpl in H; simplify_eq.
-        iExists _,_,_,_,_; iSplit;[eauto|]. iAlways.
+        iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
         iDestruct (interp_exec_cond with "Hw") as "Hexec";[auto|]. 
         iApply exec_wp;auto.
       + destruct p0; simpl in H; simplify_eq.
-        iExists _,_,_,_,_; iSplit;[eauto|]. iAlways.
+        iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
         iDestruct (interp_exec_cond with "Hw") as "Hexec";[auto|].           
         iApply exec_wp;auto.
     - iIntros "[Hfailed HPC]".
@@ -230,12 +230,12 @@ Section awkward_helpers.
          apply Hpers with (Wv:=(W,y2.1.1)) in Hy2.
          destruct (pwl y2.1.2) eqn:Hpwl.
          - iDestruct "Hy" as "#(Hne & Hy & Hrel & Hmono)".
-           iAlways. iFrame "#".
+           iModIntro. iFrame "#".
          - iDestruct "Hy" as "#(Hne & Hy & Hrel & Hmono)".
-           iAlways. iFrame "#".
+           iModIntro. iFrame "#".
        }
        iDestruct "Hl" as "#Hl". 
-       iAlways. iApply region_addrs_exists2.
+       iModIntro. iApply region_addrs_exists2.
        iExists ps. iSplit;auto. iApply region_addrs_exists2.
        iExists φs. iSplit;auto.
        iApply big_sepL2_sep. iSplit.
