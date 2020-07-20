@@ -307,10 +307,10 @@ Section heap.
       + rewrite -Hdom. rewrite dom_insert_L.
         assert (a ∈ dom (gset Addr) (m >> (revoke W)).1) as Hin.
         { rewrite Hdom HMeq dom_insert_L. set_solver. }
-        admit. (* set_solver. *)
+        set X := dom (gset Addr) (override_uninitialized m (revoke_std_sta (std W))) in Hin |- *. set_solver.
       + rewrite dom_insert_L -Hdom'. assert (a ∈ dom (gset Addr) Mρ) as Hin;[apply elem_of_gmap_dom;eauto|].
         set_solver.
-   Admitted. (* Qed. *)
+   Qed.
 
 
    (* the following lemma takes some uninitilized states and revokes them. For simplicity we ignore their values *)
