@@ -177,7 +177,7 @@ Section Contiguous.
 
   Lemma contiguous_nil : contiguous [].
   Proof.
-    rewrite contiguous_iff_contiguous_between. exists top, top. constructor.
+    rewrite contiguous_iff_contiguous_between. exists za, za. constructor.
   Qed.
 
   Lemma contiguous_weak hd a :
@@ -342,7 +342,7 @@ Section Contiguous.
     intros Hcond Hi Hsi.
     pose proof (contiguous_spec _ Hcond i a0 a1) as Hcond'; simpl in Hcond'.
     apply Hcond' in Hi; try rewrite Nat.add_1_r; auto.
-    solve_addr. 
+    solve_addr.
   Qed.
 
   Lemma contiguous_between_incr_addr (a: list Addr) (i : nat) a0 ai an :
@@ -383,12 +383,12 @@ Section Contiguous.
     length a > 0 ->
     (ai + 1)%a = Some a_last -> list.last a = Some ai.
   Proof.
-    revert a_first. induction a; intros a_first Ha Hlen Hlink. 
-    - inversion Hlen. 
+    revert a_first. induction a; intros a_first Ha Hlen Hlink.
+    - inversion Hlen.
     - destruct a0.
       + inversion Ha. subst. inversion H4. subst.
         solve_addr.
-      + simpl in *. apply IHa with a0;[|lia|auto]. 
+      + simpl in *. apply IHa with a0;[|lia|auto].
         inversion Ha; subst.
         apply contiguous_between_cons_inv_first in H4 as Heq.
         congruence.
@@ -437,10 +437,10 @@ Section Contiguous.
     assert ((an + (length a - 1 - i))%a = Some an) as Hcontr.
     { apply (contiguous_incr_addr_middle a i (length a - 1 - i)%nat an an) in Ha;auto.
       - solve_addr.
-      - rewrite -Hj. f_equiv. lia. 
-    } 
-    apply next_lt_i in Hcontr; [done|lia]. 
-  Qed. 
+      - rewrite -Hj. f_equiv. lia.
+    }
+    apply next_lt_i in Hcontr; [done|lia].
+  Qed.
 
   Lemma contiguous_incr_addr_middle' (a : list Addr) (i : nat) (j: Z) ai aj :
     contiguous a →
@@ -506,14 +506,14 @@ Section Contiguous.
   (* Note that we are assuming that both prog1 and prog2 are nonempty *)
   Lemma contiguous_between_program_split prog1 prog2 (φ : Addr → Word → iProp Σ) a i j :
     contiguous_between a i j →
-    (([∗ list] a_i;w_i ∈ a;prog1 ++ prog2, φ a_i w_i) -∗
+    ([∗ list] a_i;w_i ∈ a;prog1 ++ prog2, φ a_i w_i) -∗
     ∃ (a1 a2 : list Addr) (k: Addr),
       ([∗ list] a_i;w_i ∈ a1;prog1, φ a_i w_i)
         ∗ ([∗ list] a_i;w_i ∈ a2;prog2, φ a_i w_i)
         ∗ ⌜contiguous_between a1 i k
            ∧ contiguous_between a2 k j
            ∧ a = a1 ++ a2
-           ∧ (i + length a1 = Some k)%a⌝)%I.
+           ∧ (i + length a1 = Some k)%a⌝.
   Proof.
     iIntros (Ha) "Hprog".
     iDestruct (big_sepL2_length with "Hprog") as %Hlength.

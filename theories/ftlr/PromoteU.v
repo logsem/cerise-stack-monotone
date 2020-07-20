@@ -4,6 +4,7 @@ From iris.program_logic Require Import weakestpre adequacy lifting.
 From stdpp Require Import base.
 From cap_machine Require Import ftlr_base interp_weakening.
 From cap_machine.rules Require Import rules_PromoteU.
+From cap_machine Require Import stdpp_extra.
 
 Section fundamental.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
@@ -24,7 +25,7 @@ Section fundamental.
   Lemma promote_interp W p g b e a (Hp: p <> E):
     IH -∗
     ((fixpoint interp1) W) (inr (p, g, b, e, a)) -∗
-    ((fixpoint interp1) W) (inr (promote_perm p, g, b, min a e, a)).
+    ((fixpoint interp1) W) (inr (promote_perm p, g, b, addr_reg.min a e, a)).
   Proof.
     iIntros "#IH A". destruct (isU p) eqn:HisU.
     - rewrite !fixpoint_interp1_eq /=. destruct p; simpl in *; try congruence; auto.
@@ -32,8 +33,8 @@ Section fundamental.
         * (* iDestruct "A" as (p) "[% A]". *)
           (* iExists p; iSplit; [auto|]. *)
           iApply (big_sepL_submseteq with "A").
-          destruct (Addr_le_dec b (min a e)).
-          { rewrite (region_addrs_split b (min a e) e); [|solve_addr].
+          destruct (Addr_le_dec b (addr_reg.min a e)).
+          { rewrite (region_addrs_split b (addr_reg.min a e) e); [|solve_addr].
             eapply submseteq_inserts_r. auto. }
           { rewrite region_addrs_empty; [|solve_addr].
             eapply submseteq_nil_l. }
@@ -42,8 +43,8 @@ Section fundamental.
       + destruct g.
         * iDestruct "A" as "#A".
           iApply (big_sepL_submseteq with "A").
-          destruct (Addr_le_dec b (min a e)).
-          { rewrite (region_addrs_split b (min a e) e); [|solve_addr].
+          destruct (Addr_le_dec b (addr_reg.min a e)).
+          { rewrite (region_addrs_split b (addr_reg.min a e) e); [|solve_addr].
             eapply submseteq_inserts_r. auto. }
           { rewrite region_addrs_empty; [|solve_addr].
             eapply submseteq_nil_l. }
@@ -78,7 +79,7 @@ Section fundamental.
       iApply wp_pure_step_later; auto. iNext.
       iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
       { destruct ρ;auto;congruence. }
-      iApply ("IH" $! _ (<[dst:=inr (promote_perm p0, g0, b0, min a0 e0, a0)]> (<[PC:=_]> r)) with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); eauto.
+      iApply ("IH" $! _ (<[dst:=inr (promote_perm p0, g0, b0, addr_reg.min a0 e0, a0)]> (<[PC:=_]> r)) with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); eauto.
       { intro. cbn. by repeat (rewrite lookup_insert_is_Some'; right). }
       { iIntros (ri Hri). rewrite /(RegLocate _ ri) //; auto.
         destruct (reg_eq_dec dst ri).
@@ -99,7 +100,7 @@ Section fundamental.
       { iModIntro. destruct (reg_eq_dec PC dst).
         - subst dst. rewrite !lookup_insert in H0 H1. inv H1. inv H0.
           assert (promote_perm p0 = p0) as -> by (destruct Hp as [-> | [-> | [-> ->] ] ]; auto).
-          rewrite (isWithin_region_addrs_decomposition x1 (min x3 e0) x1 e0); try solve_addr.
+          rewrite (isWithin_region_addrs_decomposition x1 (addr_reg.min x3 e0) x1 e0); try solve_addr.
           rewrite !big_sepL_app. iDestruct "Hinv" as "[A1 [A2 A3]]". auto.
         - rewrite lookup_insert_ne in H1; auto. rewrite lookup_insert in H1.
           inv H1. auto. } }

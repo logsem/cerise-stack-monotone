@@ -3,7 +3,8 @@ From iris.program_logic Require Import weakestpre adequacy lifting.
 From stdpp Require Import base.
 From cap_machine Require Export logrel monotone.
 From cap_machine Require Import ftlr_base.
-From cap_machine.rules Require Import rules_Store rules_base.
+From cap_machine.rules Require Import rules_Store.
+From cap_machine Require Import stdpp_extra.
 Import uPred.
 
 Section fundamental.
@@ -378,6 +379,5 @@ Section fundamental.
     { iApply wp_pure_step_later; auto. iNext. iApply wp_value; auto. iIntros; discriminate. }
     Unshelve. all: auto.
   Qed.
-
 
 End fundamental.

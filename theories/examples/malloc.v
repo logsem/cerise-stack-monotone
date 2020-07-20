@@ -194,13 +194,13 @@ Section SimpleMalloc.
     destruct (a_m + size)%a as [a_m'|] eqn:Ha_m'; cycle 1.
     { iAssert ([∗ map] k↦x ∈ (∅:gmap RegName Word), k ↦ᵣ x)%I as "Hregs".
         by rewrite big_sepM_empty.
-      iDestruct (big_sepM_insert with "[$Hregs $HPC]") as "Hregs".
+      iDestruct (big_sepM_insert with "[$Hregs $HPC]") as "Hregs'".
         by apply lookup_empty.
-      iDestruct (big_sepM_insert with "[$Hregs $Hr1]") as "Hregs".
+      iDestruct (big_sepM_insert with "[$Hregs' $Hr1]") as "Hregs''".
         by rewrite lookup_insert_ne // lookup_empty.
-      iDestruct (big_sepM_insert with "[$Hregs $Hr2]") as "Hregs".
+      iDestruct (big_sepM_insert with "[$Hregs'' $Hr2]") as "Hregs'''".
         by rewrite !lookup_insert_ne // lookup_empty.
-      iApply (wp_lea with "[$Hregs $Hi]");
+      iApply (wp_lea with "[$Hregs''' $Hi]");
         [apply decode_encode_instrW_inv|done| |done|..].
       { apply HPC; repeat constructor. }
       { rewrite /regs_of /regs_of_argument !dom_insert_L dom_empty_L. set_solver-. }
@@ -235,15 +235,15 @@ Section SimpleMalloc.
     destruct (isWithin a_m a_m' b_m e) eqn:Ha_m'_within; cycle 1.
     { iAssert ([∗ map] k↦x ∈ (∅:gmap RegName Word), k ↦ᵣ x)%I as "Hregs".
         by rewrite big_sepM_empty.
-      iDestruct (big_sepM_insert with "[$Hregs $HPC]") as "Hregs".
+      iDestruct (big_sepM_insert with "[$Hregs $HPC]") as "Hregs'".
         by apply lookup_empty.
-      iDestruct (big_sepM_insert with "[$Hregs $Hr1]") as "Hregs".
+      iDestruct (big_sepM_insert with "[$Hregs' $Hr1]") as "Hregs''".
         by rewrite lookup_insert_ne // lookup_empty.
-      iDestruct (big_sepM_insert with "[$Hregs $Hr3]") as "Hregs".
+      iDestruct (big_sepM_insert with "[$Hregs'' $Hr3]") as "Hregs'''".
         by rewrite !lookup_insert_ne // lookup_empty.
-      iDestruct (big_sepM_insert with "[$Hregs $Hr4]") as "Hregs".
+      iDestruct (big_sepM_insert with "[$Hregs''' $Hr4]") as "Hregs''''".
         by rewrite !lookup_insert_ne // lookup_empty.
-      iApply (wp_Subseg with "[$Hregs $Hi]");
+      iApply (wp_Subseg with "[$Hregs'''' $Hi]");
         [apply decode_encode_instrW_inv|done| |done|..].
       { apply HPC; repeat constructor. }
       { rewrite /regs_of /regs_of_argument !dom_insert_L dom_empty_L. set_solver-. }

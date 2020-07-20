@@ -4,6 +4,7 @@ From iris.program_logic Require Import weakestpre adequacy lifting.
 From cap_machine Require Export logrel.
 From cap_machine Require Import ftlr_base.
 From cap_machine.rules Require Import rules_Load.
+From cap_machine Require Import stdpp_extra.
 Import uPred.
 
 Section fundamental.

@@ -38,10 +38,10 @@ Section region_alloc.
      p ≠ O →
      l ∉ dom (gset Addr) (std W) →
      (pwl p) = true →
-     (future_pub_mono φ v →
+     future_pub_mono φ v -∗
      sts_full_world W -∗ region W -∗ l ↦ₐ[p] v -∗ φ (W,v) ={E}=∗ region (<s[l := Temporary ]s>W)
                                                               ∗ rel l p φ
-                                                              ∗ sts_full_world (<s[l := Temporary ]s>W))%I.
+                                                              ∗ sts_full_world (<s[l := Temporary ]s>W).
   Proof.
     iIntros (Hpne Hnone1 Hpwl) "#Hmono Hfull Hreg Hl #Hφ".
     rewrite region_eq rel_eq /region_def /rel_def.
@@ -70,7 +70,7 @@ Section region_alloc.
     iMod (sts_alloc_std_i W l Temporary
             with "[] Hfull") as "(Hfull & Hstate)"; auto.
     apply (related_sts_pub_world_fresh W l Temporary) in Hnone1 as Hrelated; auto.
-    iDestruct (region_map_monotone $! Hrelated with "Hpreds") as "Hpreds'".
+    iDestruct (region_map_monotone _ _ _ _ Hrelated with "Hpreds") as "Hpreds'".
     iModIntro. rewrite bi.sep_exist_r. iExists _.
     rewrite -fmap_insert.
     iFrame "HR". iFrame "∗ #".
@@ -106,10 +106,10 @@ Section region_alloc.
      p ≠ O →
      l ∉ dom (gset Addr) (std W) →
      (pwl p) = false →
-     (future_priv_mono φ v →
+     future_priv_mono φ v -∗
      sts_full_world W -∗ region W -∗ l ↦ₐ[p] v -∗ φ (W,v) ={E}=∗ region (<s[l := Temporary ]s>W)
                                                               ∗ rel l p φ
-                                                              ∗ sts_full_world (<s[l := Temporary ]s>W))%I.
+                                                              ∗ sts_full_world (<s[l := Temporary ]s>W).
   Proof.
     iIntros (Hpne Hnone1 Hpwl) "#Hmono Hfull Hreg Hl #Hφ".
     rewrite region_eq rel_eq /region_def /rel_def.
@@ -138,7 +138,7 @@ Section region_alloc.
     iMod (sts_alloc_std_i W l Temporary
             with "[] Hfull") as "(Hfull & Hstate)"; auto.
     apply (related_sts_pub_world_fresh W l Temporary) in Hnone1 as Hrelated; auto.
-    iDestruct (region_map_monotone $! Hrelated with "Hpreds") as "Hpreds'".
+    iDestruct (region_map_monotone _ _ _ _ Hrelated with "Hpreds") as "Hpreds'".
     iModIntro. rewrite bi.sep_exist_r. iExists _.
     rewrite -fmap_insert.
     iFrame "HR". iFrame.
@@ -174,10 +174,10 @@ Section region_alloc.
   Lemma extend_region_perm E W l p v φ `{∀ Wv, Persistent (φ Wv)}:
      p ≠ O →
      l ∉ dom (gset Addr) (std W) →
-     (future_priv_mono φ v →
+     future_priv_mono φ v -∗
      sts_full_world W -∗ region W -∗ l ↦ₐ[p] v -∗ φ (W,v) ={E}=∗ region (<s[l := Permanent ]s>W)
                                                               ∗ rel l p φ
-                                                              ∗ sts_full_world (<s[l := Permanent ]s>W))%I.
+                                                              ∗ sts_full_world (<s[l := Permanent ]s>W).
   Proof.
     iIntros (Hpne Hnone1) "#Hmono Hfull Hreg Hl #Hφ".
     rewrite region_eq rel_eq /region_def /rel_def.
@@ -206,7 +206,7 @@ Section region_alloc.
     iMod (sts_alloc_std_i W l Permanent
             with "[] Hfull") as "(Hfull & Hstate)"; auto.
     apply (related_sts_pub_world_fresh W l Permanent) in Hnone1 as Hrelated; auto.
-    iDestruct (region_map_monotone $! Hrelated with "Hpreds") as "Hpreds'".
+    iDestruct (region_map_monotone _ _ _ _ Hrelated with "Hpreds") as "Hpreds'".
     iModIntro. rewrite bi.sep_exist_r. iExists _.
     rewrite -fmap_insert.
     iFrame "HR". iFrame.
@@ -243,9 +243,9 @@ Section region_alloc.
 
   Lemma extend_region_revoked E W l p φ `{∀ Wv, Persistent (φ Wv)} :
      l ∉ dom (gset Addr) (std W) →
-     (sts_full_world W -∗ region W ={E}=∗ region (<s[l := Revoked ]s>W)
+     sts_full_world W -∗ region W ={E}=∗ region (<s[l := Revoked ]s>W)
                                                ∗ rel l p φ
-                                               ∗ sts_full_world (<s[l := Revoked ]s>W))%I.
+                                               ∗ sts_full_world (<s[l := Revoked ]s>W).
   Proof.
     iIntros (Hnone1) "Hfull Hreg".
     rewrite region_eq rel_eq /region_def /rel_def.
@@ -274,7 +274,7 @@ Section region_alloc.
     iMod (sts_alloc_std_i W l Revoked
             with "[] Hfull") as "(Hfull & Hstate)"; auto.
     apply (related_sts_pub_world_fresh W l Revoked) in Hnone1 as Hrelated; auto.
-    iDestruct (region_map_monotone $! Hrelated with "Hpreds") as "Hpreds'".
+    iDestruct (region_map_monotone _ _ _ _ Hrelated with "Hpreds") as "Hpreds'".
     iModIntro. rewrite bi.sep_exist_r. iExists _.
     rewrite -fmap_insert.
     iFrame "HR". iFrame.
@@ -306,14 +306,14 @@ Section region_alloc.
   Lemma extend_region_perm_sepL2 E W l1 l2 p φ `{∀ Wv, Persistent (φ Wv)}:
      p ≠ O →
      Forall (λ k, std W !! k = None) l1 →
-     (sts_full_world W -∗ region W -∗
+     sts_full_world W -∗ region W -∗
      ([∗ list] k;v ∈ l1;l2, k ↦ₐ[p] v ∗ φ (W, v) ∗ future_priv_mono φ v)
 
      ={E}=∗
 
      region (std_update_multiple W l1 Permanent)
      ∗ ([∗ list] k ∈ l1, rel k p φ)
-     ∗ sts_full_world (std_update_multiple W l1 Permanent))%I.
+     ∗ sts_full_world (std_update_multiple W l1 Permanent).
   Proof.
     revert l2. induction l1.
     { cbn. intros. iIntros "? ? ?". iFrame. eauto. }
@@ -338,11 +338,11 @@ Section region_alloc.
   Lemma extend_region_static_single E W l p v φ `{∀ Wv, Persistent (φ Wv)}:
      p ≠ O →
      l ∉ dom (gset Addr) (std W) →
-     (sts_full_world W -∗ region W -∗ l ↦ₐ[p] v
+     sts_full_world W -∗ region W -∗ l ↦ₐ[p] v
      ={E}=∗
      region (<s[l := Static {[l := v]}]s>W)
      ∗ rel l p φ
-     ∗ sts_full_world (<s[l := Static {[l := v]} ]s>W))%I.
+     ∗ sts_full_world (<s[l := Static {[l := v]} ]s>W).
   Proof.
     iIntros (Hpne Hnone1) "Hfull Hreg Hl".
     rewrite region_eq rel_eq /region_def /rel_def.
@@ -371,7 +371,7 @@ Section region_alloc.
     iMod (sts_alloc_std_i W l (Static {[l:=v]})
             with "[] Hfull") as "(Hfull & Hstate)"; auto.
     eapply (related_sts_pub_world_fresh W l (Static {[l:=v]})) in Hnone1 as Hrelated; auto.
-    iDestruct (region_map_monotone $! Hrelated with "Hpreds") as "Hpreds'".
+    iDestruct (region_map_monotone _ _ _ _ Hrelated with "Hpreds") as "Hpreds'".
     iModIntro. rewrite bi.sep_exist_r. iExists _.
     rewrite -fmap_insert.
     iFrame "HR". iFrame.
@@ -406,14 +406,14 @@ Section region_alloc.
   Lemma extend_region_static_single_sepM E W (m: gmap Addr Word) p φ `{∀ Wv, Persistent (φ Wv)}:
      p ≠ O →
      (∀ k, is_Some (m !! k) → std W !! k = None) →
-     (sts_full_world W -∗ region W -∗
+     sts_full_world W -∗ region W -∗
      ([∗ map] k↦v ∈ m, k ↦ₐ[p] v)
 
      ={E}=∗
 
      region (override_uninitializedW m W)
      ∗ ([∗ map] k↦_ ∈ m, rel k p φ)
-     ∗ sts_full_world (override_uninitializedW m W))%I.
+     ∗ sts_full_world (override_uninitializedW m W).
   Proof.
     induction m using map_ind.
     { intros. rewrite !override_uninitializedW_empty !big_sepM_empty.

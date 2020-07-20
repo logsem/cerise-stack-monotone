@@ -28,7 +28,7 @@ Proof.
   revert l2. induction l1;intros l2 Hlen.
   - destruct l2;[|inversion Hlen]. done.
   - destruct l2;[inversion Hlen|]. simpl.
-    f_equiv. auto. 
+    f_equiv. auto.
 Qed.
 
 Lemma length_zip_l {A B} (l1: list A) (l2: list B) :
@@ -609,3 +609,82 @@ Proof.
   - cbn [create_gmap_default list_to_set]. rewrite dom_insert_L // IHl //.
 Qed.
 
+(* COPIED PASTED FROM rules_base.v TO AVOID SOME REQUIRE IMPORT WEIRDNESS BUGS *)
+(*----------------------- FIXME TEMPORARY ------------------------------------*)
+(* This is a copy-paste from stdpp (fin_maps.v), plus a fix to avoid using
+   "rewrite .. by .." that is not available when using ssreflect's rewrite. *)
+(* TODO: upstream the fix into stdpp, and remove the code below whenever we
+   upgrade to a version of stdpp that includes it *)
+
+Tactic Notation "simpl_map" "by" tactic3(tac) := repeat
+  match goal with
+  | H : context[ ∅ !! _ ] |- _ => rewrite lookup_empty in H
+  | H : context[ (<[_:=_]>_) !! _ ] |- _ =>
+    rewrite lookup_insert in H || (rewrite lookup_insert_ne in H; [| by tac])
+  | H : context[ (alter _ _ _) !! _] |- _ =>
+    rewrite lookup_alter in H || (rewrite lookup_alter_ne in H; [| by tac])
+  | H : context[ (delete _ _) !! _] |- _ =>
+    rewrite lookup_delete in H || (rewrite lookup_delete_ne in H; [| by tac])
+  | H : context[ {[ _ := _ ]} !! _ ] |- _ =>
+    rewrite lookup_singleton in H || (rewrite lookup_singleton_ne in H; [| by tac])
+  | H : context[ (_ <$> _) !! _ ] |- _ => rewrite lookup_fmap in H
+  | H : context[ (omap _ _) !! _ ] |- _ => rewrite lookup_omap in H
+  | H : context[ lookup (A:=?A) ?i (?m1 ∪ ?m2) ] |- _ =>
+    let x := fresh in evar (x:A);
+    let x' := eval unfold x in x in clear x;
+    let E := fresh in
+    assert ((m1 ∪ m2) !! i = Some x') as E by (clear H; by tac);
+    rewrite E in H; clear E
+  | |- context[ ∅ !! _ ] => rewrite lookup_empty
+  | |- context[ (<[_:=_]>_) !! _ ] =>
+    rewrite lookup_insert || (rewrite lookup_insert_ne; [| by tac])
+  | |- context[ (alter _ _ _) !! _ ] =>
+    rewrite lookup_alter || (rewrite lookup_alter_ne; [| by tac])
+  | |- context[ (delete _ _) !! _ ] =>
+    rewrite lookup_delete || (rewrite lookup_delete_ne; [| by tac])
+  | |- context[ {[ _ := _ ]} !! _ ] =>
+    rewrite lookup_singleton || (rewrite lookup_singleton_ne; [| by tac])
+  | |- context[ (_ <$> _) !! _ ] => rewrite lookup_fmap
+  | |- context[ (omap _ _) !! _ ] => rewrite lookup_omap
+  | |- context [ lookup (A:=?A) ?i ?m ] =>
+    let x := fresh in evar (x:A);
+    let x' := eval unfold x in x in clear x;
+    let E := fresh in
+    assert (m !! i = Some x') as E by tac;
+    rewrite E; clear E
+  end.
+
+Tactic Notation "simpl_map" := simpl_map by eauto with simpl_map map_disjoint.
+
+Tactic Notation "simplify_map_eq" "by" tactic3(tac) :=
+  decompose_map_disjoint;
+  repeat match goal with
+  | _ => progress simpl_map by tac
+  | _ => progress simplify_eq/=
+  | _ => progress simpl_option by tac
+  | H : {[ _ := _ ]} !! _ = None |- _ => rewrite lookup_singleton_None in H
+  | H : {[ _ := _ ]} !! _ = Some _ |- _ =>
+    rewrite lookup_singleton_Some in H; destruct H
+  | H1 : ?m1 !! ?i = Some ?x, H2 : ?m2 !! ?i = Some ?y |- _ =>
+    let H3 := fresh in
+    feed pose proof (lookup_weaken_inv m1 m2 i x y) as H3; [done|by tac|done|];
+    clear H2; symmetry in H3
+  | H1 : ?m1 !! ?i = Some ?x, H2 : ?m2 !! ?i = None |- _ =>
+    let H3 := fresh in
+    apply (lookup_weaken _ m2) in H1; [congruence|by tac]
+  | H : ?m ∪ _ = ?m ∪ _ |- _ =>
+    apply map_union_cancel_l in H; [|by tac|by tac]
+  | H : _ ∪ ?m = _ ∪ ?m |- _ =>
+    apply map_union_cancel_r in H; [|by tac|by tac]
+  | H : {[?i := ?x]} = ∅ |- _ => by destruct (map_non_empty_singleton i x)
+  | H : ∅ = {[?i := ?x]} |- _ => by destruct (map_non_empty_singleton i x)
+  | H : ?m !! ?i = Some _, H2 : ?m !! ?j = None |- _ =>
+     unless (i ≠ j) by done;
+     assert (i ≠ j) by (by intros ?; simplify_eq)
+  end.
+Tactic Notation "simplify_map_eq" "/=" "by" tactic3(tac) :=
+  repeat (progress csimpl in * || simplify_map_eq by tac).
+Tactic Notation "simplify_map_eq" :=
+  simplify_map_eq by eauto with simpl_map map_disjoint.
+Tactic Notation "simplify_map_eq" "/=" :=
+  simplify_map_eq/= by eauto with simpl_map map_disjoint.

@@ -4,6 +4,7 @@ From iris.program_logic Require Import weakestpre adequacy lifting.
 From cap_machine Require Export logrel.
 From cap_machine Require Import ftlr_base.
 From cap_machine.rules Require Import rules_LoadU.
+From cap_machine Require Import stdpp_extra.
 Import uPred.
 
 Section fundamental.
@@ -27,10 +28,10 @@ Section fundamental.
     ∀ (W : leibnizO WORLD) (a' a b e : Addr) (p : Perm) (g : Locality),
       (b ≤ a' < addr_reg.min a e)%Z
       → isU p = true
-      → ((interp W) (inr (p, g, b, e, a))
-         → ∃ p' : Perm, ⌜PermFlows (promote_perm p) p'⌝ ∗ read_write_cond a' p' interp
-                        ∧ ⌜(∃ ρ : region_type, std W !! a' = Some ρ
-                                               ∧ ρ ≠ Revoked /\ (∀ g, ρ ≠ Static g))⌝)%I.
+      → ⊢ (interp W) (inr (p, g, b, e, a))
+      → ∃ p' : Perm, ⌜PermFlows (promote_perm p) p'⌝ ∗ read_write_cond a' p' interp
+                     ∧ ⌜(∃ ρ : region_type, std W !! a' = Some ρ
+                                            ∧ ρ ≠ Revoked /\ (∀ g, ρ ≠ Static g))⌝.
   Proof.
     intros. rewrite /interp fixpoint_interp1_eq /=. iIntros "H".
     assert (p = URW \/ p = URWL \/ p = URWX \/ p = URWLX) as [-> | [-> | [-> | ->] ] ] by (destruct p; simpl in H0; auto; congruence); simpl.

@@ -136,7 +136,7 @@ Section monotone.
   Qed.
 
   Lemma interp_monotone W W' w :
-    related_sts_pub_world W W' ->
+    ⌜related_sts_pub_world W W'⌝ -∗
     interp W w -∗ interp W' w.
   Proof.
     iIntros (Hrelated) "#Hw".
@@ -270,7 +270,7 @@ Section monotone.
   Qed.
 
   Lemma interp_monotone_nl W W' w :
-    related_sts_priv_world W W' → isLocalWord w = false →
+    ⌜related_sts_priv_world W W'⌝ -∗ ⌜isLocalWord w = false⌝ -∗
     interp W w -∗ interp W' w.
   Proof.
     iIntros (Hrelated Hnl) "#Hw".

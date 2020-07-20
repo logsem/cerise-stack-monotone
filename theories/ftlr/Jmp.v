@@ -116,7 +116,7 @@ Section fundamental.
             iNext.
             iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
             { destruct ρ;auto;[..|specialize (Hnotstatic g0)];contradiction. }
-            iDestruct ("H" with "[$Hmap $Hr $Hsts $Hown]") as "[_ H]"; auto.
+            iDestruct ("H" with "[$Hmap $Hr $Hsts $Hown]") as "[_ HA]"; auto.
         - iApply (wp_bind (fill [SeqCtx])).
           iApply (wp_notCorrectPC with "HPC"); [eapply not_isCorrectPC_perm; eauto|].
           iNext. iNext. iIntros "HPC /=".
