@@ -3222,9 +3222,9 @@ Section awkward_example.
               zify_addr; subst;
               try solve_addr_close_proof.
               destruct (Z_le_dec (z1 + 9)%Z MemNum);try lia.
-              destruct (Z_le_dec 0 (z1 + 9)%Z); try lia.
-              destruct (Z.leb_le (z1 + 9) MemNum); try lia.
-              destruct (Z.leb_le 0 (z1 + 9)); try lia.
+              destruct (Z_le_dec 0 (z1 + 9)%Z); [|lia].
+              destruct (Z.leb_le (z1 + 9) MemNum).
+              destruct (Z.leb_le 0 (z1 + 9)).
               f_equal. eapply z_of_eq. reflexivity. }
             iPrologue rest3' Hrest_length2 "Hprog".
             iApply (wp_subseg_success with "[$HPC $Hinstr $Hr_stk $Hr_t1 $Hr_t2]");
@@ -3491,7 +3491,7 @@ Section awkward_example.
                   iExists RWLX,(λ Wv : WORLD * Word, ((fixpoint interp1) Wv.1) Wv.2).
                   iSplit;[iPureIntro;apply _|]. iSplit;[auto|]. iFrame. iExists (inl 0%Z). iSimpl.
                   iSplit;[auto|]. iFrame. iSplit.
-                  { iModIntro. iIntros (W0 W0'). iApply interp_monotone. }
+                  { iModIntro. iIntros. iApply interp_monotone; eauto. }
                   rewrite fixpoint_interp1_eq /=. auto. iFrame.
                   apply withinBounds_le_addr in Hwb3 as [Hb1 Hb2].
                   revert Hb1 Hb2;clear. solve_addr.
@@ -3749,9 +3749,9 @@ Section awkward_example.
         iIntros (Hne').
         assert (r !r! r1 = inl 0%Z) as Hr1.
         { rewrite /RegLocate.
-          destruct (r !! r1) eqn:Hsome; rewrite Hsome; last done. rewrite /r in Hsome.
+          destruct (r !! r1) eqn:Hsome; last done. rewrite /r in Hsome.
           do 4 (rewrite lookup_insert_ne in Hsome;auto).
-          assert (Some w3 = Some (inl 0%Z)) as Heq.
+          assert (Some s = Some (inl 0%Z)) as Heq.
           { rewrite -Hsome. apply create_gmap_default_lookup.
             apply elem_of_list_difference. split; first apply all_registers_correct.
             repeat (apply not_elem_of_cons;split;auto).
