@@ -13,11 +13,11 @@ Section fundamental.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
 
-  Notation D := (WORLD -n> (leibnizO Word) -n> iProp Σ).
-  Notation R := (WORLD -n> (leibnizO Reg) -n> iProp Σ).
+  Notation D := (WORLD -n> (leibnizO Word) -n> iPropO Σ).
+  Notation R := (WORLD -n> (leibnizO Reg) -n> iPropO Σ).
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
@@ -61,10 +61,10 @@ Section fundamental.
           - iApply ("IH" $! _ r with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); try iClear "IH"; eauto.
             + destruct p''; simpl in Hpft; auto.
               repeat rewrite fixpoint_interp1_eq. simpl.
-              destruct g''; auto. 
+              destruct g''; auto.
             + iModIntro.
               destruct p''; simpl in Hpft; try discriminate; repeat (rewrite fixpoint_interp1_eq); simpl; auto.
-              destruct g''; auto. 
+              destruct g''; auto.
           - iApply (wp_bind (fill [SeqCtx])).
             iDestruct ((big_sepM_delete _ _ PC) with "Hmap") as "[HPC Hmap]"; [apply lookup_insert|].
             iApply (wp_notCorrectPC with "HPC"); [eapply not_isCorrectPC_perm; destruct p''; simpl in Hpft; try discriminate; eauto|].
@@ -89,7 +89,7 @@ Section fundamental.
             * repeat rewrite fixpoint_interp1_eq; auto.
             * destruct (reg_eq_dec PC r0).
               { subst r0.
-                - simplify_map_eq. 
+                - simplify_map_eq.
                   rewrite (fixpoint_interp1_eq _ (inr (_, g'', b'', e'', a''))) /=.
                 destruct Hp as [Hp | [Hp | [Hp Hg] ] ]; subst p''; try subst g'';
                   (iFrame "Hinv Hexec"). }

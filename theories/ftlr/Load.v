@@ -14,11 +14,11 @@ Section fundamental.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
 
-  Notation D := (WORLD -n> (leibnizO Word) -n> iProp Σ).
-  Notation R := (WORLD -n> (leibnizO Reg) -n> iProp Σ).
+  Notation D := (WORLD -n> (leibnizO Word) -n> iPropO Σ).
+  Notation R := (WORLD -n> (leibnizO Reg) -n> iPropO Σ).
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
@@ -27,7 +27,7 @@ Section fundamental.
   Definition region_open_resources W l ls p φ v (bl : bool): iProp Σ :=
     (∃ ρ,
      sts_state_std l ρ
-    ∗ ⌜ρ ≠ Revoked ∧ (∀ g, ρ ≠ Static g)⌝ 
+    ∗ ⌜ρ ≠ Revoked ∧ (∀ g, ρ ≠ Static g)⌝
     ∗ open_region_many (l :: ls) W
     ∗ ⌜p ≠ O⌝
     ∗ (if bl then monotonicity_guarantees_region ρ v p φ ∗ φ (W, v)
@@ -43,7 +43,7 @@ Section fundamental.
       pose (Hrar' := Hrar).
       destruct Hrar' as (Hinr0 & _). destruct H3 as [Hinr1 | Hinl1].
       * rewrite Hinr0 in Hinr1. inversion Hinr1.
-        subst. auto. 
+        subst. auto.
       * destruct Hinl1 as [z Hinl1]. rewrite Hinl1 in Hinr0. by exfalso.
   Qed.
 
@@ -200,7 +200,7 @@ Section fundamental.
     -  destruct Hallows as [Hrinr [Hra Hwb] ].
        iDestruct "HLoadRes" as (p'1 w0) "[-> [% HLoadRes] ]".
        iDestruct "HLoadRes" as (ρ1) "(Hstate' & #Hrev & Hr & % & (Hfuture & #HV) & Hrel')".
-       iDestruct "Hrev" as %[Hnotrevoked Hnotstatic]. 
+       iDestruct "Hrev" as %[Hnotrevoked Hnotstatic].
        rewrite memMap_resource_2ne; last auto. iDestruct "Hmem" as  "[Ha1 $]".
        iDestruct (region_close_next with "[$Hr $Ha1 $Hrel' $Hstate' $Hfuture]") as "Hr"; eauto.
        { intros [g Hg]; specialize (Hnotstatic g); contradiction. }

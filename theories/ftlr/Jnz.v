@@ -13,14 +13,14 @@ Section fundamental.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
 
-  Notation D := (WORLD -n> (leibnizO Word) -n> iProp Σ).
-  Notation R := (WORLD -n> (leibnizO Reg) -n> iProp Σ).
+  Notation D := (WORLD -n> (leibnizO Word) -n> iPropO Σ).
+  Notation R := (WORLD -n> (leibnizO Reg) -n> iPropO Σ).
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
-  
+
   (* TODO: Move somewhere *)
   Ltac destruct_cap c :=
     let p := fresh "p" in
@@ -101,7 +101,7 @@ Section fundamental.
               - destruct W. apply related_sts_priv_refl_world.
               - destruct W. apply related_sts_pub_refl_world. }
             iSpecialize ("H" $! _ _ with "Hfuture").
-            iNext. iDestruct ("H" with "[$Hmap $Hr $Hsts $Hown]") as "[_ H]"; auto. } }
+            iNext. iDestruct ("H" with "[$Hmap $Hr $Hsts $Hown]") as "[_ HX]"; auto. } }
         iApply (wp_bind (fill [SeqCtx])).
         iDestruct ((big_sepM_delete _ _ PC) with "Hmap") as "[HPC Hmap]"; [apply lookup_insert|].
         iApply (wp_notCorrectPC with "HPC").

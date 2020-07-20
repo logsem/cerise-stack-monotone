@@ -14,11 +14,11 @@ Section fundamental.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
 
-  Notation D := (WORLD -n> (leibnizO Word) -n> iProp Σ).
-  Notation R := (WORLD -n> (leibnizO Reg) -n> iProp Σ).
+  Notation D := (WORLD -n> (leibnizO Word) -n> iPropO Σ).
+  Notation R := (WORLD -n> (leibnizO Reg) -n> iPropO Σ).
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
@@ -143,11 +143,11 @@ Section fundamental.
     iDestruct "Hpreds" as "[Hl Hpreds]".
     iDestruct "Hl" as (ρ) "[ % [Hstate Hl] ]". destruct ρ.
     1,2,3,4,5: iDestruct (sts_full_state_std with "Hfull Hstate") as %Hcontr.
-    1,2,3,4,5: try (rewrite Htemp in Hcontr; by inversion Hcontr). 
+    1,2,3,4,5: try (rewrite Htemp in Hcontr; by inversion Hcontr).
     iDestruct "Hl" as (γpred p0 φ Heq Hpers) "[#Hsaved Hl]". inversion Heq.
     iDestruct "Hl" as (v Hlookup Hneq) "[Hl _]". rewrite Htemp in Hcontr. inversion Hcontr. subst g.
-    rewrite lookup_insert in Hlookup. inversion Hlookup. 
-    iFrame. 
+    rewrite lookup_insert in Hlookup. inversion Hlookup.
+    iFrame.
     repeat iSplitL; auto.
     iExists _,Mρ. iFrame "∗ #". subst. rewrite -HMeq.
     repeat iSplit;auto.
@@ -194,18 +194,18 @@ Section fundamental.
     assert (p = URW \/ p = URWL \/ p = URWX \/ p = URWLX) as [-> | [-> | [-> | ->] ] ] by (destruct p; simpl in H0; auto; congruence); simpl.
     - destruct g.
       + iDestruct (extract_from_region_inv with "H") as (p' ?) "[C %]"; eauto.
-        iExists p'. iSplit;auto. simpl. iFrame. iPureIntro. eexists. repeat split;eauto. done. 
+        iExists p'. iSplit;auto. simpl. iFrame. iPureIntro. eexists. repeat split;eauto. done.
       + iDestruct "H" as "[B C]".
         iDestruct (extract_from_region_inv with "C") as (p' ?) "[D %]"; try (iExists p'; iSplit;auto;iFrame); eauto.
         split;auto;solve_addr.
-        iPureIntro; destruct H2 as [-> | [-> | [ ? -> ] ] ]; eexists;repeat split;eauto; try done. 
-        intros m Hm. inversion Hm. exists x. auto. 
+        iPureIntro; destruct H2 as [-> | [-> | [ ? -> ] ] ]; eexists;repeat split;eauto; try done.
+        intros m Hm. inversion Hm. exists x. auto.
     - destruct g; auto.
       iDestruct "H" as "[B C]".
       iDestruct (extract_from_region_inv with "C") as (p' ?) "[D %]"; try (iExists p'; iSplit;auto;iFrame); eauto.
       split; eauto; solve_addr.
       iPureIntro; eauto. destruct H2 as [-> | [? ->] ]; eexists;repeat split;eauto;try done.
-      intros m Hm; inversion Hm. eauto. 
+      intros m Hm; inversion Hm. eauto.
     - destruct g.
       + iDestruct (extract_from_region_inv with "H") as (p' ?) "[D %]"; try (iExists p'; iSplit;auto;iFrame);auto.
         iPureIntro. eexists;repeat split;eauto; try done.
@@ -213,13 +213,13 @@ Section fundamental.
         iDestruct (extract_from_region_inv with "C") as (p' ?) "[E %]"; try (iExists p'; iSplit;auto;iFrame);auto.
         split; eauto; solve_addr.
         iPureIntro; auto. destruct H2 as [-> | [-> | [? ->] ] ]; eexists;repeat split;eauto; try done.
-        intros m Hm; inversion Hm;eauto. 
+        intros m Hm; inversion Hm;eauto.
     - destruct g; auto.
       iDestruct "H" as "[B D]".
       iDestruct (extract_from_region_inv with "D") as (p' ?) "[E %]"; try (iExists p'; iSplit;auto;iFrame); eauto.
       split; eauto; solve_addr.
       iPureIntro; auto. destruct H2 as [-> | [? ->] ]; eexists;repeat split;eauto; try done.
-      intros m Hm; inversion Hm;eauto. 
+      intros m Hm; inversion Hm;eauto.
   Qed.
 
   Definition region_open_resources W l ls p φ v (bl : bool): iProp Σ :=
@@ -281,9 +281,9 @@ Section fundamental.
     { iDestruct (big_sepM_insert _ (delete l (delete_list ls M)) l with "[-HM]") as "Hmap_def";
         first by rewrite lookup_delete.
       { simpl.
-        iDestruct (region_map_insert_nonstatic Temporary with "Hpreds") as "Hpreds";auto. 
+        iDestruct (region_map_insert_nonstatic Temporary with "Hpreds") as "Hpreds";auto.
         iFrame. iExists Temporary. iFrame.
-        iSplit;[iPureIntro;apply lookup_insert|]. 
+        iSplit;[iPureIntro;apply lookup_insert|].
         iExists γpred, p, _. iFrame "∗ #". repeat iSplitR; auto.
         iExists v. rewrite Hpwl. auto. }
       assert (Hpub: related_sts_pub_world W (<s[l:=Temporary]s>W)).
@@ -292,11 +292,11 @@ Section fundamental.
       iExists M,(<[l:=Temporary]>Mρ); iFrame.
       assert (l ∈ dom (gset Addr) M) as Hin.
       { rewrite -H1. apply elem_of_gmap_dom. eauto. }
-      repeat rewrite dom_insert_L. 
+      repeat rewrite dom_insert_L.
       repeat iSplit;[iPureIntro..|];[rewrite H1;set_solver|rewrite H2;set_solver|].
-      rewrite -delete_list_delete;auto. rewrite -delete_list_insert; auto. rewrite -HMeq. 
+      rewrite -delete_list_delete;auto. rewrite -delete_list_insert; auto. rewrite -HMeq.
       rewrite delete_list_insert; auto. }
-    iFrame. 
+    iFrame.
   Qed.
 
   Lemma region_close_next_uninit_nwl W ls l φ p w v `{forall Wv, Persistent (φ Wv)}:
@@ -324,9 +324,9 @@ Section fundamental.
     { iDestruct (big_sepM_insert _ (delete l (delete_list ls M)) l with "[-HM]") as "Hmap_def";
         first by rewrite lookup_delete.
       { simpl.
-        iDestruct (region_map_insert_nonstatic Temporary with "Hpreds") as "Hpreds";auto. 
+        iDestruct (region_map_insert_nonstatic Temporary with "Hpreds") as "Hpreds";auto.
         iFrame. iExists Temporary. iFrame.
-        iSplit;[iPureIntro;apply lookup_insert|]. 
+        iSplit;[iPureIntro;apply lookup_insert|].
         iExists γpred, p, _. iFrame "∗ #". repeat iSplitR; auto.
         iExists v. rewrite Hpwl. auto. }
       assert (Hpub: related_sts_pub_world W (<s[l:=Temporary]s>W)).
@@ -335,11 +335,11 @@ Section fundamental.
       iExists M,(<[l:=Temporary]>Mρ); iFrame.
       assert (l ∈ dom (gset Addr) M) as Hin.
       { rewrite -H1. apply elem_of_gmap_dom. eauto. }
-      repeat rewrite dom_insert_L. 
+      repeat rewrite dom_insert_L.
       repeat iSplit;[iPureIntro..|];[rewrite H1;set_solver|rewrite H2;set_solver|].
-      rewrite -delete_list_delete;auto. rewrite -delete_list_insert; auto. rewrite -HMeq. 
+      rewrite -delete_list_delete;auto. rewrite -delete_list_insert; auto. rewrite -HMeq.
       rewrite delete_list_insert; auto. }
-    iFrame. 
+    iFrame.
   Qed.
 
   Lemma region_close_next_uninit W ls l φ p w v `{forall Wv, Persistent (φ Wv)}:
@@ -348,7 +348,7 @@ Section fundamental.
     ∗ open_region_many (l::ls) W
     ∗ l ↦ₐ[p] v
     ∗ ⌜p ≠ O⌝
-    ∗ (if pwl p then future_pub_mono else future_priv_mono) φ v 
+    ∗ (if pwl p then future_pub_mono else future_priv_mono) φ v
     ∗ ▷ φ (W,v) (* Maybe φ (<l[ l := Temporary, (Rpub, Rpriv) ]l> W, v) *)
     ∗ rel l p φ
     ∗ sts_full_world W
@@ -481,10 +481,10 @@ Section fundamental.
                      iDestruct (memMap_resource_2ne with "[$Ha $Ha0]") as "H"; auto.
                      iExists (<[a:=(p', w)]> (<[a0:=(_, wa0)]> ∅)).
                      rewrite lookup_insert_ne; auto. rewrite lookup_insert.
-                     
+
                      iFrame. iSplitR; auto.
                      iSplitL; [iSplitR;auto|].
-                     iExists _. iFrame. repeat iSplit;auto.  
+                     iExists _. iFrame. repeat iSplit;auto.
                      iFrame "∗ #"; auto. rewrite lookup_insert; auto.
                ++ iDestruct (isU_inv _ a0 with "Hinvdst") as "H"; auto.
                   { split; solve_addr. }
@@ -516,7 +516,7 @@ Section fundamental.
             iExists _; iFrame; auto. rewrite lookup_insert; auto.
         + iDestruct (memMap_resource_1 with "Ha") as "H".
           iExists _; iFrame; auto. rewrite lookup_insert; auto. }
-    
+
     iDestruct "H" as (mem) "[% [A [B %]]]".
     iApply (wp_storeU with "[Hmap B]"); eauto.
     { simplify_map_eq; auto. }
@@ -552,12 +552,12 @@ Section fundamental.
               iModIntro. (* iExists p'. iSplitR; auto. *) simpl.
               iDestruct "Hfuture" as %Hfuture.
               iApply (big_sepL_mono with "Hinv"); intros; simpl.
-              iIntros "H". iDestruct "H" as (? ?) "[HA %]". iExists _; iSplit;eauto. iFrame. iPureIntro. 
+              iIntros "H". iDestruct "H" as (? ?) "[HA %]". iExists _; iSplit;eauto. iFrame. iPureIntro.
               destruct (pwl p) eqn:Hpwlp.
               - eapply region_state_pwl_monotone; eauto.
                 destruct Hp as [-> | [-> | [-> ->] ] ]; simpl in Hpwlp; try congruence.
               - destruct g; [eapply region_state_nwl_monotone_nl; eauto| eapply region_state_nwl_monotone; eauto].
-            }  
+            }
             destruct Hp as [-> | [-> | [-> ->] ] ]; iFrame "#"; auto.
           + rewrite lookup_insert_ne in H2; auto.
             iDestruct ("Hreg" $! r0 ltac:(auto)) as "HX"; auto.
@@ -636,10 +636,10 @@ Section fundamental.
                   + iApply big_sepL_cons. iSplitL; [|iApply big_sepL_nil; auto].
                     iDestruct (extract_from_region_inv a e0 a with "A4") as (pp ?) "[X1 %]"; [solve_addr|].
                     iExists pp. iSplit;auto. iSplitL; auto.
-                    iPureIntro; auto. 
+                    iPureIntro; auto.
                     destruct (pwlU p0) eqn:Hp0.
-                    { rewrite /region_state_U_pwl in H2. destruct H2; auto. 
-                      destruct H2. 
+                    { rewrite /region_state_U_pwl in H2. destruct H2; auto.
+                      destruct H2.
                       eelim Hnotstatic. congruence. }
                     { rewrite /region_state_U_pwl in H2. destruct H2; auto.
                       destruct H2; auto. destruct H2. eelim Hnotstatic. congruence. }
@@ -656,7 +656,7 @@ Section fundamental.
           + subst mem. iDestruct "A" as (ρ') "[A1 [ [% %] [A2 [% #A3]]]]".
             iDestruct (sts_full_state_std with "[$Hsts] [$A1]") as "%".
             (* destruct (region_type_EqDecision ρ' Uninitialized). *)
-            destruct (decide (exists w, ρ' = Static {[a':=w]})). 
+            destruct (decide (exists w, ρ' = Static {[a':=w]})).
             * destruct e1 as [? e1]. subst ρ'. rewrite -(insert_delete _ a' (p'0, w0)).
               rewrite delete_insert_ne; auto. rewrite delete_insert; auto.
               iDestruct (memMap_resource_2ne with "B") as "[B1 B2]"; auto.
@@ -674,8 +674,8 @@ Section fundamental.
                   destruct w0; auto.
                   destruct_cap c. simpl. destruct c3; auto.
                   simpl in H5. destruct (pwlU p0) eqn:HpwlU; try congruence.
-                  exfalso. destruct p0; simpl in H,H4,HpwlU; try congruence; 
-                  destruct p'0; simpl in *; inv H; congruence. } 
+                  exfalso. destruct p0; simpl in H,H4,HpwlU; try congruence;
+                  destruct p'0; simpl in *; inv H; congruence. }
               iDestruct "HX" as ">[Hregion Hfull]".
               iDestruct (region_open_prepare with "Hregion") as "Hregion".
               assert (related_sts_pub_world W (<s[a':=Temporary]s>W)).
@@ -706,7 +706,7 @@ Section fundamental.
                   + iApply big_sepL_cons. iSplitL; [|iApply big_sepL_nil; auto].
                     iDestruct (extract_from_region_inv a' e0 a' with "A4") as (pp ?) "[X1 %]"; [solve_addr|].
                     iExists pp; iSplit;auto. iSplitL; auto.
-                    iPureIntro; auto. 
+                    iPureIntro; auto.
                     destruct (pwlU p0) eqn:Hp0; auto.
                     { rewrite /region_state_pwl /std_update /std /=.
                       rewrite lookup_insert. reflexivity. }
@@ -744,7 +744,7 @@ Section fundamental.
                     destruct w0; auto.
                     destruct_cap c. simpl. destruct c3; auto.
                     simpl in H7. destruct (pwlU p0) eqn:HpwlU; try congruence; exfalso;
-                    destruct p0; simpl in H,H4,HpwlU; try congruence; 
+                    destruct p0; simpl in H,H4,HpwlU; try congruence;
                       destruct p'0; simpl in *; inv H; congruence.
                 - simpl. rewrite /future_priv_mono /=. iModIntro.
                   iIntros (W1 W2) "% #A". iApply interp_monotone_nl; auto.
@@ -756,7 +756,7 @@ Section fundamental.
                     { eapply verify_access_spec in H7.
                       destruct H7 as [X1 [X2 [X3 X4] ] ].
                       solve_addr. }
-                    destruct H11;[|destruct H11]; rewrite H11 in H9; discriminate. 
+                    destruct H11;[|destruct H11]; rewrite H11 in H9; discriminate.
                   + rewrite (fixpoint_interp1_eq W (inr (URWLX,_,_,_,_))) /=.
                     destruct g0; auto. iDestruct "Hwdst" as "[Y1 Y3]".
                     iDestruct (extract_from_region_inv _ _ a' with "Y3") as (pp ?) "[Y4 %]".
@@ -793,7 +793,7 @@ Section fundamental.
                       destruct (pwlU p0) eqn:Hp0; auto.
                       { destruct H7; auto. elim n0.
                         rewrite H9 in H7; inv H7. exists x. inversion H11. eauto. }
-                      { destruct H7; auto. destruct H7; auto. elim n0. destruct H7. 
+                      { destruct H7; auto. destruct H7; auto. elim n0. destruct H7.
                         rewrite H7 in H9; inv H9. eauto. }
                     + rewrite /region_addrs /region_size /=.
                       replace (a'' - a')%Z with 1%Z by solve_addr.
@@ -850,7 +850,7 @@ Section fundamental.
                   * assert (HpwlU2: pwlU p' = true).
                     { destruct p0; simpl in H5; simpl in HwplU; try congruence; destruct p'; rewrite /PermFlows in H; inv H; simpl in H0; try congruence; reflexivity. }
                     exfalso. destruct Hp as [-> | [-> | [-> ->] ] ]; destruct p'; simpl in HpwlU2; simpl in *; try congruence; inv Hfp. }
-            
+
             iExists W. iFrame. iPureIntro. apply related_sts_pub_refl_world.
           + subst mem. rewrite insert_commute; auto.
             rewrite insert_insert.
@@ -943,7 +943,7 @@ Section fundamental.
           eapply incrementPC_Some_inv in H10.
           destruct H10 as (?&?&?&?&?&?&?&?&?).
           subst r'. rewrite insert_insert.
-          simplify_map_eq. auto. 
+          simplify_map_eq. auto.
         - eapply incrementPC_Some_inv in H10.
           destruct H10 as (?&?&?&?&?&?&?&?&?).
           subst r'. rewrite insert_insert.
@@ -951,7 +951,7 @@ Section fundamental.
       { iModIntro. (* iExists p'; iSplitR; auto. *)
         iApply (big_sepL_mono with "Hinv"); auto.
         intros. simpl. iIntros "Hw". iDestruct "Hw" as (pp ?) "Hw".
-        iExists pp; iSplit;auto. 
+        iExists pp; iSplit;auto.
         iDestruct "Hw" as "[$ %]".
         destruct (pwl p);iPureIntro.
         + eapply region_state_pwl_monotone; eauto.
@@ -964,7 +964,7 @@ Section fundamental.
       iPureIntro. eapply related_sts_priv_trans_world; eauto.
       eapply related_sts_pub_priv_world; auto. }
     { iApply wp_pure_step_later; auto. iNext. iApply wp_value; auto. iIntros; discriminate. }
-    Unshelve. all: eauto; try exact {[a:=x]}. 
+    Unshelve. all: eauto; try exact {[a:=x]}.
   Qed.
-  
+
 End fundamental.

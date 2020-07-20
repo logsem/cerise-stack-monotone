@@ -16,7 +16,7 @@ Definition AddrRegionRange (l: list Addr) (b e: Addr) :=
   ∀ a, a ∈ l → (b <= a)%a ∧ (a < e)%a.
 
 Lemma AddrRegionRange_singleton a :
-  ByReflexivity (eqb_addr a top = false) →
+  ByReflexivity (eqb_addr a addr_reg.top = false) →
   AddrRegionRange [a] a (^(a+1))%a.
 Proof.
   unfold eqb_addr. unfold ByReflexivity. cbn. intros ?%Z.eqb_neq.
@@ -45,7 +45,7 @@ Hint Resolve 1 AddrRegionsRange_single : disj_regions.
 Lemma AddrRegionsRange_cons l ll b e b' e' :
   AddrRegionRange l b e →
   AddrRegionsRange ll b' e' →
-  AddrRegionsRange (l :: ll) (min b b') (max e e').
+  AddrRegionsRange (l :: ll) (addr_reg.min b b') (addr_reg.max e e').
 Proof.
   intros Hl Hll l' a [->|H]%elem_of_cons.
   - intros ?%Hl. solve_addr.

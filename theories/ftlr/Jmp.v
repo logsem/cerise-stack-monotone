@@ -13,11 +13,11 @@ Section fundamental.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
 
-  Notation D := (WORLD -n> (leibnizO Word) -n> iProp Σ).
-  Notation R := (WORLD -n> (leibnizO Reg) -n> iProp Σ).
+  Notation D := (WORLD -n> (leibnizO Word) -n> iPropO Σ).
+  Notation R := (WORLD -n> (leibnizO Reg) -n> iPropO Σ).
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
@@ -31,11 +31,11 @@ Section fundamental.
     rewrite delete_insert_delete.
     destruct (reg_eq_dec PC r0).
     * subst r0.
-      iApply (wp_jmp_successPC with "[HPC Ha]"); eauto; first iFrame. 
+      iApply (wp_jmp_successPC with "[HPC Ha]"); eauto; first iFrame.
       iNext. iIntros "[HPC Ha] /=".
       iApply wp_pure_step_later; auto.
       (* reconstruct regions *)
-      iNext. 
+      iNext.
       iDestruct ((big_sepM_delete _ _ PC) with "[HPC Hmap]") as "Hmap /=";
         [apply lookup_insert|rewrite delete_insert_delete;iFrame|]. simpl.
       (* close region *)
@@ -44,7 +44,7 @@ Section fundamental.
       (* apply IH *)
       iApply ("IH" $! _ _ _ g _ _ a with "[] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); eauto.
       { iPureIntro. apply Hsome. }
-      destruct p; iFrame. 
+      destruct p; iFrame.
       destruct Hp as [Hp | [Hp | [Hp Hg] ] ]; congruence.
     * specialize Hsome with r0 as Hr0.
       destruct Hr0 as [wsrc Hsomesrc].
@@ -52,11 +52,11 @@ Section fundamental.
       rewrite (lookup_delete_ne r PC r0); eauto.
       iApply (wp_jmp_success with "[$HPC $Ha $Hsrc]"); eauto.
       iNext. iIntros "[HPC [Ha Hsrc]] /=".
-      iApply wp_pure_step_later; auto. 
+      iApply wp_pure_step_later; auto.
       (* reconstruct regions *)
       iDestruct ((big_sepM_delete _ _ r0) with "[Hsrc Hmap]") as "Hmap /=";
         [apply lookup_insert|rewrite delete_insert_delete;iFrame|]. simpl.
-      rewrite -delete_insert_ne; auto. 
+      rewrite -delete_insert_ne; auto.
       destruct (updatePcPerm wsrc) eqn:Heq.
       { iApply (wp_bind (fill [SeqCtx])).
         iApply (wp_notCorrectPC with "HPC"); [intro; match goal with H: isCorrectPC (inl _) |- _ => inv H end|].
@@ -64,7 +64,7 @@ Section fundamental.
         iApply wp_pure_step_later; auto.
         iApply wp_value.
         iNext. iIntros. discriminate. }
-      { destruct c,p0,p0,p0. 
+      { destruct c,p0,p0,p0.
         destruct p0.
         - iApply (wp_bind (fill [SeqCtx])).
           iApply (wp_notCorrectPC with "HPC"); [eapply not_isCorrectPC_perm; eauto|].
@@ -136,7 +136,7 @@ Section fundamental.
           rewrite (fixpoint_interp1_eq _ (inr _)).
           simpl.
           (* iDestruct "Hwsrc" as (p'') "[% H1]". *)
-          iClear "Hinv". 
+          iClear "Hinv".
           iApply ("IH" with "[] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); iFrame "#"; eauto.
         - iNext.
           iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
@@ -149,7 +149,7 @@ Section fundamental.
           iDestruct ("Hreg" $! r0 ltac:(auto)) as "Hwsrc".
           rewrite /RegLocate Hsomesrc.
           rewrite (fixpoint_interp1_eq _ (inr _)).
-          simpl. destruct l; auto. (* iDestruct "Hwsrc" as (p'') "[% H1]". *) iClear "Hinv". 
+          simpl. destruct l; auto. (* iDestruct "Hwsrc" as (p'') "[% H1]". *) iClear "Hinv".
           iApply ("IH" with "[] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); iFrame "#"; eauto.
         - iApply (wp_bind (fill [SeqCtx])).
           iApply (wp_notCorrectPC with "HPC"); [eapply not_isCorrectPC_perm; eauto|].
@@ -178,5 +178,5 @@ Section fundamental.
       }
       Unshelve. all: auto.
   Qed.
-  
+
 End fundamental.

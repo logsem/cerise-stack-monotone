@@ -14,11 +14,11 @@ Section fundamental.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
 
-  Notation D := (WORLD -n> (leibnizO Word) -n> iProp Σ).
-  Notation R := (WORLD -n> (leibnizO Reg) -n> iProp Σ).
+  Notation D := (WORLD -n> (leibnizO Word) -n> iPropO Σ).
+  Notation R := (WORLD -n> (leibnizO Reg) -n> iPropO Σ).
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
@@ -28,7 +28,7 @@ Section fundamental.
   Proof.
     intros. rewrite /leb_addr /le_addr.
     apply Z.leb_spec0.
-  Qed.    
+  Qed.
 
   Lemma isWithin_implies a0 a1 b e:
     isWithin a0 a1 b e = true ->
@@ -52,7 +52,7 @@ Section fundamental.
 
       (b <= b')%a ->
       (e' <= e)%a ->
-      □ ▷ (∀ (a7 : WORLD) (a8 : Reg) (a9 : Perm) (a10 : Locality) 
+      □ ▷ (∀ (a7 : WORLD) (a8 : Reg) (a9 : Perm) (a10 : Locality)
              (a11 a12 a13 : Addr),
               full_map a8
                        -∗ (∀ r1 : RegName,
@@ -73,7 +73,7 @@ Section fundamental.
                          read_write_cond a14 p'0 interp
                          ∧ ⌜if pwl a9
                             then region_state_pwl a7 a14
-                            else region_state_nwl a7 a14 a10⌝) -∗ 
+                            else region_state_nwl a7 a14 a10⌝) -∗
                   interp_conf a7) -∗
       (fixpoint interp1) W (inr (p, l, b, e, a)) -∗
       (fixpoint interp1) W (inr (p, l, b', e', a)).
@@ -114,7 +114,7 @@ Section fundamental.
         iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
         { destruct ρ;auto;[..|specialize (Hnotstatic g)];contradiction. }
         iApply ("IH" $! _ r with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); try iClear "IH"; eauto.
-        iModIntro. 
+        iModIntro.
         generalize (isWithin_implies _ _ _ _ H4). intros [A B].
         destruct (Z_le_dec b'' e'').
         + rewrite (isWithin_region_addrs_decomposition b'' e'' b0 e0); auto.
@@ -137,7 +137,7 @@ Section fundamental.
           destruct (reg_eq_dec ri dst).
           + subst ri. rewrite lookup_insert.
             iDestruct ("Hreg" $! dst Hri) as "Hdst".
-            generalize (isWithin_implies _ _ _ _ H4). intros [A B]. 
+            generalize (isWithin_implies _ _ _ _ H4). intros [A B].
             rewrite H0. iApply subseg_interp_preserved; eauto.
           + repeat rewrite lookup_insert_ne; auto.
             iApply "Hreg"; auto. } }

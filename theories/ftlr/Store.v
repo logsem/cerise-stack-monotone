@@ -3,7 +3,7 @@ From iris.program_logic Require Import weakestpre adequacy lifting.
 From stdpp Require Import base.
 From cap_machine Require Export logrel monotone.
 From cap_machine Require Import ftlr_base.
-From cap_machine.rules Require Import rules_Store.
+From cap_machine.rules Require Import rules_Store rules_base.
 Import uPred.
 
 Section fundamental.
@@ -14,11 +14,11 @@ Section fundamental.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
 
-  Notation D := (WORLD -n> (leibnizO Word) -n> iProp Σ).
-  Notation R := (WORLD -n> (leibnizO Reg) -n> iProp Σ).
+  Notation D := (WORLD -n> (leibnizO Word) -n> iPropO Σ).
+  Notation R := (WORLD -n> (leibnizO Reg) -n> iPropO Σ).
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
@@ -35,7 +35,7 @@ Section fundamental.
     iIntros (Hp) "#HR".
     rewrite (fixpoint_interp1_eq _ (inr _)).
     (do 2 try destruct Hp as [ | Hp]). 3:destruct Hp.
-    all:subst; auto. 
+    all:subst; auto.
   Qed.
 
   (* The necessary resources to close the region again, except for the points to predicate, which we will store separately *)
@@ -57,7 +57,7 @@ Section fundamental.
       pose (Hrar' := Hrar).
       destruct Hrar' as (Hinr0 & _). destruct H3 as [Hinr1 | Hinl1].
       * rewrite Hinr0 in Hinr1. inversion Hinr1.
-        subst;auto. 
+        subst;auto.
       * destruct Hinl1 as [z Hinl1]. rewrite Hinl1 in Hinr0. by exfalso.
   Qed.
 
@@ -283,7 +283,7 @@ Section fundamental.
         iDestruct "HStoreRes" as (p'1 w') "[-> [% HLoadRes] ]".
         rewrite lookup_insert in Ha0; inversion Ha0; clear Ha0; subst.
         iDestruct "HLoadRes" as (ρ1) "(Hstate' & % & #Hrev & Hr & % & Hrel')".
-        iDestruct "Hrev" as %[Hnotrevoked Hnotstatic]. 
+        iDestruct "Hrev" as %[Hnotrevoked Hnotstatic].
         rewrite insert_insert memMap_resource_2ne; last auto. iDestruct "Hmem" as  "[Ha1 $]".
         iDestruct (storev_interp_mono with "HVr1") as "Hr1Mono"; eauto.
         iDestruct (region_close_next with "[$Hr $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono]") as "Hr"; eauto.
@@ -295,7 +295,7 @@ Section fundamental.
          rewrite lookup_insert in Ha0; inversion Ha0; simplify_eq.
          iExists storev1. iFrame.
          iDestruct (storev_interp_mono with "HVr1") as "Hr1Mono"; eauto.
-    - by exfalso. 
+    - by exfalso.
    Qed.
 
   Lemma store_case(W : WORLD) (r : leibnizO Reg) (p p' : Perm) (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst : RegName) (src : Z + RegName) :
@@ -361,7 +361,7 @@ Section fundamental.
       iDestruct (execcPC_implies_interp _ _ _ _ _ a  with "Hinv") as "HVPC"; eauto.
 
       iDestruct (switch_monotonicity_formulation with "Hmono") as "Hmono"; auto.
-      
+
       (* Step 4: return all the resources we had in order to close the second location in the region, in the cases where we need to *)
       iDestruct (mem_map_recover_res with "HStoreMem Hreg HVPC Hw Hmono Hmem") as (w') "(Hr & Ha & #HSVInterp & Hmono)"; eauto.
 

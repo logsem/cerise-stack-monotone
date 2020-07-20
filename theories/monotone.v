@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From iris.program_logic Require Export weakestpre.
-From cap_machine Require Export logrel. 
+From cap_machine Require Export logrel.
 From iris.base_logic Require Export invariants na_invariants saved_prop.
 Import uPred.
 
@@ -12,32 +12,32 @@ Section monotone.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
-  
+
   Lemma region_state_nwl_monotone W W' a l :
     related_sts_pub_world W W' →
     region_state_nwl W a l -> region_state_nwl W' a l.
   Proof.
-    rewrite /region_state_nwl /std. 
+    rewrite /region_state_nwl /std.
     intros Hrelated Hstate.
     destruct l.
     - destruct Hrelated as [ [Hdom_sta Hrelated ] _]. simpl in *.
       assert (is_Some (W'.1 !! a)) as [y Hy].
       { apply elem_of_gmap_dom. apply elem_of_subseteq in Hdom_sta. apply Hdom_sta. apply elem_of_gmap_dom;eauto. }
       specialize (Hrelated a Permanent y Hstate Hy).
-      apply std_rel_pub_rtc_Permanent in Hrelated; subst; auto. 
+      apply std_rel_pub_rtc_Permanent in Hrelated; subst; auto.
     - destruct Hrelated as [ [Hdom_sta Hrelated] _]. simpl in *.
       assert (is_Some (W'.1 !! a)) as [y Hy].
       { apply elem_of_gmap_dom. apply elem_of_subseteq in Hdom_sta. apply Hdom_sta. apply elem_of_gmap_dom.
         destruct Hstate; eauto. }
       destruct Hstate as [HTemp | HPerm].
-      + left. 
+      + left.
         specialize (Hrelated _ Temporary y HTemp Hy).
-        apply std_rel_pub_rtc_Temporary in Hrelated; subst;auto. 
+        apply std_rel_pub_rtc_Temporary in Hrelated; subst;auto.
       + right.
         specialize (Hrelated _ Permanent y HPerm Hy).
-        apply std_rel_pub_rtc_Permanent in Hrelated; subst; auto. 
+        apply std_rel_pub_rtc_Permanent in Hrelated; subst; auto.
   Qed.
 
   Lemma region_state_nwl_monotone_nl W W' a :
@@ -50,7 +50,7 @@ Section monotone.
     assert (is_Some (W'.1 !! a)) as [y Hy].
     { apply elem_of_gmap_dom. apply elem_of_subseteq in Hdom_sta. apply Hdom_sta. apply elem_of_gmap_dom;eauto. }
     specialize (Hrelated _ Permanent y Hstate Hy).
-    apply std_rel_rtc_Permanent in Hrelated; subst; auto. 
+    apply std_rel_rtc_Permanent in Hrelated; subst; auto.
   Qed.
 
   Lemma region_state_pwl_monotone W W' a :
@@ -63,7 +63,7 @@ Section monotone.
     assert (is_Some (W'.1 !! a)) as [y Hy].
     { apply elem_of_gmap_dom. apply elem_of_subseteq in Hdom_sta. apply Hdom_sta. apply elem_of_gmap_dom;eauto. }
     specialize (Hrelated _ Temporary y Hstate Hy).
-    apply std_rel_pub_rtc_Temporary in Hrelated; subst; auto. 
+    apply std_rel_pub_rtc_Temporary in Hrelated; subst; auto.
   Qed.
 
   Lemma region_state_U_monotone W W' a :
@@ -75,12 +75,12 @@ Section monotone.
     destruct Hrelated as [ [Hdom_sta Hrelated ] _]. simpl in *.
     assert (is_Some (W'.1 !! a)) as [y Hy].
     { apply elem_of_gmap_dom. apply elem_of_subseteq in Hdom_sta. apply Hdom_sta. apply elem_of_gmap_dom;eauto.
-      destruct Hstate as [Hstate | [Hstate | [w Hstate] ] ];eauto. 
+      destruct Hstate as [Hstate | [Hstate | [w Hstate] ] ];eauto.
     }
     destruct Hstate as [Hstate|[Hstate|[w Hstate] ] ].
     - specialize (Hrelated _ Temporary y Hstate Hy).
       destruct (decide (y = Temporary)); subst; auto.
-      apply std_rel_pub_rtc_Temporary in Hrelated; auto. contradiction. 
+      apply std_rel_pub_rtc_Temporary in Hrelated; auto. contradiction.
     - specialize (Hrelated _ Permanent y Hstate Hy).
       apply std_rel_pub_rtc_Permanent in Hrelated; auto. subst y; auto.
     - specialize (Hrelated _ (Static {[a:=w]}) y Hstate Hy).
@@ -100,7 +100,7 @@ Section monotone.
     destruct Hstate as [Hstate|[? Hstate] ].
     - specialize (Hrelated _ Temporary y Hstate Hy).
       destruct (decide (y = Temporary)); subst; left; auto.
-      apply std_rel_pub_rtc_Temporary in Hrelated; auto. contradiction. 
+      apply std_rel_pub_rtc_Temporary in Hrelated; auto. contradiction.
     - specialize (Hrelated _ (Static {[a:=x]}) y Hstate Hy).
       eapply std_rel_pub_rtc_Static in Hrelated; eauto. destruct Hrelated; subst y; [left | right]; eauto.
   Qed.
@@ -125,19 +125,19 @@ Section monotone.
     (std W') !! a = Some Revoked ∨
     (std W') !! a = Some Temporary.
   Proof.
-    rewrite /region_state_pwl /std. 
+    rewrite /region_state_pwl /std.
     intros Hrelated Hstate.
     destruct Hrelated as [ [Hdom_sta Hrelated ] _]. simpl in *.
     assert (is_Some (W'.1 !! a)) as [y Hy].
     { apply elem_of_gmap_dom. apply elem_of_subseteq in Hdom_sta. apply Hdom_sta. apply elem_of_gmap_dom;eauto. }
     specialize (Hrelated _ Revoked y Hstate Hy).
     apply std_rel_pub_rtc_Revoked in Hrelated; auto.
-    destruct Hrelated as [Htemp | Hrev]; subst; auto. 
+    destruct Hrelated as [Htemp | Hrev]; subst; auto.
   Qed.
-      
+
   Lemma interp_monotone W W' w :
-    (⌜related_sts_pub_world W W'⌝ →
-    interp W w -∗ interp W' w)%I. 
+    related_sts_pub_world W W' ->
+    interp W w -∗ interp W' w.
   Proof.
     iIntros (Hrelated) "#Hw".
     rewrite /interp /= fixpoint_interp1_eq /=.
@@ -146,74 +146,74 @@ Section monotone.
     - iApply (big_sepL_mono with "Hw").
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hrel]".
-      iExists _. iSplit;eauto. iFrame "#". 
-      iDestruct "Hrel" as %Hrel. 
-      iPureIntro. apply region_state_nwl_monotone with W;auto. 
+      iExists _. iSplit;eauto. iFrame "#".
+      iDestruct "Hrel" as %Hrel.
+      iPureIntro. apply region_state_nwl_monotone with W;auto.
     - iApply (big_sepL_mono with "Hw").
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hrel]".
-      iExists _. iSplit;eauto. iFrame "#". 
-      iDestruct "Hrel" as %Hrel. 
-      iPureIntro. apply region_state_nwl_monotone with W;auto. 
-    - destruct l; auto. 
+      iExists _. iSplit;eauto. iFrame "#".
+      iDestruct "Hrel" as %Hrel.
+      iPureIntro. apply region_state_nwl_monotone with W;auto.
+    - destruct l; auto.
       iApply (big_sepL_mono with "Hw").
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hrel]".
-      iExists _. iSplit;eauto. iFrame "#". 
-      iDestruct "Hrel" as %Hrel. 
-      iPureIntro. apply region_state_pwl_monotone with W;auto. 
+      iExists _. iSplit;eauto. iFrame "#".
+      iDestruct "Hrel" as %Hrel.
+      iPureIntro. apply region_state_pwl_monotone with W;auto.
     - iApply (big_sepL_mono with "Hw").
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hrel]".
-      iExists _. iSplit;eauto. iFrame "#". 
-      iDestruct "Hrel" as %Hrel. 
-      iPureIntro. apply region_state_nwl_monotone with W;auto. 
+      iExists _. iSplit;eauto. iFrame "#".
+      iDestruct "Hrel" as %Hrel.
+      iPureIntro. apply region_state_nwl_monotone with W;auto.
     - iModIntro. iIntros (r W'').
       destruct l; simpl.
       + iIntros (Hrelated').
         iAssert (future_world Global W W'')%I as "Hrelated".
         { iPureIntro. apply related_sts_pub_priv_trans_world with W'; auto. }
         iSpecialize ("Hw" $! r W'' with "Hrelated").
-        iFrame.
+        iApply "Hw".
       + iIntros (Hrelated').
         iAssert (future_world Local W W'')%I as "Hrelated".
         { iPureIntro. apply related_sts_pub_trans_world with W'; auto. }
         iSpecialize ("Hw" $! r W'' with "Hrelated").
-        iFrame.
+        iApply "Hw".
     - iApply (big_sepL_mono with "Hw").
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hrel]".
-      iExists _. iSplit;eauto. iFrame "#". 
-      iDestruct "Hrel" as %Hrel. 
+      iExists _. iSplit;eauto. iFrame "#".
+      iDestruct "Hrel" as %Hrel.
       iPureIntro. apply region_state_nwl_monotone with W;auto.
     - destruct l; auto.
       iApply (big_sepL_mono with "Hw").
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hrel]".
-      iExists _. iSplit;eauto. iFrame "#". 
-      iDestruct "Hrel" as %Hrel. 
+      iExists _. iSplit;eauto. iFrame "#".
+      iDestruct "Hrel" as %Hrel.
       iPureIntro. apply region_state_pwl_monotone with W;auto.
     - destruct l; simpl.
       + iApply (big_sepL_mono with "Hw").
         iIntros (n y Hsome) "Hw".
         iDestruct "Hw" as (p Hfl) "#[Hrw Hst]".
-        iExists _. iSplit;eauto. iFrame "#". 
-        iDestruct "Hst" as %Hst. 
-        iPureIntro. eapply (region_state_nwl_monotone W W' _ Global); auto. 
+        iExists _. iSplit;eauto. iFrame "#".
+        iDestruct "Hst" as %Hst.
+        iPureIntro. eapply (region_state_nwl_monotone W W' _ Global); auto.
       + iDestruct "Hw" as "[Hw1 Hw2]".
         iSplitL "Hw1".
         * iApply (big_sepL_mono with "Hw1").
           iIntros (n y Hsome) "Hw".
           iDestruct "Hw" as (p Hfl) "#[Hrw Hst ]".
           iExists _. iSplit;eauto. iFrame "#".
-          iDestruct "Hst" as %Hstd. 
+          iDestruct "Hst" as %Hstd.
           iPureIntro. eapply (region_state_nwl_monotone W W' _ Local); auto.
         * iApply (big_sepL_mono with "Hw2").
           iIntros (n y Hsome) "Hw".
           iDestruct "Hw" as (p Hfl) "#[Hrw Hst ]".
           iExists _. iSplit;eauto. iFrame "#".
-          iDestruct "Hst" as %Hst. 
-          iPureIntro. 
+          iDestruct "Hst" as %Hst.
+          iPureIntro.
           eapply region_state_U_monotone; eauto.
     - destruct l; auto.
       iDestruct "Hw" as "[Hbe Hexec]".
@@ -222,35 +222,35 @@ Section monotone.
         iIntros (n y Hsome) "Hw".
         iDestruct "Hw" as (p Hfl) "#[Hrw Hrel ]".
         iExists _. iSplit;eauto. iFrame "#".
-        iDestruct "Hrel" as %Hrel. 
-        iPureIntro. apply region_state_pwl_monotone with W;auto. }        
+        iDestruct "Hrel" as %Hrel.
+        iPureIntro. apply region_state_pwl_monotone with W;auto. }
       { iApply (big_sepL_mono with "Hexec").
         iIntros (n y Hsome) "Hw".
         iDestruct "Hw" as (p Hfl) "#[Hrw Hrel ]".
         iExists _. iSplit;eauto. iFrame "#".
-        iDestruct "Hrel" as %Hrel. 
+        iDestruct "Hrel" as %Hrel.
         iPureIntro. apply region_state_U_pwl_monotone with W;auto. }
     - destruct l; simpl.
       + iApply (big_sepL_mono with "Hw").
         iIntros (n y Hsome) "Hw".
         iDestruct "Hw" as (p Hfl) "#[Hrw Hst ]".
         iExists _. iSplit;eauto. iFrame "#".
-        iDestruct "Hst" as %Hst. 
-        iPureIntro. eapply (region_state_nwl_monotone W W' _ Global); auto. 
+        iDestruct "Hst" as %Hst.
+        iPureIntro. eapply (region_state_nwl_monotone W W' _ Global); auto.
       + iDestruct "Hw" as "[Hw1 Hw2]".
         iSplitL "Hw1".
         * iApply (big_sepL_mono with "Hw1").
           iIntros (n y Hsome) "Hw".
           iDestruct "Hw" as (p Hfl) "#[Hrw Hst ]".
           iExists _. iSplit;eauto. iFrame "#".
-          iDestruct "Hst" as %Hstd. 
+          iDestruct "Hst" as %Hstd.
           iPureIntro. eapply (region_state_nwl_monotone W W' _ Local); auto.
         * iApply (big_sepL_mono with "Hw2").
           iIntros (n y Hsome) "Hw".
           iDestruct "Hw" as (p Hfl) "#[Hrw Hst ]".
           iExists _. iSplit;eauto. iFrame "#".
-          iDestruct "Hst" as %Hst. 
-          iPureIntro. 
+          iDestruct "Hst" as %Hst.
+          iPureIntro.
           eapply region_state_U_monotone; eauto.
     - destruct l; auto.
       iDestruct "Hw" as "[Hbe Hexec]".
@@ -259,19 +259,19 @@ Section monotone.
         iIntros (n y Hsome) "Hw".
         iDestruct "Hw" as (p Hfl) "#[Hrw Hrel ]".
         iExists _. iSplit;eauto. iFrame "#".
-        iDestruct "Hrel" as %Hrel. 
-        iPureIntro. apply region_state_pwl_monotone with W;auto. }        
+        iDestruct "Hrel" as %Hrel.
+        iPureIntro. apply region_state_pwl_monotone with W;auto. }
       { iApply (big_sepL_mono with "Hexec").
         iIntros (n y Hsome) "Hw".
         iDestruct "Hw" as (p Hfl) "#[Hrw Hrel ]".
         iExists _. iSplit;eauto. iFrame "#".
-        iDestruct "Hrel" as %Hrel. 
+        iDestruct "Hrel" as %Hrel.
         iPureIntro. apply region_state_U_pwl_monotone with W;auto. }
   Qed.
 
   Lemma interp_monotone_nl W W' w :
-    (⌜related_sts_priv_world W W'⌝ → ⌜isLocalWord w = false⌝ →
-    interp W w -∗ interp W' w)%I. 
+    related_sts_priv_world W W' → isLocalWord w = false →
+    interp W w -∗ interp W' w.
   Proof.
     iIntros (Hrelated Hnl) "#Hw".
     rewrite /interp /= fixpoint_interp1_eq /=.
@@ -281,22 +281,22 @@ Section monotone.
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hrel ]".
       iExists _. iSplit;eauto. iFrame "#".
-      iDestruct "Hrel" as %Hrel. 
-      iPureIntro. destruct l; try discriminate. 
-      apply region_state_nwl_monotone_nl with W;auto. 
+      iDestruct "Hrel" as %Hrel.
+      iPureIntro. destruct l; try discriminate.
+      apply region_state_nwl_monotone_nl with W;auto.
     - iApply (big_sepL_mono with "Hw").
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hrel ]".
       iExists _. iSplit;eauto. iFrame "#".
-      iDestruct "Hrel" as %Hrel. 
-      iPureIntro. destruct l; try discriminate. 
-      apply region_state_nwl_monotone_nl with W;auto. 
-    - destruct l; auto. discriminate. 
+      iDestruct "Hrel" as %Hrel.
+      iPureIntro. destruct l; try discriminate.
+      apply region_state_nwl_monotone_nl with W;auto.
+    - destruct l; auto. discriminate.
     - iApply (big_sepL_mono with "Hw").
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hrel ]".
       iExists _. iSplit;eauto. iFrame "#".
-      iDestruct "Hrel" as %Hrel. 
+      iDestruct "Hrel" as %Hrel.
       iPureIntro. destruct l; try discriminate.
       apply region_state_nwl_monotone_nl with W;auto.
     - iModIntro. iIntros (r W'').
@@ -305,13 +305,13 @@ Section monotone.
       iAssert (future_world Global W W'')%I as "Hrelated".
       { iPureIntro. apply related_sts_priv_trans_world with W'; auto. }
       iSpecialize ("Hw" $! r W'' with "Hrelated").
-      iFrame.
+      iApply "Hw".
     - iApply (big_sepL_mono with "Hw").
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hrel ]".
       iExists _. iSplit;eauto. iFrame "#".
-      iDestruct "Hrel" as %Hrel. 
-      iPureIntro. destruct l; try discriminate. 
+      iDestruct "Hrel" as %Hrel.
+      iPureIntro. destruct l; try discriminate.
       apply region_state_nwl_monotone_nl with W;auto.
     - destruct l; try discriminate. done.
     - destruct l; simpl in Hnl; try discriminate.
@@ -319,7 +319,7 @@ Section monotone.
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hst ]".
       iExists _. iSplit;eauto. iFrame "#".
-      iDestruct "Hst" as %Hst. 
+      iDestruct "Hst" as %Hst.
       iPureIntro.
       apply region_state_nwl_monotone_nl with W; auto.
     - destruct l; auto. discriminate.
@@ -328,8 +328,8 @@ Section monotone.
       iIntros (n y Hsome) "Hw".
       iDestruct "Hw" as (p Hfl) "#[Hrw Hst ]".
       iExists _. iSplit;eauto. iFrame "#".
-      iDestruct "Hst" as %Hst. 
-      iPureIntro. 
+      iDestruct "Hst" as %Hst.
+      iPureIntro.
       apply region_state_nwl_monotone_nl with W; auto.
     - destruct l; try discriminate. done.
   Qed.
@@ -346,8 +346,8 @@ Section monotone.
         destruct (decide (Temporary = Temporary ∧ true = true)). auto. assert (Temporary = Temporary ∧ true = true); auto. by congruence.
         destruct (decide (Temporary = Temporary ∧ false = true)). destruct a; by exfalso. auto.
       *  destruct (decide (Permanent = Temporary ∧ pwl p = true)). destruct a; by exfalso. auto.
-      * by intros. 
-      * specialize (Hsta g). done. 
+      * by intros.
+      * specialize (Hsta g). done.
     - intros. destruct ρ.
       * destruct (pwl p).
         destruct (decide (Temporary = Temporary ∧ true = true)). auto.
@@ -355,40 +355,40 @@ Section monotone.
         destruct (decide (Temporary = Temporary ∧ false = true)). destruct a; by exfalso. auto.
       *  destruct (decide (Permanent = Temporary ∧ pwl p = true)). destruct a; by exfalso. auto.
       * by iPureIntro.
-      * by iPureIntro. 
+      * by iPureIntro.
   Qed.
 
   (* The validity of regions are monotone wrt private/public future worlds *)
   Lemma adv_monotone W W' b e :
     related_sts_priv_world W W' →
-    (([∗ list] a ∈ region_addrs b e, read_write_cond a RX interp
+    ([∗ list] a ∈ region_addrs b e, read_write_cond a RX interp
                       ∧ ⌜std W !! a = Some Permanent⌝)
     -∗ ([∗ list] a ∈ region_addrs b e, read_write_cond a RX interp
-                      ∧ ⌜std W' !! a = Some Permanent⌝))%I.
+                      ∧ ⌜std W' !! a = Some Permanent⌝).
   Proof.
     iIntros (Hrelated) "Hr".
     iApply (big_sepL_mono with "Hr").
-    iIntros (k y Hsome) "(Hy & Hperm)". 
+    iIntros (k y Hsome) "(Hy & Hperm)".
     iFrame.
     iDestruct "Hperm" as %Hperm.
-    iPureIntro. 
+    iPureIntro.
     apply (region_state_nwl_monotone_nl _ W') in Hperm; auto.
   Qed.
 
   Lemma adv_stack_monotone W W' b e :
     related_sts_pub_world W W' ->
-    (([∗ list] a ∈ region_addrs b e, read_write_cond a RWLX interp
+    ([∗ list] a ∈ region_addrs b e, read_write_cond a RWLX interp
                                      ∧ ⌜region_state_pwl W a⌝)
     -∗ ([∗ list] a ∈ region_addrs b e, read_write_cond a RWLX interp
-                                       ∧ ⌜region_state_pwl W' a⌝))%I.
+                                       ∧ ⌜region_state_pwl W' a⌝).
   Proof.
-    iIntros (Hrelated) "Hstack_adv". 
+    iIntros (Hrelated) "Hstack_adv".
     iApply (big_sepL_mono with "Hstack_adv").
     iIntros (k y Hsome) "(Hr & Htemp)".
-    iDestruct "Htemp" as %Htemp. 
-    iFrame. iPureIntro. 
+    iDestruct "Htemp" as %Htemp.
+    iFrame. iPureIntro.
     apply (region_state_pwl_monotone _ W') in Htemp; auto.
-  Qed. 
+  Qed.
 
 Global Instance interp_ne n :
   Proper (dist n ==> dist n) (λ Wv : WORLD * (leibnizO Word), (interp Wv.1) Wv.2).
@@ -451,7 +451,5 @@ Proof.
   - trivial.
   - auto.
 Qed.
-
-
 
 End monotone.

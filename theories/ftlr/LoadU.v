@@ -14,18 +14,18 @@ Section fundamental.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
 
-  Notation D := (WORLD -n> (leibnizO Word) -n> iProp Σ).
-  Notation R := (WORLD -n> (leibnizO Reg) -n> iProp Σ).
+  Notation D := (WORLD -n> (leibnizO Word) -n> iPropO Σ).
+  Notation R := (WORLD -n> (leibnizO Reg) -n> iPropO Σ).
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
   (* TODO: move somewhere *)
   Lemma isU_inv:
     ∀ (W : leibnizO WORLD) (a' a b e : Addr) (p : Perm) (g : Locality),
-      (b ≤ a' < min a e)%Z
+      (b ≤ a' < addr_reg.min a e)%Z
       → isU p = true
       → ((interp W) (inr (p, g, b, e, a))
          → ∃ p' : Perm, ⌜PermFlows (promote_perm p) p'⌝ ∗ read_write_cond a' p' interp
@@ -188,14 +188,14 @@ Section fundamental.
           iDestruct (region_open_prepare with "A") as "A".
           iDestruct (memMap_resource_1 with "B") as "B".
           iDestruct (region_close with "[A B $Hmono $Hstate]") as "B";eauto.
-          { destruct ρ;auto;[|specialize (Hnotstatic g1)];contradiction. }      
+          { destruct ρ;auto;[|specialize (Hnotstatic g1)];contradiction. }
           iFrame. iSplitR; auto.
         - subst mem. iDestruct (memMap_resource_2ne with "B") as "[B C]"; auto.
           rewrite /region_open_resources. iDestruct "A" as (ρ') "[A1 [% [A2 [% [[A3 #Hw'] A4]]]]]".
-          destruct H1 as [Hnotrevoked' Hnotstatic']. 
+          destruct H1 as [Hnotrevoked' Hnotstatic'].
           iDestruct (region_close_next with "[$A1 $A2 $A3 $A4 $C]") as "A"; auto.
           { intros [g' Hcontr]. destruct ρ';auto;inversion Hcontr;try contradiction.
-            specialize (Hnotstatic' g'). contradiction. 
+            specialize (Hnotstatic' g'). contradiction.
           }
           { eapply not_elem_of_cons; split; auto. eapply not_elem_of_nil. }
           iFrame "#".
@@ -216,7 +216,7 @@ Section fundamental.
         iApply (wp_notCorrectPC_perm with "[HPC]"); eauto. iIntros "!> _".
         iApply wp_pure_step_later; auto. iNext. iApply wp_value.
         iIntros (a1); inversion a1. }
-      
+
       iApply ("IH" $! _ r' with "[%] [] [C] [$Hregion] [$Hsts] [$Hown]").
       - subst r'. intros. rewrite lookup_insert_is_Some'.
         destruct (reg_eq_dec PC x5); auto; right.

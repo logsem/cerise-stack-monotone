@@ -13,11 +13,11 @@ Section fundamental.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
-  Notation WORLD := (prodO STS_STD STS). 
+  Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
 
-  Notation D := (WORLD -n> (leibnizO Word) -n> iProp Σ).
-  Notation R := (WORLD -n> (leibnizO Reg) -n> iProp Σ).
+  Notation D := (WORLD -n> (leibnizO Word) -n> iPropO Σ).
+  Notation R := (WORLD -n> (leibnizO Reg) -n> iPropO Σ).
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
@@ -30,7 +30,7 @@ Section fundamental.
   Lemma PermPairFlows_interp_preserved W p p' l l' b e a :
     p <> E ->
     PermPairFlowsTo (p', l') (p, l) = true →
-    □ ▷ (∀ (a7 : WORLD) (a8 : Reg) (a9 : Perm) (a10 : Locality) 
+    □ ▷ (∀ (a7 : WORLD) (a8 : Reg) (a9 : Perm) (a10 : Locality)
            (a11 a12 a13 : Addr),
             full_map a8
             -∗ (∀ r1 : RegName,
@@ -51,7 +51,7 @@ Section fundamental.
                        read_write_cond a14 p'0 interp
                        ∧ ⌜if pwl a9
                           then region_state_pwl a7 a14
-                          else region_state_nwl a7 a14 a10⌝) -∗ 
+                          else region_state_nwl a7 a14 a10⌝) -∗
                 interp_conf a7) -∗
     (fixpoint interp1) W (inr (p, l, b, e, a)) -∗
     (fixpoint interp1) W (inr (p', l', b, e, a)).
@@ -121,8 +121,8 @@ Section fundamental.
           iIntros "H". iDestruct "H" as (? ?) "[H %]". iExists H4. iSplitR; auto.
           { destruct (andb_true_eq _ _ ltac:(naive_solver)).
             iPureIntro. eapply PermFlows_trans with p0; auto. naive_solver. }
-          iSplitL;auto. 
-          iPureIntro. 
+          iSplitL;auto.
+          iPureIntro.
           destruct (andb_true_eq _ _ ltac:(naive_solver)); simpl in *.
           destruct (locality_eq_dec g'' g0).
           * subst g0. destruct Hp as [Hp | [ Hp | [Hp Hl] ] ]; destruct Hpg as [Hp' | [ Hp' | [Hp' Hg' ] ] ]; subst; simpl in *; simpl; try congruence; auto.
