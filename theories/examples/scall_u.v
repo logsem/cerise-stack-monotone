@@ -305,9 +305,9 @@ Section scall.
       [apply decode_encode_instrW_inv|apply Hfl| |auto |iContiguous_next Ha 10|].
     { iCorrectPC a_first a_cont. }
     iEpilogue "(HPC & Hinstr & Hr_t0)" "Hinstr" "Hi".
-    assert ((min b_r_adv e_r) = b_r_adv) as ->.
+    assert ((addr_reg.min b_r_adv e_r) = b_r_adv) as ->.
     { apply withinBounds_le_addr in Hwb2 as [_ Hlt].
-      unfold min. destruct (Addr_le_dec b_r_adv e_r); auto. destruct n.
+      unfold addr_reg.min. destruct (Addr_le_dec b_r_adv e_r); auto. destruct n.
       apply Z.lt_le_incl; auto.
     }
     (* lea r_t0 -7 *)
@@ -362,7 +362,7 @@ Section scall.
       * simpl. do 15 (instantiate (1:= cons _ _)). instantiate (1 := []). simpl; eauto.
       * cbn.  eapply (contiguous_between_incr_addr _ 15); eauto.
     }
-    { instantiate(H2:= [_]). unfold app; auto. }
+    { instantiate(2:= [_]). unfold app; auto. }
     iDestruct "Hcont" as %(Hcont21 & Hcont22 & Happeq' & Hlink').
     assert (a14 <= rclear_first)%a as Harcl. by eapply contiguous_between_bounds;eauto.
     destruct subseg_addrs.
@@ -468,7 +468,7 @@ Section scall.
     iApply (wp_move_success_reg_fromPC with "[$HPC $Hinstr $Hr_t1]");
       [apply decode_encode_instrW_inv|apply Hfl| |iContiguous_next Hcont 0|auto|].
     { iCorrectPC stack_own_b stack_own_e. }
-    iAssert (emp)%I as "Hframe_past";[done|].
+    iAssert (emp)%I as "-#Hframe_past";[done|].
     iEpilogue "(HPC & Hinstr & Hr_t1)" "Hinstr" "Hframe_past".
     (* lea r_t1 6 *)
     iPrologue l Hframe_length "Hprog".
