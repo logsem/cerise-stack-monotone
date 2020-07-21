@@ -239,6 +239,7 @@ Section Adequacy.
     pose proof (dom_mkregion_incl a e l) as HH.
     rewrite elem_of_subseteq in HH |- * => HH.
     specialize (HH _ H). eapply elem_of_list_to_set; eauto.
+    Unshelve. apply _.
   Qed.
 
   Lemma in_dom_mkregion' a e l k:
@@ -263,7 +264,7 @@ Section Adequacy.
     try match goal with |- _ ## dom _ (mkregion _ _ _) =>
       eapply disjoint_mono_r; [ apply dom_mkregion_incl |] end;
     rewrite -?list_to_set_app_L ?dom_list_to_map_singleton;
-    apply list_to_set_disj.
+    apply stdpp_extra.list_to_set_disj.
 
   Lemma mkregion_sepM_to_sepL2 (a e: Addr) l (φ: Addr → Word → iProp Σ) :
     (a + length l)%a = Some e →
@@ -369,22 +370,22 @@ Section Adequacy.
 
     (* Massage points-to into sepL2s with permission-pointsto *)
 
-    iDestruct (mkregion_prepare RO with "Hlink_table") as ">Hlink_table". by apply link_table_size.
-    iDestruct (mkregion_prepare RW with "Hfail") as ">Hfail". by apply fail_size.
-    iDestruct (mkregion_prepare RWX with "Hmalloc_mem") as ">Hmalloc_mem".
+    iDestruct (mkregion_prepare RO with "[$Hlink_table]") as ">Hlink_table". by apply link_table_size.
+    iDestruct (mkregion_prepare RW with "[$Hfail]") as ">Hfail". by apply fail_size.
+    iDestruct (mkregion_prepare RWX with "[$Hmalloc_mem]") as ">Hmalloc_mem".
     { rewrite replicate_length /region_size. clear.
       generalize malloc_mem_start malloc_end malloc_mem_size. solve_addr. }
-    iMod (MonRefAlloc _ _ RWX with "Hmalloc_memptr") as "Hmalloc_memptr".
-    iDestruct (mkregion_prepare RX with "Hmalloc_code") as ">Hmalloc_code".
+    iMod (MonRefAlloc _ _ RWX with "[$Hmalloc_memptr]") as "Hmalloc_memptr".
+    iDestruct (mkregion_prepare RX with "[$Hmalloc_code]") as ">Hmalloc_code".
       by apply malloc_code_size.
-    iDestruct (mkregion_prepare RWX with "Hadv") as ">Hadv". by apply adv_size.
+    iDestruct (mkregion_prepare RWX with "[$Hadv]") as ">Hadv". by apply adv_size.
     (* Keep the stack as a sepM, it'll be easier to allocate the corresponding
        uninitialized region later. *)
-    iDestruct (MonRefAlloc_sepM RWLX with "Hstack") as ">Hstack".
-    iDestruct (mkregion_prepare RWX with "Hawk_preamble") as ">Hawk_preamble".
+    iDestruct (MonRefAlloc_sepM RWLX with "[$Hstack]") as ">Hstack".
+    iDestruct (mkregion_prepare RWX with "[$Hawk_preamble]") as ">Hawk_preamble".
       by apply awk_preamble_size.
-    iDestruct (mkregion_prepare RWX with "Hawk_body") as ">Hawk_body". by apply awk_body_size.
-    iMod (MonRefAlloc _ _ RWX with "Hawk_link") as "Hawk_link".
+    iDestruct (mkregion_prepare RWX with "[$Hawk_body]") as ">Hawk_body". by apply awk_body_size.
+    iMod (MonRefAlloc _ _ RWX with "[$Hawk_link]") as "Hawk_link".
     rewrite -/(awkward_example _ _ _ _) -/(awkward_preamble _ _ _ _).
 
     (* Split the link table *)
@@ -536,9 +537,9 @@ Section Adequacy.
         (* Stack: trivially valid because fully uninitialized *)
         destruct (decide (r = r_stk)) as [ -> |].
         { rewrite /RegLocate Hstk fixpoint_interp1_eq /=.
-          rewrite (region_addrs_empty stack_start (min _ _)) /=.
+          rewrite (region_addrs_empty stack_start (addr_reg.min _ _)) /=.
           2: clear; solve_addr. iSplitR; [auto|].
-          rewrite (_: max stack_start stack_start = stack_start). 2: clear; solve_addr.
+          rewrite (_: addr_reg.max stack_start stack_start = stack_start). 2: clear; solve_addr.
           iApply (big_sepL_mono with "Hstack").
           iIntros (? ? Hk) "H". iDestruct "H" as (?) "?".
           rewrite /read_write_cond /region_state_U_pwl. iExists _. iFrame.

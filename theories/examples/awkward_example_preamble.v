@@ -93,7 +93,7 @@ Section awkward_example_preamble.
   Definition awk_invN : namespace := awkN .@ "inv".
   Definition awk_codeN : namespace := awkN .@ "code".
   Definition awk_clsN : namespace := awkN .@ "cls".
-  Definition awk_env : namespace := awkN .@ "env". 
+  Definition awk_env : namespace := awkN .@ "env".
 
   Lemma awkward_preamble_spec (f_m f_a offset_to_awkward: Z) (r: Reg) W pc_p pc_b pc_e
         ai pc_p' a_first a_end b_link e_link a_link a_entry a_entry'
@@ -273,7 +273,7 @@ Section awkward_example_preamble.
 
       rewrite /registers_mapsto.
       rewrite -insert_delete.
-      iDestruct (big_sepM_insert with "Hregs'") as "[HPC Hregs']". by apply lookup_delete. 
+      iDestruct (big_sepM_insert with "Hregs'") as "[HPC Hregs']". by apply lookup_delete.
       destruct (Hr'_full r_t1) as [r1v ?].
       iDestruct (big_sepM_delete _ _ r_t1 with "Hregs'") as "[Hr1 Hregs']".
         by rewrite lookup_delete_ne //.
@@ -318,7 +318,7 @@ Section awkward_example_preamble.
       { unshelve iSpecialize ("Hr'_valid" $! r_adv _); [done|].
         rewrite /(RegLocate r' r_adv) Hradvv. iApply "Hr'_valid". }
       unshelve iSpecialize ("Hr'_valid" $! r_t0 _); [done|].
-      rewrite /(RegLocate r' r_t0) Hr0v. iApply "Hr'_valid". 
+      rewrite /(RegLocate r' r_t0) Hr0v. iApply "Hr'_valid".
       { iNext. iIntros (?) "HH". iIntros (->). iApply "HH". eauto. }
     }
 
@@ -334,10 +334,10 @@ Section awkward_example_preamble.
 
     (* either we fail, or we use the continuation in rt0 *)
     iDestruct (jmp_or_fail_spec with "Hr0_valid2") as "Hcont".
-    destruct (decide (isCorrectPC (updatePcPerm r0))). 
+    destruct (decide (isCorrectPC (updatePcPerm r0))).
     2 : { iEpilogue "(HPC & Hi & Hr0)". iApply "Hcont". iFrame "HPC". iIntros (Hcontr);done. }
-    iDestruct "Hcont" as (p g b e a3 Heq) "#Hcont". 
-    simplify_eq. 
+    iDestruct "Hcont" as (p g b e a3 Heq) "#Hcont".
+    simplify_eq.
 
     iAssert (future_world g W2 W2) as "#Hfuture".
     { destruct g; iPureIntro. apply related_sts_priv_refl_world. apply related_sts_pub_refl_world. }
@@ -374,7 +374,7 @@ Section awkward_example_preamble.
     { apply related_sts_pub_world_fresh_loc; auto. }
     iSpecialize ("Hcont'" $! r'' with "[Hsts Hr Hregs HnaI]").
     { iFrame.
-      iDestruct (region_monotone with "[] [] Hr") as "$"; auto.
+      iDestruct (region_monotone with "Hr") as "$"; auto.
       rewrite /interp_reg. iSplit; [iPureIntro; apply Hr''_full|].
       iIntros (rr Hrr).
       assert (is_Some (r'' !! rr)) as [rrv Hrrv] by apply Hr''_full.
