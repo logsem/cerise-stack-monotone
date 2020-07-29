@@ -63,7 +63,7 @@ Section fundamental.
     - (* Correct PC *)
       assert ((b <= a)%a ∧ (a < e)%a) as Hbae.
       { eapply in_range_is_correctPC; eauto.
-        unfold le_addr; omega. }
+        unfold le_addr; lia. }
       iDestruct (extract_from_region_inv _ _ a with "Hinv") as (p' Hfp) "(Hinva & Hstate_a)"; auto.
       iDestruct "Hstate_a" as %Hstate_a.
       assert (∃ (ρ : region_type), (std W) !! a = Some ρ ∧ ρ ≠ Revoked ∧ (∀ g, ρ ≠ Static g))

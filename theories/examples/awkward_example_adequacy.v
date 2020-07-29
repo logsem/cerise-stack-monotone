@@ -235,11 +235,11 @@ Section Adequacy.
     k ∈ dom (gset Addr) (mkregion a e l) →
     k ∈ region_addrs a e.
   Proof.
-    intros H.
+    intros H. eapply (@elem_of_list_to_set _ (gset Addr)); auto.
+    typeclasses eauto.
     pose proof (dom_mkregion_incl a e l) as HH.
     rewrite elem_of_subseteq in HH |- * => HH.
-    specialize (HH _ H). eapply elem_of_list_to_set; eauto.
-    Unshelve. apply _.
+    specialize (HH _ H). auto.
   Qed.
 
   Lemma in_dom_mkregion' a e l k:

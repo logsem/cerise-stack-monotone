@@ -604,11 +604,11 @@ Section fundamental.
                     - simpl. iDestruct "Hwdst" as "[YA YB]".
                       destruct (proj1 (verify_access_spec _ _) H7) as (A & B & C & D).
                       iDestruct (extract_from_region_inv with "YB") as (pp ?) "[E %]"; auto.
-                      split; try solve_addr. rewrite /addr_reg.max; destruct (Addr_le_dec b0 a); solve_addr.
+                      split; try solve_addr.
                     - simpl. iDestruct "Hwdst" as "[YA YC]".
                       destruct (proj1 (verify_access_spec _ _) H7) as (A & B & C & D).
                       iDestruct (extract_from_region_inv with "YC") as (pp ?) "[E %]"; auto.
-                      split; try solve_addr. rewrite /addr_reg.max; destruct (Addr_le_dec b0 a); solve_addr. }
+                      split; try solve_addr. }
                   destruct Hρ as [Hρ | Hρ]; rewrite Hregion in Hρ; inversion Hρ; try subst ρ; congruence.
                 * assert (HpwlU2: pwlU p' = true).
                   { destruct p0; simpl in H6; simpl in HwplU; try congruence; destruct p'; rewrite /PermFlows in H; inv H; simpl in H0; try congruence; reflexivity. }
@@ -834,14 +834,10 @@ Section fundamental.
                         destruct (proj1 (verify_access_spec _ _) H7) as (A & B & C & D).
                         iDestruct (extract_from_region_inv _ _ a with "YA") as (pp ?) "[E %]"; auto.
                         split; try solve_addr. rewrite /addr_reg.min; destruct (Addr_le_dec a0 e0); solve_addr.
-                        iPureIntro. rewrite /region_state_U_pwl.
-                        rewrite /region_state_pwl in H6; auto.
                       - simpl. iDestruct "Hwdst" as "[YA YB]".
                         destruct (proj1 (verify_access_spec _ _) H7) as (A & B & C & D).
                         iDestruct (extract_from_region_inv _ _ a with "YA") as (pp ?) "[E %]"; auto.
-                        split; try solve_addr. rewrite /addr_reg.min; destruct (Addr_le_dec a0 e0); solve_addr.
-                        iPureIntro. rewrite /region_state_U_pwl.
-                        rewrite /region_state_pwl in H6; auto. }
+                        split; try solve_addr. rewrite /addr_reg.min; destruct (Addr_le_dec a0 e0); solve_addr. }
                     destruct Hρ as [Hρ | Hρ]; rewrite Hregion in Hρ; inversion Hρ; try subst ρ; congruence.
                   * assert (HpwlU2: pwlU p' = true).
                     { destruct p0; simpl in H5; simpl in HwplU; try congruence; destruct p'; rewrite /PermFlows in H; inv H; simpl in H0; try congruence; reflexivity. }
@@ -880,13 +876,11 @@ Section fundamental.
                     - simpl. iDestruct "Hwdst" as "[YA YB]".
                       destruct (proj1 (verify_access_spec _ _) H7) as (A & B & C & D).
                       iDestruct (extract_from_region_inv b0 _ a' with "YA") as (pp ?) "[E %]"; auto.
-                      split; try solve_addr. rewrite /addr_reg.min; destruct (Addr_le_dec a0 e0); solve_addr.
-                      iPureIntro. left; auto.
+                      split; try solve_addr. iPureIntro. left; auto.
                     - simpl. iDestruct "Hwdst" as "[YA YC]".
                       destruct (proj1 (verify_access_spec _ _) H7) as (A & B & C & D).
                       iDestruct (extract_from_region_inv b0 _ a' with "YA") as (pp ?) "[E %]"; auto.
-                      split; try solve_addr. rewrite /addr_reg.min; destruct (Addr_le_dec a0 e0); solve_addr.
-                      iPureIntro. left; auto. }
+                      split; try solve_addr. iPureIntro. left; auto. }
                   destruct Hρ as [Hρ | Hρ]; rewrite H8 in Hρ; inversion Hρ; try subst ρ'; congruence.
                 * assert (HpwlU2: pwlU p'0 = true).
                   { destruct p0; simpl in H5; simpl in HwplU; try congruence; destruct p'0; rewrite /PermFlows in H; inv H; simpl in H0; try congruence; reflexivity. }
