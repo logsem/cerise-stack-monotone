@@ -20,7 +20,8 @@ Inductive Perm: Type :=
 
 Inductive Locality: Type :=
 | Global
-| Local.
+| Local
+| Monotone.
 
 Definition Cap: Type :=
   (Perm * Locality) * Addr * Addr * Addr.
@@ -59,12 +60,11 @@ Inductive instr: Type :=
 Notation Reg := (gmap RegName Word).
 Notation Mem := (gmap Addr Word).
 
-
 (* Auxiliary definitions for localities *)
 
 Definition isLocal (l: Locality): bool :=
   match l with
-  | Local => true
+  | Local | Monotone => true
   | _ => false
   end.
 
@@ -79,7 +79,8 @@ Lemma isLocalWord_cap_isLocal (c0:Cap):
   ∃ p g b e a, c0 = (p,g,b,e,a) ∧ isLocal g = true.
 Proof.
   intros. destruct c0, p, p, p.
-  cbv in H. destruct l; first by congruence.
+  cbv in H. destruct l; try congruence.
+  eexists _, _, _, _, _. split; eauto.
   eexists _, _, _, _, _. split; eauto.
 Qed.
 
@@ -101,7 +102,7 @@ Lemma isGlobalWord_cap_isGlobal (w0:Word):
 Proof.
   intros. destruct w0;[done|].
   destruct c, p, p, p.
-  cbv in H. destruct l; last done.
+  cbv in H. destruct l; try done.
   eexists _, _, _, _, _. split; eauto.
 Qed.
 
@@ -117,7 +118,6 @@ Instance word_eq_dec : EqDecision Word.
 Proof. solve_decision. Defined.
 Instance instr_eq_dec : EqDecision instr.
 Proof. solve_decision. Defined.
-
 
 (* Auxiliary definitions to work on permissions *)
 
@@ -178,16 +178,34 @@ Proof.
   by left. by right.
 Qed.
 
-Definition canStore (p: Perm) (w: Word): bool :=
+Definition canReadUpTo (w: Word): Addr :=
   match w with
-  | inl _ => true
-  | inr ((_, g), _, _, _) => if isLocal g then pwl p else true
+  | inl _ => za
+  | inr ((p, g), b, e, a) => match p with
+                            | O => za
+                            | RO | RW | RWL | RX | RWX | RWLX | E => e
+                            | URW | URWL | URWX | URWLX => a
+                            end
   end.
 
-Definition canStoreU (p: Perm) (w: Word): bool :=
+Definition canStore (p: Perm) (a: Addr) (w: Word): bool :=
   match w with
   | inl _ => true
-  | inr ((_, g), _, _, _) => if isLocal g then pwlU p else true
+  | inr ((_, g), _, _, _) => match g with
+                            | Global => true
+                            | Local => pwl p
+                            | Monotone => pwl p && leb_addr (canReadUpTo w) a
+                            end
+  end.
+
+Definition canStoreU (p: Perm) (a: Addr) (w: Word): bool :=
+  match w with
+  | inl _ => true
+  | inr ((_, g), _, _, _) => match g with
+                            | Global => true
+                            | Local => pwlU p
+                            | Monotone => pwlU p && leb_addr (canReadUpTo w) a
+                            end
   end.
 
 Definition isPerm p p' := @bool_decide _ (perm_eq_dec p p').
@@ -213,19 +231,36 @@ Proof.
   eexists _, _, _, _, _; split; eauto.
 Qed.
 
-
 (* perm-flows-to: the locality and permission lattice.
    "x flows to y" if x is lower than y in the lattice.
   *)
 
 Definition LocalityFlowsTo (l1 l2: Locality): bool :=
   match l1 with
-  | Local => true
+  | Monotone => true
+  | Local => match l2 with
+            | Monotone => false
+            | _ => true
+            end
   | Global => match l2 with
              | Global => true
              | _ => false
              end
   end.
+
+(* Sanity check *)
+Lemma LocalityFlowsToTransitive:
+  transitive _ LocalityFlowsTo.
+Proof.
+  red; intros; destruct x; destruct y; destruct z; try congruence; auto.
+Qed.
+
+(* Sanity check 2 *)
+Lemma LocalityFlowsToReflexive:
+  forall g, LocalityFlowsTo g g.
+Proof.
+  intros; destruct g; auto.
+Qed.
 
 Definition PermFlowsTo (p1 p2: Perm): bool :=
   match p1 with
@@ -309,7 +344,6 @@ Proof.
   intros Hp1 Hp2. rewrite /PermFlows /PermFlowsTo.
   destruct P1,P3,P2; simpl; auto; contradiction.
 Qed.
-
 
 Lemma readAllowed_nonO p p' :
   PermFlows p p' → readAllowed p = true → p' ≠ O.
@@ -588,10 +622,12 @@ Proof.
   set encode := fun l => match l with
     | Local => 1
     | Global => 2
+    | Monotone => 3
     end%positive.
   set decode := fun n => match n with
     | 1 => Some Local
     | 2 => Some Global
+    | 3 => Some Monotone
     | _ => None
     end%positive.
   eapply (Build_Countable _ _ encode decode).

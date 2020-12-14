@@ -181,7 +181,7 @@ Section opsem.
       | inl n => (Failed, φ)
       | inr ((p, g), b, e, a) =>
         (* Fails for U cap *)
-        if writeAllowed p && withinBounds ((p, g), b, e, a) && canStore p (RegLocate (reg φ) src) then
+        if writeAllowed p && withinBounds ((p, g), b, e, a) && canStore p a (RegLocate (reg φ) src) then
           updatePC (update_mem φ a (RegLocate (reg φ) src))
         else (Failed, φ)
       end
@@ -471,7 +471,7 @@ Section opsem.
       match RegLocate (reg φ) dst with
       | inl _ => (Failed, φ)
       | inr ((p, g), b, e, a) =>
-        if isU p && canStoreU p w then
+        if isU p && canStoreU p a w then
           match z_of_argument (reg φ) offs with
           | None => (Failed, φ)
           | Some noffs => match verify_access (StoreU_access b e a noffs) with
@@ -557,7 +557,6 @@ Section opsem.
   | FailedV: val
   | NextIV: val.
 
-  (* TODO: change to co-inductive list in the Seq case *)
   Inductive expr: Type :=
   | Instr (c : ConfFlag)
   | Seq (e : expr).

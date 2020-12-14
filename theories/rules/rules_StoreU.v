@@ -28,20 +28,20 @@ Section cap_lang_rules.
   | StoreU_fail_perm2 p g b e a w:
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
-      canStoreU p w = false ->
+      canStoreU p a w = false ->
       StoreU_failure regs dst offs src
   | StoreU_fail_offs_arg p g b e a w:
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
       isU p = true ->
-      canStoreU p w = true ->
+      canStoreU p a w = true ->
       z_of_argument regs offs = None ->
       StoreU_failure regs dst offs src
   | StoreU_fail_verify_access p g b e a w zoffs:
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
       isU p = true ->
-      canStoreU p w = true ->
+      canStoreU p a w = true ->
       z_of_argument regs offs = Some zoffs ->
       verify_access (StoreU_access b e a zoffs) = None ->
       StoreU_failure regs dst offs src
@@ -49,7 +49,7 @@ Section cap_lang_rules.
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
       isU p = true ->
-      canStoreU p w = true ->
+      canStoreU p a w = true ->
       z_of_argument regs offs = Some zoffs ->
       verify_access (StoreU_access b e a zoffs) = Some a ->
       (a + 1)%a = None ->
@@ -58,7 +58,7 @@ Section cap_lang_rules.
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
       isU p = true ->
-      canStoreU p w = true ->
+      canStoreU p a w = true ->
       z_of_argument regs offs = Some zoffs ->
       verify_access (StoreU_access b e a zoffs) = Some a ->
       (a + 1)%a = Some a' ->
@@ -68,7 +68,7 @@ Section cap_lang_rules.
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
       isU p = true ->
-      canStoreU p w = true ->
+      canStoreU p a w = true ->
       z_of_argument regs offs = Some zoffs ->
       verify_access (StoreU_access b e a zoffs) = Some a' ->
       a <> a' ->
@@ -80,7 +80,7 @@ Section cap_lang_rules.
       regs !! rdst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs rsrc = Some w ->
       isU p = true ->
-      canStoreU p w = true ->
+      canStoreU p a w = true ->
       z_of_argument regs offs = Some zoffs ->
       verify_access (StoreU_access b e a zoffs) = Some a' ->
       mem !! a' = Some (p', old) ->
@@ -110,7 +110,7 @@ Section cap_lang_rules.
    | None => True
    | Some (inl _) => True
    | Some (inr (p, g, b, e, a)) =>
-     if isU p && canStoreU p wsrc then
+     if isU p && canStoreU p a wsrc then
        match z_of_argument regs offs with
        | None => True
        | Some zoffs => match verify_access (StoreU_access b e a zoffs) with
@@ -171,7 +171,7 @@ Section cap_lang_rules.
        rewrite HB; congruence. }
      rewrite Hwsrc' in Hstep.
 
-     destruct (canStoreU p wsrc) eqn:HcanStoreU; cycle 1.
+     destruct (canStoreU p a wsrc) eqn:HcanStoreU; cycle 1.
      { simpl in Hstep. inversion Hstep.
        iFailWP "Hφ" StoreU_fail_perm2. }
 
@@ -199,9 +199,12 @@ Section cap_lang_rules.
        { instantiate (1 := wsrc). assert (Hpf1: PermFlows URW p).
          { destruct p; simpl in HisU; try congruence; auto. }
          destruct wsrc; simpl; auto; [eapply PermFlows_trans; eauto|].
-         destruct_cap c0. destruct c4; [eapply PermFlows_trans; eauto|].
+         destruct_cap c0. destruct c4; [eapply PermFlows_trans; eauto| |].
          simpl in HcanStoreU. destruct (pwlU p) eqn:HpwlU; try congruence.
-         eapply (PermFlows_trans _ p p'); eauto. }
+         eapply (PermFlows_trans _ p p'); eauto.
+         simpl in HcanStoreU. destruct (pwlU p) eqn:HpwlU; try congruence.
+         eapply (PermFlows_trans URWL p p'); eauto.
+         simpl in HcanStoreU. congruence. }
 
        destruct (incrementPC (<[rdst:=inr (p, g, b, e, a')]> regs)) eqn:Hincr; cycle 1.
        { assert _ as Hincr' by (eapply (incrementPC_overflow_mono (<[rdst:=_]> regs) (<[rdst:=_]> r) Hincr _ _)).
@@ -226,9 +229,12 @@ Section cap_lang_rules.
      { instantiate (1 := wsrc). assert (Hpf1: PermFlows URW p).
        { destruct p; simpl in HisU; try congruence; auto. }
        destruct wsrc; simpl; auto; [eapply PermFlows_trans; eauto|].
-       destruct_cap c0. destruct c4; [eapply PermFlows_trans; eauto|].
+       destruct_cap c0. destruct c4; [eapply PermFlows_trans; eauto| |].
        simpl in HcanStoreU. destruct (pwlU p) eqn:HpwlU; try congruence.
-       eapply (PermFlows_trans _ p p'); eauto. }
+       eapply (PermFlows_trans _ p p'); eauto.
+       simpl in HcanStoreU. destruct (pwlU p) eqn:HpwlU; try congruence.
+       eapply (PermFlows_trans _ p p'); eauto.
+       simpl in HcanStoreU; congruence. }
 
      destruct (incrementPC regs) eqn:Hincr; cycle 1.
      { assert _ as Hincr' by (eapply (incrementPC_overflow_mono regs r Hincr _ _)).
