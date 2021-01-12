@@ -21,14 +21,16 @@ Inductive region_type :=
 | Permanent
 | Revoked
 | Static of gmap Addr Word
-| Monostatic of gmap Addr Word.
+| Monostatic of gmap Addr Word
+| Uninitialized of Word.
 
 Inductive std_rel_pub : region_type -> region_type -> Prop :=
 | Std_pub_Revoked_Temporary : std_rel_pub Revoked Temporary
 | Std_pub_Static_Temporary m : std_rel_pub (Static m) Temporary
 | Std_pub_Revoked_Monotemporary : std_rel_pub Revoked Monotemporary
 | Std_pub_Monostatic_Monotemporary m : std_rel_pub (Monostatic m) Monotemporary
-| Std_pub_Revoked_Permanent : std_rel_pub Revoked Permanent.
+| Std_pub_Revoked_Permanent : std_rel_pub Revoked Permanent
+| Std_pub_Uninitialized_Monotemporary w : std_rel_pub (Uninitialized w) Monotemporary.
 
 Inductive std_rel_priv : region_type -> region_type -> Prop :=
 | Std_priv_Temporary_Static m : std_rel_priv Temporary (Static m)
@@ -39,7 +41,7 @@ Inductive std_rel_priv : region_type -> region_type -> Prop :=
 | Std_priv_Monotemporary_Temporary : std_rel_priv Monotemporary Temporary.
 
 Inductive std_rel_pub_plus : region_type → region_type → Prop :=
-| Std_pub_plus_Monotemporary_Monostatic m : std_rel_pub_plus Monotemporary (Monostatic m).
+| Std_pub_plus_Monotemporary_Monostatic w : std_rel_pub_plus Monotemporary (Uninitialized w).
 
 Global Instance sts_std : STS_STD region_type :=
   {| Rpub := std_rel_pub; Rpubp := std_rel_pub_plus; Rpriv := std_rel_priv |}.
@@ -135,26 +137,57 @@ Section heap.
              | Monotemporary, Monotemporary => left eq_refl
              | Static m1, Static m2 => ltac:(solve_decision)
              | Monostatic m1, Monostatic m2 => ltac:(solve_decision)
+             | Uninitialized w1, Uninitialized w2 => ltac:(solve_decision)
              | _, _ => ltac:(right; auto)
              end).
 
-
-  Lemma two_div_odd n m :
-    (2 | (2 * n + m))%Z → (2 | m)%Z.
+  Lemma i_div i n m :
+    i ≠ 0 ->
+    (i | (i * n + m))%Z → (i | m)%Z.
   Proof.
-    intros [m' Hdiv].
-    assert (((2 * n + m) `div` 2)%Z = ((m' * 2) `div` 2)%Z).
+    intros Hne [m' Hdiv].
+    assert (((i * n + m) `div` i)%Z = ((m' * i) `div` i)%Z).
     { rewrite Hdiv. auto. }
     rewrite Z.div_mul in H0;[|lia].
-    assert ((2 * n + m) `div` 2 = ((2 * n) `div` 2) + (m `div` 2))%Z as Heq.
+    assert ((i * n + m) `div` i = ((i * n) `div` i) + (m `div` i))%Z as Heq.
     { rewrite Z.add_comm Z.mul_comm Z.div_add;[|lia].
       rewrite Z.div_mul;[|lia]. rewrite Z.add_comm. auto. }
     rewrite Heq in H0. rewrite Z.mul_comm Z.div_mul in H0;[|lia].
-    assert (m `div` 2 = m' - n)%Z.
+    assert (m `div` i = m' - n)%Z.
     { rewrite -H0. lia. }
     exists (m' - n)%Z. lia.
   Qed.
 
+  Lemma two_div_odd n m :
+    (2 | (2 * n + m))%Z → (2 | m)%Z.
+  Proof.
+    intros Hdiv. apply (i_div 2 n);auto.
+  Qed.
+
+  Lemma i_mod i n m k :
+    (i > 0 ->
+    (m + i * n) `mod` i = k → m `mod` i = k)%Z.
+  Proof.
+    intros Hlt Hmod.
+    rewrite Z.mul_comm Z_mod_plus in Hmod;auto.
+  Qed.
+
+  Lemma three_mod n m k :
+    ((m + 3 * n) `mod` 3 = k → m `mod` 3 = k)%Z.
+  Proof.
+    apply i_mod. lia.
+  Qed.
+
+  Lemma five_mod_three :
+    (5 `mod` 3 = 2)%Z.
+  Proof. auto. Qed.
+  Lemma six_mod_three :
+    (6 `mod` 3 = 0)%Z.
+  Proof. auto. Qed.
+  Lemma seven_mod_three :
+    (7 `mod` 3 = 1)%Z.
+  Proof. auto. Qed. 
+  
   Global Instance divide_dec : forall p1 p2, Decision (Pos.divide p1 p2).
   Proof.
     intros p1 p2.
@@ -170,42 +203,54 @@ Section heap.
                          | Monotemporary => 2
                          | Permanent => 3
                          | Revoked => 4
-                         | Static m => 5 + 2 * (encode m)
-                         | Monostatic m => 6 + 2 * (encode m)
+                         | Static m => 5 + 3 * (encode m)
+                         | Monostatic m => 6 + 3 * (encode m)
+                         | Uninitialized w => 7 + 3 * (encode w)
                          end%positive.
     set decode := (fun n =>
                      if decide (n = 1) then Some Temporary
                      else if decide (n = 2) then Some Monotemporary
                           else if decide (n = 3) then Some Permanent
                                else if decide (n = 4) then Some Revoked
-                                    else if decide (2 | n) then 
-                                           match (decode (Z.to_pos (((Zpos n)-6) / 2)%Z)) with
+                                    else if decide (Zpos n `mod` 3 = 0)%Z then
+                                           match (decode (Z.to_pos (((Zpos n)-6) / 3)%Z)) with
                                            | Some m => Some (Monostatic m)
                                            | None => None
                                            end
-                                         else match (decode (Z.to_pos (((Zpos n)-5) / 2)%Z)) with
-                                           | Some m => Some (Static m)
-                                           | None => None
-                                           end)%positive
-    .
+                                         else if decide (Zpos n `mod` 3 = 1)%Z then
+                                                match (decode (Z.to_pos (((Zpos n)-7) / 3)%Z)) with
+                                                | Some w => Some (Uninitialized w)
+                                                | None => None
+                                                end
+                                              else match (decode (Z.to_pos (((Zpos n)-5) / 3)%Z)) with
+                                                   | Some m => Some (Static m)
+                                                   | None => None
+                                                   end)%positive.
     eapply (Build_Countable _ _ encode decode).
     intro ty. destruct ty; try reflexivity;
     unfold encode, decode;
     repeat (match goal with |- context [ decide ?x ] =>
                             destruct (decide x); [ try (exfalso; lia) | ] end).
-    - apply Pos2Z.inj_divide in d.
-      rewrite Pos2Z.inj_add Pos2Z.inj_mul Z.add_comm in d.
-      apply two_div_odd in d. destruct d as [? ?]. lia.
+    - rewrite Pos2Z.inj_add Pos2Z.inj_mul in e.
+      apply three_mod in e. rewrite five_mod_three in e. done.
+    - rewrite Pos2Z.inj_add Pos2Z.inj_mul in e.
+      apply three_mod in e. rewrite five_mod_three in e. done.
     - rewrite Pos2Z.inj_add Z.add_comm Z.add_simpl_r Pos2Z.inj_mul.
       rewrite Z.mul_comm Z.div_mul;[|lia]. rewrite Pos2Z.id decode_encode//.
     - rewrite Pos2Z.inj_add Z.add_comm Z.add_simpl_r Pos2Z.inj_mul.
       rewrite Z.mul_comm Z.div_mul;[|lia]. rewrite Pos2Z.id decode_encode//.
-    - exfalso. apply n3. clear.
-      apply Pos2Z.inj_divide.
-      rewrite Pos2Z.inj_add Pos2Z.inj_mul.
-      assert (6 = 2 * 3)%Z as ->;[lia|]. rewrite -Z.mul_add_distr_l.
-      exists (3 + Z.pos (encode g))%Z. lia.
+    - rewrite Pos2Z.inj_add Pos2Z.inj_mul in e.
+      apply three_mod in e. rewrite six_mod_three in e. done.
+    - exfalso. apply n3.
+      rewrite Pos2Z.inj_add Pos2Z.inj_mul Z.mul_comm Z_mod_plus;auto. lia.
+    - rewrite Pos2Z.inj_add Pos2Z.inj_mul in e.
+      apply three_mod in e. rewrite seven_mod_three in e. done.
+    - rewrite Pos2Z.inj_add Z.add_comm Z.add_simpl_r Pos2Z.inj_mul.
+      rewrite Z.mul_comm Z.div_mul;[|lia]. rewrite Pos2Z.id decode_encode//.
+    - exfalso. apply n4.
+      rewrite Pos2Z.inj_add Pos2Z.inj_mul Z.mul_comm Z_mod_plus;auto. lia.
   Qed.
+
 
   Global Instance rel_persistent l p (φ : (WORLD * Word) -> iProp Σ) :
     Persistent (rel l p φ).
@@ -303,6 +348,7 @@ Section heap.
                                              ∗ a ↦ₐ[p] v
                                              ∗ ⌜∀ a', a' ∈ dom (gset Addr) m →
                                                       Mρ !! a' = Some (Monostatic m)⌝
+                            | Uninitialized w => ⌜p ≠ O⌝ ∗ a ↦ₐ[p] w
                             | Revoked => emp
                             end)%I.
 
@@ -411,6 +457,7 @@ Section heap.
       iApply "Hmono"; iFrame "∗ #"; auto.
       iPureIntro.
       by apply related_sts_pub_priv_world.
+    - done.
     - done.
     - done.
     - done. 
@@ -829,8 +876,8 @@ Section heap.
     { apply elem_of_gmap_dom. rewrite -HMW. apply elem_of_gmap_dom. eauto. }
     iDestruct (big_sepM_delete with "Hpreds") as "[Hl Hpreds]"; eauto.
     iDestruct "Hl" as (ρ) "[ % [Hstate Hl] ]". destruct ρ.
-    1,2,3,4,5,6: iDestruct (sts_full_state_std with "Hfull Hstate") as %Hcontr.
-    1,2,3,4,5: rewrite Htemp in Hcontr; try by inversion Hcontr.
+    1,2,3,4,5,6,7: iDestruct (sts_full_state_std with "Hfull Hstate") as %Hcontr.
+    1,2,3,4,5,6: rewrite Htemp in Hcontr; try by inversion Hcontr.
     iDestruct "Hl" as (γpred' p' φ) "(% & #Hpers & #Hsaved & Hl)".
     iDestruct "Hl" as (v' Hlookup Hneq) "[Hl _]".
     inversion H2; subst.  inversion Hcontr;subst g.
@@ -1697,8 +1744,8 @@ Section heap.
     iDestruct (big_sepM_delete with "Hpreds") as "[Hl Hpreds]"; eauto.
     { rewrite lookup_delete_list_notin; eauto. }
     iDestruct "Hl" as (ρ) "[% [Hstate Hl] ]". destruct ρ.
-    1,2,3,4,5,6: iDestruct (sts_full_state_std with "Hfull Hstate") as %Hcontr.
-    1,2,3,4,5: rewrite Htemp in Hcontr; try by inversion Hcontr.
+    1,2,3,4,5,6,7: iDestruct (sts_full_state_std with "Hfull Hstate") as %Hcontr.
+    1,2,3,4,5,6: rewrite Htemp in Hcontr; try by inversion Hcontr.
     iDestruct "Hl" as (γpred p φ Heq Hpers) "[#Hsaved Hl]".
     iDestruct "Hl" as (v Hlookup Hne) "[Hl _]".
     inversion Hcontr; subst g.
@@ -1727,15 +1774,16 @@ Section heap.
     iDestruct (big_sepM_delete with "Hpreds") as "[Hl Hpreds]"; eauto.
     { rewrite lookup_delete_list_notin; eauto. }
     iDestruct "Hl" as (ρ) "[% [Hstate Hl] ]". destruct ρ.
-    1,2,3,4,5,6: iDestruct (sts_full_state_std with "Hfull Hstate") as %Hcontr.
-    1,2,3,4,5: rewrite Htemp in Hcontr; try by inversion Hcontr.
+    1,2,3,4,5,6,7: iDestruct (sts_full_state_std with "Hfull Hstate") as %Hcontr.
+    1,2,3,4,5,6: rewrite Htemp in Hcontr; try by inversion Hcontr.
     iDestruct "Hl" as (γpred p φ Heq Hpers) "[#Hsaved Hl]".
     iDestruct "Hl" as (v Hlookup Hne) "[Hl _]".
-    rewrite Htemp in Hcontr. inversion Hcontr; subst g.
+    inversion Hcontr; subst g.
     iExists p. rewrite lookup_insert in Hlookup;inversion Hlookup. iFrame. iSplit;auto.
     iExists _,_. iFrame "∗ #".
     iDestruct (region_map_delete_monosingleton with "Hpreds") as "Hpreds"; eauto.
     iFrame. subst. eauto.
+    rewrite Htemp in Hcontr. inversion Hcontr.
   Qed.
 
   Lemma region_close_next_temp_pwl W φ ls l p v `{forall Wv, Persistent (φ Wv)} :
@@ -2065,21 +2113,24 @@ Section heap.
      | Temporary => if pwl p then future_pub_plus_mono else future_priv_mono
      | Monotemporary => if pwl p then future_pub_a_mono l else future_priv_mono
      | Permanent => future_priv_mono
-     | Revoked | Static _ | Monostatic _ => λ (_ : WORLD * Word → iProp Σ) (_ : Word), True
+     | Revoked | Static _ | Monostatic _ | Uninitialized _ => λ (_ : WORLD * Word → iProp Σ) (_ : Word), True
      end φ w)%I.
 
   Definition monotonicity_guarantees_decide ρ l w p φ:=
     (if decide (ρ = Monotemporary ∧ pwl p = true)
      then future_pub_a_mono l φ w
      else if decide (ρ = Temporary ∧ pwl p = true)
-          then future_pub_mono φ w
+          then future_pub_plus_mono φ w
           else future_priv_mono φ w)%I.
 
    Lemma region_open_next
         (W : WORLD)
         (φ : WORLD * Word → iProp Σ)
         (ls : list Addr) (l : Addr) (p : Perm) (ρ : region_type)
-        (Hρnotrevoked : ρ <> Revoked) (Hρnotstatic : ¬ exists g, ρ = Static g) (Hρnotmonostatic : ¬ exists g, ρ = Monostatic g):
+        (Hρnotrevoked : ρ <> Revoked)
+        (Hρnotstatic : ¬ exists g, ρ = Static g)
+        (Hρnotmonostatic : ¬ exists g, ρ = Monostatic g)
+        (Hρnotuninitialized : ¬ exists w, ρ = Uninitialized w):
      l ∉ ls →
      std W !! l = Some ρ →
      ⊢ open_region_many ls W ∗ rel l p φ ∗ sts_full_world W
@@ -2105,7 +2156,8 @@ Section heap.
         iExists v. iFrame.
     - iApply (region_open_next_perm with "H"); eauto.
     - exfalso. apply Hρnotstatic. eauto.
-    - exfalso. apply Hρnotmonostatic. eauto. 
+    - exfalso. apply Hρnotmonostatic. eauto.
+    - exfalso. apply Hρnotuninitialized. eauto. 
   Qed.
 
   Lemma region_close_next
@@ -2113,7 +2165,10 @@ Section heap.
         (φ : WORLD * Word → iProp Σ)
         `{forall Wv, Persistent (φ Wv)}
         (ls : list Addr) (l : Addr) (p : Perm) (v : Word) (ρ : region_type)
-        (Hρnotrevoked : ρ <> Revoked) (Hρnotstatic : ¬ exists g, ρ = Static g) (Hρnotmonostatic : ¬ exists g, ρ = Monostatic g):
+        (Hρnotrevoked : ρ <> Revoked)
+        (Hρnotstatic : ¬ exists g, ρ = Static g)
+        (Hρnotmonostatic : ¬ exists g, ρ = Monostatic g)
+        (Hρnotuninitialized : ¬ exists w, ρ = Uninitialized w):
     l ∉ ls
     → sts_state_std l ρ
                     ∗ open_region_many (l :: ls) W
@@ -2132,141 +2187,11 @@ Section heap.
     - iApply (region_close_next_perm with "[A B C D E F G]"); eauto; iFrame.
     - exfalso. apply Hρnotstatic. eauto.
     - exfalso. apply Hρnotmonostatic. eauto.
-  Qed.
-
-  (* --------------------------------------------------------------------------------- *)
-  (* ------------------------- LEMMAS ABOUT STD TRANSITIONS -------------------------- *)
-
-  Lemma std_rel_pub_Permanent x :
-    std_rel_pub Permanent x → x = Permanent.
-  Proof.
-    intros Hrel.
-    inversion Hrel.
-  Qed.
-
-  Lemma std_rel_pub_rtc_Permanent x y :
-    x = Permanent →
-    rtc std_rel_pub x y → y = Permanent.
-  Proof.
-    intros Hx Hrtc.
-    induction Hrtc;auto.
-    subst. apply IHHrtc. apply std_rel_pub_Permanent; auto.
-  Qed.
-
-  Lemma std_rel_priv_Permanent x :
-    std_rel_priv Permanent x → x = Permanent.
-  Proof.
-    intros Hrel.
-    inversion Hrel; done.
-  Qed.
-
-  Lemma std_rel_priv_rtc_Permanent x y :
-    x = Permanent →
-    rtc std_rel_priv x y → y = Permanent.
-  Proof.
-    intros Hx Hrtc.
-    induction Hrtc;auto.
-    subst. apply IHHrtc. apply std_rel_priv_Permanent; auto.
-  Qed.
-
-  Lemma std_rel_rtc_Permanent x y :
-    x = Permanent →
-    rtc (λ x0 y0 : region_type, std_rel_pub x0 y0 ∨ std_rel_priv x0 y0) x y →
-    y = Permanent.
-  Proof.
-    intros Hx Hrtc.
-    induction Hrtc as [|x y z Hrel];auto.
-    subst. destruct Hrel as [Hrel | Hrel].
-    - apply std_rel_pub_Permanent in Hrel. auto.
-    - apply std_rel_priv_Permanent in Hrel. auto.
-  Qed.
-
-  Lemma std_rel_pub_Temporary x :
-    std_rel_pub Temporary x → x = Temporary.
-  Proof.
-    intros Hrel.
-    inversion Hrel.
-  Qed.
-
-  Lemma std_rel_pub_rtc_Temporary x y :
-    x = Temporary →
-    rtc std_rel_pub x y → y = Temporary.
-  Proof.
-    intros Hx Hrtc.
-    induction Hrtc ;auto.
-    subst. apply IHHrtc. apply std_rel_pub_Temporary; auto.
-  Qed.
-
-  Lemma std_rel_pub_Monotemporary x :
-    std_rel_pub Monotemporary x → x = Monotemporary.
-  Proof.
-    intros Hrel.
-    inversion Hrel.
-  Qed.
-
-  Lemma std_rel_pub_rtc_Monotemporary x y :
-    x = Monotemporary →
-    rtc std_rel_pub x y → y = Monotemporary.
-  Proof.
-    intros Hx Hrtc.
-    induction Hrtc ;auto.
-    subst. apply IHHrtc. apply std_rel_pub_Monotemporary; auto.
-  Qed.
-
-  Lemma std_rel_pub_Revoked x :
-    std_rel_pub Revoked x → x = Temporary ∨ x = Permanent ∨ x = Monotemporary.
-  Proof.
-    intros Hrel.
-    inversion Hrel; auto.
-  Qed.
-
-  Lemma std_rel_pub_rtc_Revoked x y :
-    x = Revoked →
-    rtc std_rel_pub x y → y = Temporary ∨ y = Permanent ∨ y = Monotemporary ∨ y = Revoked.
-  Proof.
-    intros Hx Hrtc.
-    inversion Hrtc; subst; auto.
-    apply std_rel_pub_Revoked in H0 as [-> | [-> | ->] ];auto. 
-    - left. eapply std_rel_pub_rtc_Temporary;eauto.
-    - right. left. eapply std_rel_pub_rtc_Permanent;eauto.
-    - right. right. left. eapply std_rel_pub_rtc_Monotemporary;eauto.
-  Qed.
-  
-  Lemma std_rel_pub_Static x g :
-    std_rel_pub (Static g) x → x = Temporary.
-  Proof.
-    intros Hrel.
-    inversion Hrel. auto. 
-  Qed.
-
-  Lemma std_rel_pub_Monostatic x g :
-    std_rel_pub (Monostatic g) x → x = Monotemporary.
-  Proof.
-    intros Hrel.
-    inversion Hrel. auto. 
-  Qed.
-
-  Lemma std_rel_pub_rtc_Static x y g :
-    x = (Static g) →
-    rtc std_rel_pub x y → y = Temporary ∨ y = (Static g).
-  Proof.
-    intros Hx Hrtc.
-    inversion Hrtc; subst; auto. left.
-    apply std_rel_pub_Static in H0. 
-    eapply std_rel_pub_rtc_Temporary;eauto.
-  Qed.
-
-  Lemma std_rel_pub_rtc_Monostatic x y g :
-    x = (Monostatic g) →
-    rtc std_rel_pub x y → y = Monotemporary ∨ y = (Monostatic g).
-  Proof.
-    intros Hx Hrtc.
-    inversion Hrtc; subst; auto. left.
-    apply std_rel_pub_Monostatic in H0. 
-    eapply std_rel_pub_rtc_Monotemporary;eauto.
+    - exfalso. apply Hρnotuninitialized. eauto. 
   Qed.
 
 End heap.
 
 Notation "<s[ a := ρ ]s> W" := (std_update W a ρ) (at level 10, format "<s[ a := ρ ]s> W").
 Notation "<l[ a := ρ , r ]l> W" := (loc_update W a ρ r.1 r.2.1 r.2.2) (at level 10, format "<l[ a := ρ , r ]l> W").
+
