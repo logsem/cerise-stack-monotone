@@ -2374,10 +2374,10 @@ Section heap.
      end φ w)%I.
 
   Definition monotonicity_guarantees_decide ρ l w p φ:=
-    (if decide (ρ = Monotemporary ∧ pwl p = true)
-     then future_pub_a_mono l φ w
-     else if decide (ρ = Temporary ∧ pwl p = true)
-          then future_pub_plus_mono φ w
+    (if decide (ρ = Temporary ∧ pwl p = true)
+     then future_pub_plus_mono φ w
+     else if decide (ρ = Monotemporary ∧ pwl p = true)
+          then future_pub_a_mono l φ w
           else future_priv_mono φ w)%I.
 
    Lemma region_open_next

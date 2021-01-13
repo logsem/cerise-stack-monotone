@@ -78,6 +78,13 @@ Section transitions.
     intros r q Hr. destruct (decide (le_a i a));auto.
   Qed.
 
+  Lemma related_sts_std_a_refl a fsd :
+    related_sts_a fsd fsd a.
+  Proof.
+    apply related_sts_pub_a.
+    apply related_sts_std_pub_refl. 
+  Qed. 
+
   Lemma related_sts_std_a_pub_plus_trans a fsd gsd hsd :
     related_sts_a fsd gsd a → related_sts_std_pub_plus gsd hsd →
     related_sts_std_pub_plus fsd hsd.
@@ -234,6 +241,13 @@ Section transitions.
     - apply related_sts_pub_plus_trans with W'.2.1 W'.2.2;auto.
   Qed.
 
+  Lemma related_sts_a_refl_world W a :
+    related_sts_a_world W W a.
+  Proof. 
+    split.
+    - apply related_sts_std_a_refl.
+    - apply related_sts_pub_plus_refl.
+  Qed. 
 
   (* --------------------------------------------------------------------------------- *)
   (* ------------------------- LEMMAS ABOUT STD TRANSITIONS -------------------------- *)

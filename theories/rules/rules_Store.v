@@ -60,7 +60,7 @@ Section cap_lang_rules.
   Definition reg_allows_store (regs : Reg) (r : RegName) p g b e a (storev : Word) :=
     regs !! r = Some (inr ((p, g), b, e, a)) ∧
     writeAllowed p = true ∧ withinBounds ((p, g), b, e, a) = true ∧
-    (isLocalWord storev = false ∨ pwl p = true).
+    (canStore p a storev = true).
 
   Inductive Store_failure (regs: Reg) (r1 : RegName)(r2 : Z + RegName) (mem : PermMem):=
   | Store_fail_const z:
@@ -112,7 +112,7 @@ Section cap_lang_rules.
       → word_of_argument r r2 = Some storev
       → writeAllowed p = true
       → withinBounds (p, g, b, e, a) = true
-      → (isLocalWord storev = false ∨ pwl p = true)
+      → (canStore  p a storev = true)
       → ∃ (p' : Perm) (storev : Word),
           mem0 !! a = Some (p', storev) ∧ PermFlows p p'.
   Proof.

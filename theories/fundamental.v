@@ -1,4 +1,4 @@
-From cap_machine.ftlr Require Export Jmp Jnz Get AddSubLt IsPtr Lea Load Mov Store Restrict Subseg LoadU StoreU PromoteU.
+From cap_machine.ftlr Require Export Jmp. (*Jnz Get AddSubLt IsPtr Lea Load Mov Store Restrict Subseg LoadU StoreU PromoteU. *)
 From iris.proofmode Require Import tactics.
 From iris.program_logic Require Import weakestpre adequacy lifting.
 From stdpp Require Import base.
@@ -46,9 +46,9 @@ Section fundamental.
 
   (*TODO: change to region_conditions *)
   Theorem fundamental W r p g b e (a : Addr) :
-    ⊢ ((⌜p = RX⌝ ∨ ⌜p = RWX⌝ ∨ ⌜p = RWLX ∧ g = Local⌝) →
+    ⊢ ((⌜p = RX⌝ ∨ ⌜p = RWX⌝ ∨ ⌜p = RWLX ∧ g = Monotone⌝) →
       ([∗ list] a ∈ (region_addrs b e), ∃ p', ⌜PermFlows p p'⌝ ∗ (read_write_cond a p' interp)
-                                             ∧ ⌜if pwl p then region_state_pwl W a else region_state_nwl W a g⌝) →
+                                             ∧ ⌜if pwl p then region_state_pwl_mono W a else region_state_nwl W a g⌝) →
       interp_expression r W (inr ((p,g),b,e,a))).
   Proof.
     iIntros (Hp) "#Hinv /=".
@@ -66,12 +66,14 @@ Section fundamental.
         unfold le_addr; lia. }
       iDestruct (extract_from_region_inv _ _ a with "Hinv") as (p' Hfp) "(Hinva & Hstate_a)"; auto.
       iDestruct "Hstate_a" as %Hstate_a.
-      assert (∃ (ρ : region_type), (std W) !! a = Some ρ ∧ ρ ≠ Revoked ∧ (∀ g, ρ ≠ Static g))
-        as [ρ [Hρ [Hne Hne'] ] ].
-      { destruct (pwl p),g; eauto. destruct Hstate_a as [Htemp | Hperm];eauto. }
+      assert (∃ (ρ : region_type), (std W) !! a = Some ρ ∧ ρ ≠ Revoked ∧ (∀ g, ρ ≠ Static g)
+                                   ∧ (∀ g, ρ ≠ Monostatic g) ∧ (∀ w, ρ ≠ Uninitialized w))
+        as [ρ [Hρ [Hne_rev [Hne_sta [Hne_mono Hne_uninit] ] ] ] ].
+      { destruct (pwl p); [rewrite Hstate_a;eexists;eauto|].
+        destruct g; [rewrite Hstate_a|destruct Hstate_a as [-> | ->]|destruct Hstate_a as [-> | [-> | ->] ] ];eexists;eauto. }
       iDestruct (region_open W a p' with "[$Hinva $Hr $Hsts]")
         as (w) "(Hr & Hsts & Hstate & Ha & % & Hmono & #Hw) /=";[|apply Hρ|].
-      { destruct ρ;auto;[..|specialize (Hne' g0)]; contradiction. }
+      { destruct ρ;auto;[done|by specialize (Hne_sta g0)|by specialize (Hne_mono g0)|by specialize (Hne_uninit w)]. }
       iDestruct ((big_sepM_delete _ _ PC) with "Hmreg") as "[HPC Hmap]";
         first apply (lookup_insert _ _ (inr (p, g, b, e, a))).
       destruct (decodeInstrW w) eqn:Hi. (* proof by cases on each instruction *)
