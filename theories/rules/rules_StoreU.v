@@ -25,50 +25,48 @@ Section cap_lang_rules.
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       isU p = false ->
       StoreU_failure regs dst offs src
-  | StoreU_fail_perm2 p g b e a w:
+  | StoreU_fail_perm2 p g b e a a' w zoffs :
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
-      canStoreU p a w = false ->
+      z_of_argument regs offs = Some zoffs ->
+      verify_access (StoreU_access b e a zoffs) = Some a' ->
+      canStoreU p a' w = false ->
       StoreU_failure regs dst offs src
   | StoreU_fail_offs_arg p g b e a w:
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
-      isU p = true ->
-      canStoreU p a w = true ->
       z_of_argument regs offs = None ->
       StoreU_failure regs dst offs src
   | StoreU_fail_verify_access p g b e a w zoffs:
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
-      isU p = true ->
-      canStoreU p a w = true ->
       z_of_argument regs offs = Some zoffs ->
       verify_access (StoreU_access b e a zoffs) = None ->
       StoreU_failure regs dst offs src
-  | StoreU_fail_incrPC1 p g b e a w zoffs:
+  | StoreU_fail_incrPC1 p g b e a a' w zoffs:
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
       isU p = true ->
       canStoreU p a w = true ->
       z_of_argument regs offs = Some zoffs ->
-      verify_access (StoreU_access b e a zoffs) = Some a ->
+      verify_access (StoreU_access b e a zoffs) = Some a' ->
       (a + 1)%a = None ->
       StoreU_failure regs dst offs src
-  | StoreU_fail_incrPC2 p g b e a w zoffs a':
+  | StoreU_fail_incrPC2 p g b e a w zoffs a'' a':
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
       isU p = true ->
-      canStoreU p a w = true ->
+      canStoreU p a'' w = true ->
       z_of_argument regs offs = Some zoffs ->
-      verify_access (StoreU_access b e a zoffs) = Some a ->
-      (a + 1)%a = Some a' ->
+      verify_access (StoreU_access b e a zoffs) = Some a'' ->
+      (a'' + 1)%a = Some a' ->
       incrementPC (<[dst := (inr ((p, g), b, e, a'))]> regs) = None ->
       StoreU_failure regs dst offs src
-  | StoreU_fail_incrPC3 p g b e a w zoffs a':
+  | StoreU_fail_incrPC3 p g b e a w zoffs a' :
       regs !! dst = Some (inr ((p, g), b, e, a)) ->
       word_of_argument regs src = Some w ->
       isU p = true ->
-      canStoreU p a w = true ->
+      canStoreU p a' w = true ->
       z_of_argument regs offs = Some zoffs ->
       verify_access (StoreU_access b e a zoffs) = Some a' ->
       a <> a' ->
@@ -78,7 +76,7 @@ Section cap_lang_rules.
   Definition reg_allows_storeU (regs : Reg) (r : RegName) p g b e a a' (storev : Word) :=
     regs !! r = Some (inr ((p, g), b, e, a)) ∧
     isU p = true ∧ (b <= a')%a ∧ (a' <= a)%a ∧ (a < e)%a ∧
-    (canStoreU p a storev = true).
+    (canStoreU p a' storev = true).
 
   Inductive StoreU_spec (regs: Reg) (rdst: RegName) (offs rsrc: Z + RegName) (regs': Reg) (mem mem': PermMem) : cap_lang.val → Prop :=
   | StoreU_spec_success p p' g b e a w zoffs a' old:
@@ -125,18 +123,18 @@ Section cap_lang_rules.
    | None => True
    | Some (inl _) => True
    | Some (inr (p, g, b, e, a)) =>
-     if isU p && canStoreU p a wsr then
        match z_of_argument regs offs with
        | None => True
        | Some zoffs => match verify_access (StoreU_access b e a zoffs) with
                       | None => True
-                      | Some a' => match mem !! a' with
-                                  | None => False
-                                  | Some (p', w) => PermFlows p p'
-                                  end
+                      | Some a' => if isU p && canStoreU p a' wsr then
+                                    match mem !! a' with
+                                    | None => False
+                                    | Some (p', w) => PermFlows p p'
+                                    end
+                                  else True
                       end
        end
-     else True
     end.
   Proof.
     intros Hallow.
@@ -144,9 +142,9 @@ Section cap_lang_rules.
     exists storev.
     split;auto.
     destruct Hreg as [Hreg | [z Hreg] ];rewrite Hreg;auto.
-    destruct (isU p && canStoreU p a storev) eqn:Hstore;[|auto].
     destruct (z_of_argument regs offs);auto.
     destruct (verify_access (StoreU_access b e a z)) eqn:Hverify;auto.
+    destruct (isU p && canStoreU p a0 storev) eqn:Hstore;[|auto].
     apply verify_access_spec in Hverify as (Haz & Hconds).
     rewrite Haz in Hcond.
     case_decide.
@@ -171,18 +169,18 @@ Section cap_lang_rules.
    | None => True
    | Some (inl _) => True
    | Some (inr (p, g, b, e, a)) =>
-     if isU p && canStoreU p a wsrc then
-       match z_of_argument regs offs with
+     match z_of_argument regs offs with
        | None => True
        | Some zoffs => match verify_access (StoreU_access b e a zoffs) with
                       | None => True
-                      | Some a' => match mem !! a' with
-                                  | None => False
-                                  | Some (p', w) => PermFlows p p'
-                                  end
+                      | Some a' => if isU p && canStoreU p a' wsrc then
+                                    match mem !! a' with
+                                    | None => False
+                                    | Some (p', w) => PermFlows p p'
+                                    end
+                                  else True
                       end
        end
-     else True
    end ->
 
    {{{ (▷ [∗ map] a↦pw ∈ mem, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗
@@ -216,8 +214,8 @@ Section cap_lang_rules.
      destruct rdstv as [zdst| [[[[p g] b] e] a] ].
      { inv Hstep. iFailWP "Hφ" StoreU_fail_const. }
 
-     destruct (isU p) eqn:HisU; cycle 1.
-     { simpl in Hstep. inv Hstep. iFailWP "Hφ" StoreU_fail_perm1. }
+     (* destruct (isU p) eqn:HisU; cycle 1. *)
+     (* { simpl in Hstep. inv Hstep. iFailWP "Hφ" StoreU_fail_perm1. } *)
 
      assert (Hwsrc': match rsrc with
                      | inl n => inl n
@@ -232,9 +230,9 @@ Section cap_lang_rules.
        rewrite HB; congruence. }
      rewrite Hwsrc' in Hstep.
 
-     destruct (canStoreU p a wsrc) eqn:HcanStoreU; cycle 1.
-     { simpl in Hstep. inversion Hstep.
-       iFailWP "Hφ" StoreU_fail_perm2. }
+     (* destruct (canStoreU p a wsrc) eqn:HcanStoreU; cycle 1. *)
+     (* { simpl in Hstep. inversion Hstep. *)
+     (*   iFailWP "Hφ" StoreU_fail_perm2. } *)
 
      assert (Hzofargeq: z_of_argument r offs = z_of_argument regs offs).
      { rewrite /z_of_argument; destruct offs; auto.
@@ -249,7 +247,13 @@ Section cap_lang_rules.
      destruct (verify_access (StoreU_access b e a zoffs)) as [a'|] eqn:Hverify; cycle 1.
      { inv Hstep. iFailWP "Hφ" StoreU_fail_verify_access. }
 
-     rewrite Hrdst' HisU HcanStoreU Hverify /= in HaStore.
+     destruct (isU p) eqn:HisU; cycle 1.
+     { simpl in Hstep. inv Hstep. iFailWP "Hφ" StoreU_fail_perm1. }
+
+     destruct (canStoreU p a' wsrc) eqn:HcanStoreU; cycle 1.
+     { simpl in Hstep. inversion Hstep. iFailWP "Hφ" StoreU_fail_perm2. }
+     
+     rewrite Hrdst' HisU Hverify HcanStoreU /= in HaStore. 
      destruct (mem !! a') as [(p', wa)|]eqn:Ha; try (inv HaStore; fail).
 
      destruct (addr_eq_dec a a').

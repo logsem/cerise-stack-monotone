@@ -471,20 +471,20 @@ Section opsem.
       match RegLocate (reg φ) dst with
       | inl _ => (Failed, φ)
       | inr ((p, g), b, e, a) =>
-        if isU p && canStoreU p a w then
-          match z_of_argument (reg φ) offs with
-          | None => (Failed, φ)
-          | Some noffs => match verify_access (StoreU_access b e a noffs) with
-                         | None => (Failed, φ)
-                         | Some a' => if addr_eq_dec a a' then
+        match z_of_argument (reg φ) offs with
+        | None => (Failed, φ)
+        | Some noffs => match verify_access (StoreU_access b e a noffs) with
+                       | None => (Failed, φ)
+                       | Some a' => if isU p && canStoreU p a' w then
+                                     if addr_eq_dec a a' then
                                        match (a + 1)%a with
                                        | Some a => updatePC (update_reg (update_mem φ a' w) dst (inr ((p, g), b, e, a)))
                                        | None => (Failed, φ)
                                        end
                                      else updatePC (update_mem φ a' w)
-                         end
-          end
-        else (Failed, φ)
+                                   else (Failed, φ)
+                       end
+        end
       end
     | PromoteU dst =>
       match RegLocate (reg φ) dst with
