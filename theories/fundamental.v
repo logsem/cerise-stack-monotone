@@ -1,4 +1,4 @@
-From cap_machine.ftlr Require Export Jmp. (*Jnz Get AddSubLt IsPtr Lea Load Mov Store Restrict Subseg LoadU StoreU PromoteU. *)
+From cap_machine.ftlr Require Export Jmp Store. (*Jnz Get AddSubLt IsPtr Lea Load Mov Restrict Subseg LoadU StoreU PromoteU. *)
 From iris.proofmode Require Import tactics.
 From iris.program_logic Require Import weakestpre adequacy lifting.
 From stdpp Require Import base.
@@ -81,14 +81,14 @@ Section fundamental.
         iApply (jmp_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]");
           try iAssumption; eauto.
       + (* Jnz *)
-        iApply (jnz_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]");
-          try iAssumption; eauto.
+        (* iApply (jnz_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
+        (*   try iAssumption; eauto. *) admit.
       + (* Mov *)
-        iApply (mov_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]");
-          try iAssumption; eauto.
+        (* iApply (mov_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
+        (*   try iAssumption; eauto. *) admit.
       + (* Load *)
-        iApply (load_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]");
-          try iAssumption; eauto.
+        (* iApply (load_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
+        (*   try iAssumption; eauto.a *) admit. 
       + (* Store *)
         iApply (store_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]");
           try iAssumption; eauto.

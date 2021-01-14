@@ -606,6 +606,15 @@ Section logrel.
     destruct p; simpl in H; try congruence; destruct l; eauto. 
   Qed.
 
+  Lemma writeLocalAllowedU_implies_local W p l b e a:
+    pwlU p = true ->
+    interp W (inr (p, l, b, e, a)) -∗ ⌜isMonotone l = true⌝.
+  Proof.
+    intros. iIntros "Hvalid".
+    unfold interp; rewrite fixpoint_interp1_eq /=.
+    destruct p; simpl in H; try congruence; destruct l; eauto. 
+  Qed.
+
   Lemma readAllowed_valid_cap_implies W p l b e a:
     readAllowed p = true ->
     withinBounds (p, l, b, e, a) = true ->
@@ -665,6 +674,28 @@ Section logrel.
     destruct p; simpl in Hp; try congruence; destruct l;try done.
     - iDestruct (extract_from_region_inv with "Hvalid") as (? ?) "[_ %]"; eauto.
     - iDestruct (extract_from_region_inv with "Hvalid") as (? ?) "[_ %]"; eauto.
+  Qed.
+
+  Lemma writeLocalAllowedU_valid_cap_implies W p l b e a:
+    pwlU p = true ->
+    withinBounds (p, l, b, e, a) = true ->
+    interp W (inr (p, l, b, e, a)) -∗
+           ⌜std W !! a = Some Monotemporary ∨ ∃ w, std W !! a = Some (Uninitialized w)⌝.
+  Proof.
+    intros Hp Hb. iIntros "Hvalid".
+    iAssert (⌜isMonotone l = true⌝)%I as "%". by iApply writeLocalAllowedU_implies_local.
+    eapply withinBounds_le_addr in Hb.
+    unfold interp; rewrite fixpoint_interp1_eq /=.
+    destruct p; simpl in Hp; try congruence; destruct l;try done;
+      try iDestruct (extract_from_region_inv with "Hvalid") as (? ?) "[_ %]"; eauto.
+    - assert (addr_reg.max b a = a) as ->;[solve_addr|].
+      iDestruct "Hvalid" as "[_ Hvalid]". 
+      iDestruct (extract_from_region_inv _ _ a with "Hvalid") as (? ?) "[_ %]". solve_addr. 
+      destruct H3 as [? | ?];auto. 
+    - assert (addr_reg.max b a = a) as ->;[solve_addr|].
+      iDestruct "Hvalid" as "[_ Hvalid]". 
+      iDestruct (extract_from_region_inv _ _ a with "Hvalid") as (? ?) "[_ %]". solve_addr. 
+      destruct H3 as [? | ?];auto. 
   Qed.
 
   Lemma interp1_eq interp (W: WORLD) p l b e a:

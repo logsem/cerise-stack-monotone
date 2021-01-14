@@ -999,6 +999,63 @@ Proof.
       rewrite Hstd in Ha. inversion Ha.
 Qed.
 
+Lemma interp_monotone_generalUW (W : WORLD)  (ρ : region_type) (p p0 p1 : Perm) (l g : Locality)(b e a a2 a1 a0 : Addr):
+  std W !! a0 = Some ρ →
+  withinBounds (p0, l, a2, a1, a0) = true →
+  PermFlows (promote_perm p0) p1 →
+  canStoreU p0 a0 (inr (p,g,b,e,a)) = true →
+  ((fixpoint interp1) W) (inr (p0, l, a2, a1, a0)) -∗
+  monotonicity_guarantees_region ρ a0 (inr (p, g, b, e, a)) p1  (λne Wv : WORLD * (leibnizO Word), (interp Wv.1) Wv.2).
+Proof.
+  unfold monotonicity_guarantees_region.
+  iIntros (Hstd Hwb Hfl' Hconds) "#Hvdst".
+  destruct ρ;auto.
+  - destruct (pwl p1) eqn: HpwlP1 ; iModIntro; simpl;auto.
+    * iIntros (W0 W1) "% HIW0".
+      iApply (interp_monotone_nm with "[] [] HIW0");[done|].
+      destruct p0 ; try (simpl in Hconds; by exfalso).
+      all: destruct g;auto.
+      all: iDestruct (writeLocalAllowedU_valid_cap_implies with "Hvdst" ) as %Ha;auto.
+      all: destruct Ha as [Ha | [? Ha] ]; rewrite Ha in Hstd;done. 
+    * iIntros (W0 W1) "% HIW0".
+      iApply (interp_monotone_nm_nl with "[] [] HIW0");[done|].
+      destruct g;auto.
+      ** destruct p0;inversion Hconds;destruct p1;inversion Hfl';inversion Hconds;inversion HpwlP1.
+      ** apply andb_prop in Hconds as [Hconds ?]. destruct p0;inversion Hconds;destruct p1;inversion Hfl';done.
+  - destruct (pwl p1) eqn: HpwlP1 ; iModIntro; simpl;auto.
+    + iIntros (W0 W1) "% HIW0".
+      destruct g.
+      * iApply (interp_monotone_nm_nl with "[] [] HIW0");auto.
+        iPureIntro. apply related_sts_a_pub_plus_world in a3. apply related_sts_pub_plus_priv_world;auto. 
+      * iApply (interp_monotone_nm with "[] [] HIW0");auto.
+        iPureIntro. apply related_sts_a_pub_plus_world with a0;auto.
+      * destruct (decide (p = O)). 
+        { subst. rewrite !fixpoint_interp1_eq. done. }
+        iApply (interp_monotone_a with "[] HIW0");auto.
+        apply andb_prop in Hconds as [Hp0 Hleb].
+        simpl. destruct (isU p) eqn:Hu.
+        ** assert (a <= a0)%a as Hle.
+           { destruct p; inversion Hu;simpl in Hleb;apply Z.leb_le in Hleb;solve_addr. }
+           iPureIntro. apply related_sts_a_weak_world with a0;auto. 
+        ** assert (e <= a0)%a as Hle.
+           { destruct p; inversion Hu;simpl in Hleb;apply Z.leb_le in Hleb; try solve_addr. }
+           iPureIntro. apply related_sts_a_weak_world with a0;auto.
+    + assert (pwlU p0 = false) as Hpwl.
+      { destruct p0;auto; destruct p1;inversion HpwlP1;inversion Hfl'. }
+      simpl in Hconds. rewrite Hpwl andb_false_l in Hconds. destruct g;inversion Hconds.
+      iIntros (W0 W1) "% HIW0".
+      iApply (interp_monotone_nm_nl with "[] [] HIW0");auto.
+  - iModIntro. simpl. iIntros (W0 W1) "% HIW0".
+    destruct g.
+    + by iApply interp_monotone_nm_nl.
+    + (*Trick here: value relation leads to a contradiction if p0 is WL, since then its region cannot be permanent*)
+      iDestruct ( writeLocalAllowedU_valid_cap_implies with "Hvdst" ) as %Ha; eauto.
+      destruct Ha as [Ha | [? Ha] ]; rewrite Hstd in Ha; inversion Ha.
+    + apply andb_prop in Hconds as [Hp0 Hleb].
+      iDestruct ( writeLocalAllowedU_valid_cap_implies with "Hvdst" ) as %Ha; eauto.
+      destruct Ha as [Ha | [? Ha] ]; rewrite Hstd in Ha; inversion Ha.
+Qed.
+
 (* Analogous, but now we have the general monotonicity statement in case an integer z is written *)
 Lemma interp_monotone_generalZ (W : WORLD)  (ρ : region_type) (p0 p1 : Perm) (l : Locality)(a2 a1 a0 : Addr) z:
   std W !! a0 = Some ρ →
