@@ -378,55 +378,99 @@ Section fundamental.
       case_decide as Hdec1; last by done. by exfalso.
   Qed.
 
+  Lemma isU_weak_addrs W p g b e a a' :
+    isU p -> (a' <= a)%a →
+    interp W (inr (p,g,b,e,a)) -∗ interp W (inr (p,g,b,e,a')).
+  Proof.
+    iIntros (Hu Hle) "#Hv".
+    rewrite !fixpoint_interp1_eq.
+  Admitted. 
+    (* destruct p;inversion Hu. *)
+    (* - destruct g;try done. *)
+    (*   + simpl. admit. *)
+    (*     admit.  *)
+
   Lemma storev_interp_mono W (r : Reg) (r1 : RegName) (r2 : Z + RegName) p g b e a a' p' ρ storev:
      PermFlows (promote_perm p) p'
      → word_of_argument r r2 = Some storev
      → reg_allows_storeU r r1 p g b e a a' storev
      → std W !! a' = Some ρ
-     → ((fixpoint interp1) W) (inr (p,g,b,e,a'))
+     → ((fixpoint interp1) W) (inr (p,g,b,e,a))
        -∗ monotonicity_guarantees_region ρ a' storev p' interpC.
    Proof.
      iIntros (Hpf Hwoa Hras Hststd) "HInt".
      destruct Hras as (Hrir & Hwa & Hwb & Hwb1 & Hwb2 & Hloc).
      destruct storev as [z | cap].
-     - iApply (interp_monotone_generalZ with "HInt" );auto.
+     - iDestruct (isU_weak_addrs with "HInt") as "HInt";eauto.
+       iApply (interp_monotone_generalZ with "HInt" );auto.
        { apply andb_true_iff. split;[apply Z.leb_le|apply Z.ltb_lt];solve_addr. }
        eapply PermFlows_trans;eauto. destruct p;inversion Hwa;simpl;auto.
-     - destruct r2. cbn in Hwoa; inversion Hwoa; by exfalso.
+     - iDestruct (isU_weak_addrs with "HInt") as "HInt";eauto.
+       destruct r2. cbn in Hwoa; inversion Hwoa; by exfalso.
        destruct_cap cap. cbn in Hwoa.
        destruct (r !! r0); inversion Hwoa; clear Hwoa; subst w.
        iApply (interp_monotone_generalUW with "HInt" ); eauto.
-       
-  Qed.
+       apply andb_true_iff. split;[apply Z.leb_le|apply Z.ltb_lt];solve_addr. 
+   Qed.
+
+
+   Definition new_worldU W (a0 : Addr) pc_p pc_g pc_b pc_e pc_a r offs :=
+     match z_of_argument (<[PC:=inr (pc_p, pc_g, pc_b, pc_e, pc_a)]> r) offs with
+     | Some z =>
+       match (a0 + z)%a with
+       | Some a1 =>
+         if (a1 =? a0)%Z
+         then match std W !! a1 with
+              | Some (Uninitialized _) => (<[a0:=Monotemporary]> W.1,W.2)
+              | Some (Static _) => (<[a0:=Temporary]> W.1,W.2)
+              | _ => W
+              end
+         else W
+       | None => W
+       end
+     | None => W
+     end.
 
   (* Note that we turn in all information that we might have on the monotonicity of the current PC value, so that in the proof of the ftlr case itself, we do not have to worry about whether the PC was written to or not when we close the last location pc_a in the region *)
    Lemma mem_map_recover_res:
     ∀ (W : WORLD) (r : Reg) (p' : Perm)
-       (pc_w : Word) (r1 : RegName) (r2 : Z + RegName) (p0 p'0 pc_p pc_p' : Perm)
-       (g0 pc_g : Locality) (b0 e0 a0 pc_b pc_e pc_a : Addr) (mem0 : PermMem) (oldv storev : Word) (ρ : region_type),
+       (pc_w : Word) (r1 : RegName) (r2 offs : Z + RegName) (offz : Z) (p0 p'0 pc_p pc_p' : Perm)
+       (g0 pc_g : Locality) (b0 e0 a0 a1 pc_b pc_e pc_a : Addr) (mem0 : PermMem) (oldv storev : Word) (ρ : region_type),
       word_of_argument (<[PC:=inr (pc_p, pc_g, pc_b, pc_e, pc_a)]> r) r2 = Some storev
-      → reg_allows_store (<[PC:=inr (pc_p, pc_g, pc_b, pc_e, pc_a)]> r) r1 p0 g0 b0 e0 a0 storev
+      → z_of_argument (<[PC:=inr (pc_p, pc_g, pc_b, pc_e, pc_a)]> r) offs = Some offz (* necessary for successful store *)
+      → (a0 + offz)%a = Some a1 (* necessary for successful store *)
+      → (pc_p = RX ∨ pc_p = RWX ∨ pc_p = RWLX)
+      → reg_allows_storeU (<[PC:=inr (pc_p, pc_g, pc_b, pc_e, pc_a)]> r) r1 p0 g0 b0 e0 a0 a1 storev
       → std W !! pc_a = Some ρ
-      → mem0 !! a0 = Some (p'0, oldv) (*?*)
-      → allow_store_mem W r1 r2 (<[PC:=inr (pc_p, pc_g, pc_b, pc_e, pc_a)]> r) pc_a pc_p' pc_w mem0
+      → mem0 !! a1 = Some (p'0, oldv) (*?*)
+      → allow_store_mem W r1 r2 offs (<[PC:=inr (pc_p, pc_g, pc_b, pc_e, pc_a)]> r) pc_a pc_p' pc_w mem0
         -∗ (∀ r1 : RegName, ⌜r1 ≠ PC⌝ → ((fixpoint interp1) W) (r !r! r1))
         -∗ ((fixpoint interp1) W) (inr(pc_p, pc_g, pc_b, pc_e, pc_a))
         -∗ ((fixpoint interp1) W) pc_w
         -∗ monotonicity_guarantees_region ρ pc_a pc_w pc_p' interpC
-        -∗ ([∗ map] a0↦pw ∈ <[a0 := (p'0, storev)]> mem0, ∃ (p0 : Perm) (w0 : Word),
-                ⌜pw = (p0, w0)⌝ ∗ a0 ↦ₐ[p0] w0)
-        -∗ ∃ v, open_region pc_a W ∗ pc_a ↦ₐ[pc_p'] v ∗ ((fixpoint interp1) W) v ∗ monotonicity_guarantees_region ρ pc_a v pc_p' interpC.
+        -∗ ([∗ map] a0↦pw ∈ <[a1 := (p'0, storev)]> mem0, ∃ (p0 : Perm) (w0 : Word),
+               ⌜pw = (p0, w0)⌝ ∗ a0 ↦ₐ[p0] w0)
+        -∗ sts_full_world W
+        -∗ ∃ v, open_region pc_a (new_worldU W a0 pc_p pc_g pc_b pc_e pc_a r offs)
+                            ∗ sts_full_world (new_worldU W a0 pc_p pc_g pc_b pc_e pc_a r offs)
+                            ∗ pc_a ↦ₐ[pc_p'] v
+                            ∗ ((fixpoint interp1) (new_worldU W a0 pc_p pc_g pc_b pc_e pc_a r offs)) v
+                            ∗ monotonicity_guarantees_region ρ pc_a v pc_p' interpC.
    Proof.
-    intros W r p' pc_w r1 r2 p0 p'0 pc_p pc_p' g0 pc_g b0 e0 a0 pc_b pc_e pc_a mem0 oldv storev ρ Hwoa Hras Hstdst Ha0.
-    iIntros "HStoreMem #Hreg #HVPCr #Hpc_w Hpcmono Hmem".
-    iDestruct "HStoreMem" as (p1 g1 b1 e1 a1 storev1) "[% [% HStoreRes] ]".
-    destruct (store_inr_eq Hras H0) as (<- & <- &<- &<- &<-).
-    rewrite Hwoa in H1; inversion H1; simplify_eq.
+    intros W r p' pc_w r1 r2 offs offz p0 p'0 pc_p pc_p' g0 pc_g b0 e0 a0 a1 pc_b pc_e pc_a mem0 oldv storev ρ Hwoa Hz Hnext Hpcperm Hras Hstdst Ha0.
+    iIntros "HStoreMem #Hreg #HVPCr #Hpc_w Hpcmono Hmem Hsts".
+    iDestruct "HStoreMem" as (p1 g1 b1 e1 a1' storev1) "[% [% HStoreRes] ]".
+    destruct (store_inr_eq Hras H) as (<- & <- &<- &<- &<-).
+    rewrite Hwoa in H0; inversion H0; simplify_eq.
+    rewrite /new_worldU !Hz !Hnext.
+
     case_decide as Hallows.
     - iAssert (((fixpoint interp1) W) (inr (p0,g0,b0,e0,a0)))%I with "[HVPCr Hreg]" as "#HVr1".
       { destruct Hras as [Hreg _]. destruct (decide (r1 = PC)).
-        - subst r1. rewrite lookup_insert in Hreg; by inversion Hreg.
-        - iSpecialize ("Hreg" $! r1 n). rewrite lookup_insert_ne in Hreg; last congruence. by rewrite /RegLocate Hreg.
+        - subst r1. rewrite lookup_insert in Hreg. inversion Hreg. subst. 
+          destruct Hallows as (_ & Hallows & _). destruct Hpcperm as [-> | [-> | -> ] ];inversion Hallows.
+        - iSpecialize ("Hreg" $! r1 n). rewrite lookup_insert_ne in Hreg; last congruence. rewrite /RegLocate Hreg.
+          auto. 
       }
       iAssert (((fixpoint interp1) W) storev1)%I with "[HVPCr Hreg]" as "#HVstorev1".
       { destruct storev1.
@@ -445,18 +489,21 @@ Section fundamental.
         rewrite lookup_insert in Ha0; inversion Ha0; clear Ha0; subst.
         iDestruct "HLoadRes" as (ρ1) "(Hstate' & % & % & % & % & % & Hr & % & Hrel')".
         rewrite insert_insert memMap_resource_2ne; last auto. iDestruct "Hmem" as  "[Ha1 $]".
+        iDestruct (storev_interp_mono with "HVr1") as "Hr1Mono";eauto.
+        destruct ((a1 =? a0)%Z) eqn:Heqa. apply Z.eqb_eq,z_of_eq in Heqa as ->.
+        * rewrite H1. admit. 
+        * destruct H5 as [? ?].
+          iDestruct (region_close_next with "[$Hr $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono]") as "Hr"; eauto.
+          { intros [g Hcontr]. specialize (H5 g). done. }
+          { intros [g Hcontr]. specialize (H3 g). done. }
+          { intros [g Hcontr]. specialize (H7 g). done. }
+          { apply not_elem_of_cons; split; [auto|apply not_elem_of_nil]. }
+          iDestruct (region_open_prepare with "Hr") as "$". by iFrame.
+      + subst a1. iDestruct "HStoreRes" as "[-> [HStoreRes % ] ]".
+        rewrite insert_insert -memMap_resource_1.
+        rewrite lookup_insert in Ha0; inversion Ha0; simplify_eq.
+        iExists storev1. iFrame.
         iDestruct (storev_interp_mono with "HVr1") as "Hr1Mono"; eauto.
-        iDestruct (region_close_next with "[$Hr $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono]") as "Hr"; eauto.
-        { intros [g Hcontr]. specialize (H4 g). done. }
-        { intros [g Hcontr]. specialize (H5 g). done. }
-        { intros [g Hcontr]. specialize (H6 g). done. }
-        { apply not_elem_of_cons; split; [auto|apply not_elem_of_nil]. }
-        iDestruct (region_open_prepare with "Hr") as "$". by iFrame.
-       + subst a0. iDestruct "HStoreRes" as "[-> [HStoreRes % ] ]".
-         rewrite insert_insert -memMap_resource_1.
-         rewrite lookup_insert in Ha0; inversion Ha0; simplify_eq.
-         iExists storev1. iFrame.
-         iDestruct (storev_interp_mono with "HVr1") as "Hr1Mono"; eauto.
     - by exfalso.
    Qed.
 
