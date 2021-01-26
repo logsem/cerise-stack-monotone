@@ -378,6 +378,7 @@ Section fundamental.
       case_decide as Hdec1; last by done. by exfalso.
   Qed.
 
+  (* TODO: prove this using interp_weakening *)
   Lemma isU_weak_addrs W p g b e a a' :
     isU p -> (a' <= a)%a →
     interp W (inr (p,g,b,e,a)) -∗ interp W (inr (p,g,b,e,a')).
