@@ -303,6 +303,73 @@ Section transitions.
     subst. apply IHHrtc. apply std_rel_priv_Permanent; auto.
   Qed.
 
+  Lemma std_rel_priv_Revoked x :
+    std_rel_priv Revoked x → x = Revoked.
+  Proof.
+    intros Hrel.
+    inversion Hrel; done.
+  Qed.
+
+  Lemma std_rel_priv_rtc_Revoked x y :
+    x = Revoked →
+    rtc std_rel_priv x y → y = Revoked.
+  Proof.
+    intros Hx Hrtc.
+    induction Hrtc;auto.
+    subst. apply IHHrtc. apply std_rel_priv_Revoked; auto.
+  Qed.
+  
+  Lemma std_rel_priv_Temporary x :
+    std_rel_priv Temporary x → x = Permanent ∨ x = Revoked ∨ (∃ g, x = Static g).
+  Proof.
+    intros Hrel.
+    inversion Hrel;eauto.
+  Qed.
+
+  Lemma std_rel_priv_Static x g :
+    std_rel_priv (Static g) x → x = Static g.
+  Proof.
+    intros Hrel.
+    inversion Hrel; done.
+  Qed.
+
+  Lemma std_rel_priv_rtc_Static x y g :
+    x = Static g →
+    rtc std_rel_priv x y → y = Static g.
+  Proof.
+    intros Hx Hrtc.
+    induction Hrtc;auto.
+    subst. apply IHHrtc. apply std_rel_priv_Static; auto.
+  Qed.
+
+  Lemma std_rel_priv_Monostatic x g :
+    std_rel_priv (Monostatic g) x → x = Monostatic g.
+  Proof.
+    intros Hrel.
+    inversion Hrel; done.
+  Qed.
+
+  Lemma std_rel_priv_rtc_Monostatic x y g :
+    x = Monostatic g →
+    rtc std_rel_priv x y → y = Monostatic g.
+  Proof.
+    intros Hx Hrtc.
+    induction Hrtc;auto.
+    subst. apply IHHrtc. apply std_rel_priv_Monostatic; auto.
+  Qed.
+  
+  Lemma std_rel_priv_rtc_Temporary x y :
+    x = Temporary →
+    rtc std_rel_priv x y → y = Temporary ∨ y = Permanent ∨ y = Revoked ∨ (∃ g, y = Static g).
+  Proof.
+    intros Hx Hrtc.
+    induction Hrtc;auto.
+    subst. apply std_rel_priv_Temporary in H0 as [-> | [-> | [? ->] ] ].
+    - apply std_rel_priv_rtc_Permanent in Hrtc;auto.
+    - apply std_rel_priv_rtc_Revoked in Hrtc;auto.
+    - eapply std_rel_priv_rtc_Static in Hrtc;eauto.
+  Qed.
+  
   Lemma std_rel_rtc_Permanent x y :
     x = Permanent →
     rtc (λ x0 y0 : region_type, std_rel_pub x0 y0 ∨ std_rel_pub_plus x0 y0 ∨ std_rel_priv x0 y0) x y →
@@ -505,7 +572,26 @@ Section transitions.
   Proof.
     intros Hx Hrtc. subst. 
     apply (std_rel_pub_plus_rtc_Monotemporary_or_Uninitialized Monotemporary);eauto. 
-  Qed. 
+  Qed.
+
+  (*
+    this lemma does not how if there is only one revoked state, shared between
+    Temporary and Monotemporary
+   *)
+  (* Lemma std_rel_rtc_Temporary x y : *)
+  (*   x = Temporary → *)
+  (*   rtc (λ x0 y0 : region_type, std_rel_pub x0 y0 ∨ std_rel_pub_plus x0 y0 ∨ std_rel_priv x0 y0) x y → *)
+  (*   y = Temporary ∨ y = Revoked ∨ y = Permanent ∨ (∃ g, y = Static g). *)
+  (* Proof. *)
+  (*   intros Hx Hrtc. *)
+  (*   induction Hrtc as [|x y z Hrel];auto. *)
+  (*   subst. destruct Hrel as [Hrel | [Hrel | Hrel] ]. *)
+  (*   - apply std_rel_pub_Temporary in Hrel. auto. *)
+  (*   - apply std_rel_pub_plus_Temporary in Hrel. auto. *)
+  (*   - apply std_rel_priv_Temporary in Hrel as [-> | [-> | [? ->] ] ];eauto. *)
+  (*     + apply std_rel_rtc_Permanent in Hrtc;auto. *)
+  (*     +  *)
+  (* Qed. *)
 
 End transitions.
 
