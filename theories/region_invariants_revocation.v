@@ -2172,76 +2172,112 @@ Section heap.
          rewrite Hx in Hy. inversion Hy. left.
   Qed.
 
-  (*
+
   Lemma close_list_related_sts_pub_cons_nested W a a0 l k :
-    related_sts_pub_world W (close_list l (a0 :: k) W) →
+    (a :: l) ## (a0 :: k) →
+    (∀ k : list Addr, l ## k → related_sts_pub_world W (close_list l k W)) →
+    related_sts_pub_world W (close_list (a :: l) k W) →
     related_sts_pub_world W (close_list (a :: l) (a0 :: k) W).
   Proof.
-    rewrite /close_list /=. intros IHl.
-    destruct (std W !! a) eqn:Hsome; auto.
+    rewrite /close_list /=. intros Hdisj IHk IHl.
+    assert (a ≠ a0) as Hne.
+    { intros Hcontr;subst. apply elem_of_disjoint in Hdisj.
+      specialize (Hdisj a0). apply Hdisj;constructor. }
+    destruct (std W !! a0) eqn:Hsome; auto.
     destruct r;auto.
-    apply related_sts_pub_trans_world with (close_list_std_sta_monotemp l (std W),loc W); auto.
-    split;[|apply related_sts_pub_refl].
-    split.
-    + simpl. rewrite dom_insert /close_list /=.
-      apply union_subseteq_r.
-    + rewrite /close_list /=.
-      intros i x y Hx Hy.
-      destruct (decide (i = a)); subst.
-      ++ rewrite lookup_insert in Hy. inversion Hy.
-         subst.
-         destruct (decide (a ∈ l)).
-         +++ apply close_list_std_sta_monotemp_revoked with _ l _ in Hsome;auto.
-             rewrite Hsome in Hx. inversion Hx. left.
-         +++ rewrite (close_list_std_sta_same_monotemp _ l) in Hsome;auto.
-             rewrite Hsome in Hx. inversion Hx. right with Monotemporary;[|left].
-             constructor.
-      ++ rewrite lookup_insert_ne in Hy; auto.
-         rewrite Hx in Hy. inversion Hy. left.
+    rewrite lookup_insert_ne//.
+    destruct (close_list_std_sta_monotemp k (std W) !! a ) eqn:Hsome'.
+    - destruct (decide (r = Revoked));auto.
+      + subst. eapply related_sts_pub_trans_world;[apply IHl|].
+        rewrite Hsome'. split;[simpl|apply related_sts_pub_refl].
+        split.
+        { rewrite !dom_insert -!(close_list_dom_eq_temp _ l) dom_insert. clear;set_solver. }
+        intros i x y Hx Hy.
+        destruct (decide (i = a));
+          [subst;rewrite lookup_insert in Hx; rewrite lookup_insert in Hy;simplify_eq;left|].
+        rewrite lookup_insert_ne// in Hx; rewrite lookup_insert_ne// in Hy.
+        assert (is_Some (W.1 !! i)) as [x' Hx'].
+        { eapply close_list_std_sta_monotemp_is_Some, close_list_std_sta_temp_is_Some. eauto. }
+        destruct (decide (i ∈ l)).
+        { assert (i ∉ (a0::k)) as Hnin.
+          { apply elem_of_disjoint in Hdisj.
+            assert (i ∈ (a :: l)) as e';[constructor;auto|].
+            apply Hdisj in e'. auto. }
+          apply not_elem_of_cons in Hnin as [Hne' Hnin].
+          destruct (decide (x' = Revoked)).
+          - subst. rewrite close_list_std_sta_temp_revoked in Hx;auto;[|rewrite -close_list_std_sta_same_monotemp;auto].
+            rewrite close_list_std_sta_temp_revoked in Hy;auto;[|rewrite lookup_insert_ne// -close_list_std_sta_same_monotemp;auto].
+            simplify_eq;left.
+          - rewrite -close_list_std_sta_same_alt_temp in Hx.
+            2: rewrite -close_list_std_sta_same_monotemp;auto;intros Hcontr;rewrite Hcontr in Hx';congruence.
+            rewrite -close_list_std_sta_same_monotemp in Hx;auto.
+            rewrite -close_list_std_sta_same_alt_temp in Hy.
+            2: rewrite lookup_insert_ne// -close_list_std_sta_same_monotemp;auto;intros Hcontr;rewrite Hcontr in Hx';congruence.
+            rewrite lookup_insert_ne// -close_list_std_sta_same_monotemp in Hy;auto. rewrite Hx' in Hx; rewrite Hx' in Hy.
+            simplify_eq;left.
+        }
+        destruct (decide (i = a0)).
+        { subst. destruct (decide (a0 ∈ k)).
+          - apply (close_list_std_sta_monotemp_revoked _ k) in Hsome;auto.
+            rewrite (close_list_std_sta_same_temp _ l) in Hsome;auto.
+            rewrite -close_list_std_sta_same_temp in Hy;auto.
+            rewrite Hx in Hsome. rewrite lookup_insert in Hy. simplify_eq. left.
+          - rewrite -close_list_std_sta_same_temp in Hy;auto.
+            rewrite -close_list_std_sta_same_temp// -close_list_std_sta_same_monotemp// in Hx.
+            rewrite lookup_insert in Hy. simplify_eq. eright;[|left]. constructor.
+        }
+        rewrite -close_list_std_sta_same_temp// in Hy.
+        rewrite -close_list_std_sta_same_temp// in Hx.
+        rewrite lookup_insert_ne// in Hy. rewrite Hx in Hy;simplify_eq. left.
+      + rewrite Hsome'.
+        specialize (IHk (a0::k)). simpl in IHk. rewrite Hsome in IHk.
+        assert (l ## a0 :: k) as Hdisj'.
+        { apply elem_of_disjoint. intros x Hx Hx'. apply elem_of_disjoint in Hdisj.
+          apply Hdisj in Hx';auto. constructor;auto. }
+        destruct r;try contradiction;auto.
+    - assert (l ## a0 :: k) as Hdisj'.
+      { apply elem_of_disjoint. intros x Hx Hx'. apply elem_of_disjoint in Hdisj.
+        apply Hdisj in Hx';auto. constructor;auto. }
+      specialize (IHk (a0::k)). simpl in IHk. rewrite Hsome in IHk.
+      rewrite Hsome'. auto.
   Qed.
-
 
   Lemma close_list_related_sts_pub_temp W l :
     related_sts_pub_world W (close_list_std_sta_temp l W.1,loc W).
   Proof.
     induction l.
     - rewrite /close_list /=. destruct W. apply related_sts_pub_refl_world.
-    - apply close_list_related_sts_pub_cons_temp; auto. 
+    - apply close_list_related_sts_pub_cons_temp; auto.
   Qed.
   Lemma close_list_related_sts_pub_monotemp W l :
     related_sts_pub_world W (close_list_std_sta_monotemp l W.1,loc W).
   Proof.
     induction l.
     - rewrite /close_list /=. destruct W. apply related_sts_pub_refl_world.
-    - apply close_list_related_sts_pub_cons_monotemp; auto. 
+    - apply close_list_related_sts_pub_cons_monotemp; auto.
   Qed.
 
   Lemma close_list_related_sts_pub W l k :
+    l ## k →
     related_sts_pub_world W (close_list l k W).
   Proof.
-    induction l,k.
-    - rewrite /close_list /=. destruct W; apply related_sts_pub_refl_world.
-    - apply close_list_related_sts_pub_monotemp; auto.
-    - apply close_list_related_sts_pub_temp.
-    - 
-    - intros k'. eapply related_sts_pub_trans_world;eauto.
-      rewrite /close_list. 
-      apply close_list_related_sts_pub_cons_temp; eauto.
-      rewrite -/close_list. 
-      apply close_list_related_sts_pub_cons_temp; auto.
-    - 
-      apply close_list_related_sts_pub_cons_monotemp; eauto.
-      apply close_list_related_sts_pub_monotemp; eauto.
-      eapply related_sts_pub_trans_world;eauto. 
-      apply close_list_related_sts_pub_cons_temp; eauto.
-      apply close_list_related_sts_pub_temp; eauto.
+    revert k. induction l;intros k Hdisj.
+    - induction k.
+      + rewrite /close_list /=. destruct W; apply related_sts_pub_refl_world.
+      + apply close_list_related_sts_pub_monotemp; auto.
+    - induction k.
+      + apply close_list_related_sts_pub_temp.
+      + apply close_list_related_sts_pub_cons_nested;eauto.
+        apply IHk. apply elem_of_disjoint.
+        intros x Hx Hx'. apply elem_of_disjoint in Hdisj.
+        apply Hdisj in Hx. apply Hx;auto. constructor;auto.
   Qed.
 
-  Lemma close_list_related_sts_pub_insert' Wstd_sta Wloc i l :
+  Lemma close_list_related_sts_pub_insert_temp' Wstd_sta Wloc i l :
     i ∉ l → Wstd_sta !! i = Some Revoked ->
     related_sts_pub_world
-      (close_list_std_sta l ((std (Wstd_sta,Wloc))), Wloc)
-      (<[i:=Temporary]> (close_list_std_sta l Wstd_sta), Wloc).
+      (close_list_std_sta_temp l ((std (Wstd_sta,Wloc))), Wloc)
+      (<[i:=Temporary]> (close_list_std_sta_temp l Wstd_sta), Wloc).
   Proof.
     intros Hnin Hlookup.
     split;[|apply related_sts_pub_refl]; simpl.
@@ -2251,50 +2287,81 @@ Section heap.
       apply elem_of_dom. apply elem_of_gmap_dom in Hj. done.
     + intros j x y Hx Hy.
       destruct (decide (i = j)); subst.
-      * rewrite lookup_insert in Hy. rewrite -(close_list_std_sta_same _ l) in Hx; auto.
+      * rewrite lookup_insert in Hy. rewrite -(close_list_std_sta_same_temp _ l) in Hx; auto.
         rewrite Hlookup in Hx. inversion Hx; inversion Hy; subst.
         right with Temporary;[|left]. constructor.
       * rewrite lookup_insert_ne in Hy; auto. rewrite Hx in Hy. inversion Hy. left.
   Qed.
 
-  Lemma close_list_related_sts_pub_insert Wstd_sta Wloc i l :
+  Lemma close_list_related_sts_pub_insert_monotemp' Wstd_sta Wloc i l :
     i ∉ l → Wstd_sta !! i = Some Revoked ->
     related_sts_pub_world
-      (Wstd_sta, Wloc)
-      (<[i:= Temporary]> (close_list_std_sta l Wstd_sta), Wloc).
+      (close_list_std_sta_monotemp l ((std (Wstd_sta,Wloc))), Wloc)
+      (<[i:=Monotemporary]> (close_list_std_sta_monotemp l Wstd_sta), Wloc).
   Proof.
     intros Hnin Hlookup.
-    apply related_sts_pub_trans_world with (close_list_std_sta l ((std (Wstd_sta, Wloc))), Wloc).
-    - apply close_list_related_sts_pub.
-    - apply close_list_related_sts_pub_insert'; auto.
+    split;[|apply related_sts_pub_refl]; simpl.
+    split;auto.
+    + apply elem_of_subseteq. intros j Hj.
+      rewrite dom_insert_L. apply elem_of_union. right.
+      apply elem_of_dom. apply elem_of_gmap_dom in Hj. done.
+    + intros j x y Hx Hy.
+      destruct (decide (i = j)); subst.
+      * rewrite lookup_insert in Hy. rewrite -(close_list_std_sta_same_monotemp _ l) in Hx; auto.
+        rewrite Hlookup in Hx. inversion Hx; inversion Hy; subst.
+        right with Monotemporary;[|left]. constructor.
+      * rewrite lookup_insert_ne in Hy; auto. rewrite Hx in Hy. inversion Hy. left.
   Qed.
 
-  Lemma close_revoke_iff Wstd_sta (l : list Addr) :
-     (forall (i : Addr), Wstd_sta !! i = Some Temporary <-> i ∈ l) ->
-     ∀ i, (close_list_std_sta l (revoke_std_sta Wstd_sta)) !! i =
+  Lemma close_list_related_sts_pub_insert Wstd_sta Wloc i l :
+    i ∉ l → Wstd_sta !! i = Some Revoked →
+    related_sts_pub_world
+      (Wstd_sta, Wloc)
+      (<[i:= Temporary]> (close_list_std_sta_temp l Wstd_sta), Wloc).
+  Proof.
+    intros Hnin Hlookup.
+    eapply related_sts_pub_trans_world. (* with (close_list_std_sta_temp l ((std (Wstd_sta, Wloc))), Wloc). *)
+    - apply close_list_related_sts_pub_temp.
+    - eapply close_list_related_sts_pub_insert_temp'; auto.
+  Qed.
+
+  Lemma close_revoke_iff Wstd_sta (l : list Addr) (k : list Addr) :
+    (forall (i : Addr), Wstd_sta !! i = Some Temporary <-> i ∈ l) ->
+    (forall (i : Addr), Wstd_sta !! i = Some Monotemporary <-> i ∈ k) ->
+     ∀ i, (close_list_std_sta_temp l (close_list_std_sta_monotemp k (revoke_std_sta Wstd_sta))) !! i =
           Wstd_sta !! i.
   Proof.
-    intros Hiff.
+    intros Hiff Hiff'.
     intros i. destruct (decide (i ∈ l)).
     + apply Hiff in e as Htemp. rewrite Htemp.
-      apply close_list_std_sta_revoked;[auto|].
+      apply close_list_std_sta_temp_revoked;[auto|].
+      assert (i ∉ k) as Hnin.
+      { intros Hcontr. apply Hiff' in Hcontr. congruence. }
+      rewrite -close_list_std_sta_same_monotemp;auto.
       apply revoke_lookup_Temp; auto.
-    + apply (close_list_std_sta_same (revoke_std_sta Wstd_sta)) in n as Heq. rewrite -Heq.
-      apply revoke_monotone_lookup_same.
-      intros Hcontr. apply Hiff in Hcontr. contradiction.
+    + destruct (decide (i ∈ k)).
+      ++ apply (close_list_std_sta_same_temp (revoke_std_sta Wstd_sta)) in n as Heq.
+         apply Hiff' in e as Htemp. rewrite -close_list_std_sta_same_temp;auto.
+         rewrite Htemp. apply close_list_std_sta_monotemp_revoked;[auto|].
+         apply revoke_lookup_Monotemp; auto.
+      ++ rewrite -close_list_std_sta_same_temp// -close_list_std_sta_same_monotemp//.
+         apply revoke_monotone_lookup_same.
+         intros Hcontr. apply Hiff in Hcontr. contradiction.
+         intros Hcontr. apply Hiff' in Hcontr. contradiction.
   Qed.
 
-  Lemma close_revoke_eq Wstd_sta (l : list Addr) :
+  Lemma close_revoke_eq Wstd_sta (l k : list Addr) :
     (forall (i : Addr), Wstd_sta !! i = Some Temporary <-> i ∈ l) ->
-    (close_list_std_sta l (revoke_std_sta Wstd_sta)) = Wstd_sta.
+    (forall (i : Addr), Wstd_sta !! i = Some Monotemporary <-> i ∈ k) ->
+    (close_list_std_sta_temp l (close_list_std_sta_monotemp k (revoke_std_sta Wstd_sta))) = Wstd_sta.
   Proof.
-    intros Hiff.
+    intros Hiff Hiff'.
     eapply (map_leibniz (M:=gmap Addr) (A:=region_type)). Unshelve. intros i. apply leibniz_equiv_iff.
-    apply close_revoke_iff. auto. apply _.
+    apply close_revoke_iff; auto. apply _.
   Qed.
 
-  Lemma close_list_std_sta_idemp Wstd_sta (l1 l2 : list Addr) :
-    close_list_std_sta l1 (close_list_std_sta l2 Wstd_sta) = close_list_std_sta (l1 ++ l2) Wstd_sta.
+  Lemma close_list_std_sta_temp_idemp Wstd_sta (l1 l2 : list Addr) :
+    close_list_std_sta_temp l1 (close_list_std_sta_temp l2 Wstd_sta) = close_list_std_sta_temp (l1 ++ l2) Wstd_sta.
   Proof.
     induction l1;[done|].
     simpl. rewrite IHl1.
@@ -2302,35 +2369,74 @@ Section heap.
     - destruct (decide (Revoked = r)).
       + subst.
         destruct (decide (a ∈ l2)).
-        ++ apply close_list_std_sta_revoked with (l:=l2) in Hsome as Hsome'; auto.
+        ++ apply close_list_std_sta_temp_revoked with (l:=l2) in Hsome as Hsome'; auto.
            rewrite Hsome'.
            rewrite insert_id;auto.
-           apply close_list_std_sta_revoked;auto.
+           apply close_list_std_sta_temp_revoked;auto.
            apply elem_of_app;by right.
-        ++ rewrite (close_list_std_sta_same _ l2) in Hsome;auto.
+        ++ rewrite (close_list_std_sta_same_temp _ l2) in Hsome;auto.
            rewrite Hsome. auto.
       + assert (Wstd_sta !! a ≠ Some Revoked) as Hnrev.
         { intros Hcontr. congruence. }
-        rewrite (close_list_std_sta_same_alt _ l2) in Hsome;auto.
+        rewrite (close_list_std_sta_same_alt_temp _ l2) in Hsome;auto.
         by rewrite Hsome.
-    - apply (close_list_std_sta_None _ l2) in Hsome. rewrite Hsome. done.
+    - apply (close_list_std_sta_temp_None _ l2) in Hsome. rewrite Hsome. done.
+  Qed.
+
+  Lemma close_list_std_sta_monotemp_idemp Wstd_sta (l1 l2 : list Addr) :
+    close_list_std_sta_monotemp l1 (close_list_std_sta_monotemp l2 Wstd_sta) = close_list_std_sta_monotemp (l1 ++ l2) Wstd_sta.
+  Proof.
+    induction l1;[done|].
+    simpl. rewrite IHl1.
+    destruct (Wstd_sta !! a) eqn:Hsome.
+    - destruct (decide (Revoked = r)).
+      + subst.
+        destruct (decide (a ∈ l2)).
+        ++ apply close_list_std_sta_monotemp_revoked with (l:=l2) in Hsome as Hsome'; auto.
+           rewrite Hsome'.
+           rewrite insert_id;auto.
+           apply close_list_std_sta_monotemp_revoked;auto.
+           apply elem_of_app;by right.
+        ++ rewrite (close_list_std_sta_same_monotemp _ l2) in Hsome;auto.
+           rewrite Hsome. auto.
+      + assert (Wstd_sta !! a ≠ Some Revoked) as Hnrev.
+        { intros Hcontr. congruence. }
+        rewrite (close_list_std_sta_same_alt_monotemp _ l2) in Hsome;auto.
+        by rewrite Hsome.
+    - apply (close_list_std_sta_monotemp_None _ l2) in Hsome. rewrite Hsome. done.
   Qed.
 
   (* The following closes resources that are valid in the current world *)
-  Lemma monotone_close W l p φ `{forall Wv, Persistent (φ Wv)} :
+  Lemma monotone_close W l k p φ `{forall Wv, Persistent (φ Wv)} :
     ([∗ list] a ∈ l, temp_resources W φ a p ∗ rel a p φ
                                     ∗ ⌜(std W) !! a = Some Revoked⌝)
+    ∗ ([∗ list] a ∈ k, monotemp_resources W φ a p ∗ rel a p φ
+                                    ∗ ⌜(std W) !! a = Some Revoked⌝)
     ∗ sts_full_world W ∗ region W ==∗
-    sts_full_world (close_list l W)
-    ∗ region (close_list l W).
+    sts_full_world (close_list l k W)
+    ∗ region (close_list l k W).
   Proof.
-    iIntros "(Hl & Hfull & Hr)".
-    iAssert (⌜NoDup l⌝)%I as %Hdup.
-    { iClear "Hfull Hr".
-      iInduction (l) as [|x l] "IH".
-      - iPureIntro. by apply NoDup_nil.
-      - iDestruct "Hl" as "[Ha Hl]".
-        iDestruct ("IH" with "Hl") as %Hdup.
+    iIntros "(Hl & Hk & Hfull & Hr)".
+
+    iAssert (⌜l ## k⌝)%I as %Hdisj.
+    { rewrite elem_of_disjoint. iIntros (x Hl Hk).
+      iDestruct (big_sepL_elem_of with "Hl") as "Ha";eauto.
+      iDestruct "Ha" as "(Ha & _)".
+      iDestruct "Ha" as (v) "(% & Ha & _)".
+      iDestruct (big_sepL_elem_of with "Hk") as "Ha'";eauto.
+      iDestruct "Ha'" as "(Ha' & _)".
+      iDestruct "Ha'" as (w) "(% & Ha' & _)".
+      iApply (cap_duplicate_false with "[$Ha $Ha']"); auto.
+    }
+
+    iAssert (⌜NoDup (l ++ k)⌝)%I as %Hdup.
+    { rewrite NoDup_app.
+      iSplit;[|iSplit;auto].
+      - iClear "Hfull Hr Hk".
+        iInduction (l) as [|x l] "IH";[iPureIntro;by apply NoDup_nil|].
+        iDestruct "Hl" as "[Ha Hl]".
+        iDestruct ("IH" with "[] Hl") as %Hdup.
+        { iPureIntro. by apply disjoint_weak with x. }
         iAssert (⌜x ∉ l⌝)%I as %Hnin.
         { iIntros (Hcontr). iDestruct (big_sepL_elem_of _ _ x with "Hl") as "[Ha' Hcontr]"; auto.
           rewrite /temp_resources /=.
@@ -2339,13 +2445,118 @@ Section heap.
           iDestruct "Ha'" as (v') "(% & Ha' & _)".
           iApply (cap_duplicate_false with "[$Ha $Ha']"); auto.
         } iPureIntro. apply NoDup_cons. split; auto.
+      - iClear "Hfull Hr Hl".
+        iInduction (k) as [|x k] "IH";[iPureIntro;by apply NoDup_nil|].
+        iDestruct "Hk" as "[Ha Hl]".
+        iDestruct ("IH" with "[] Hl") as %Hdup.
+        { iPureIntro. apply elem_of_disjoint. apply elem_of_disjoint in Hdisj.
+          intros x0 Hd%Hdisj Hcontr. apply Hd. constructor;auto. }
+        iAssert (⌜x ∉ k⌝)%I as %Hnin.
+        { iIntros (Hcontr). iDestruct (big_sepL_elem_of _ _ x with "Hl") as "[Ha' Hcontr]"; auto.
+          rewrite /temp_resources /=.
+          iDestruct "Ha" as "(Ha & _)".
+          iDestruct "Ha" as (v) "(% & Ha & _)".
+          iDestruct "Ha'" as (v') "(% & Ha' & _)".
+          iApply (cap_duplicate_false with "[$Ha $Ha']"); auto.
+        } iPureIntro. apply NoDup_cons. split;auto. 
     }
-    iInduction (l) as [|x l] "IH".
-    - iFrame. destruct W as [ Wstd_sta Wloc]; done.
-    - apply NoDup_cons in Hdup as [Hdup Hnin].
+
+    iInduction (l) as [|x l] "IH" forall (k Hdisj Hdup).
+    - iInduction (k) as [|x k] "IH".
+      + iFrame. destruct W as [ Wstd_sta Wloc]; done.
+      + simpl in Hdup. apply NoDup_cons in Hdup as [Hnin Hdup].
+        assert (close_list [] (x::k) W = (close_list_std_sta_monotemp (x::k) W.1,W.2)) as ->;[auto|].
+        iDestruct "Hk" as "[ [Hx #[Hrel Hrev] ] Hk]".
+        pose proof (disjoint_nil_l x k) as Hdisj'.
+        iMod ("IH" $! Hdisj' Hdup with "Hl Hk Hfull Hr") as "(Hfull & Hr)"; auto.
+        assert (close_list [] (k) W = (close_list_std_sta_monotemp (k) W.1,W.2)) as ->;[auto|].
+        iClear "IH".
+        destruct W as [ Wstd_sta Wloc];simpl.
+        iDestruct "Hx" as (a HO) "(Hx & Hmono & Hφ)".
+        rewrite /close_list region_eq /region_def /std /=.
+        iDestruct "Hr" as (M Mρ) "(HM & #Hdom & #Hdom' & Hr)". iDestruct "Hdom" as %Hdom. iDestruct "Hdom'" as %Hdom'.
+        rewrite rel_eq /rel_def REL_eq RELS_eq. iDestruct "Hrel" as (γpred) "[HREL Hpred]".
+        iDestruct (reg_in γrel M with "[$HM $HREL]") as %HMeq. rewrite HMeq.
+        iDestruct (big_sepM_delete _ _ x with "Hr") as "[Hstate Hr]"; [apply lookup_insert|].
+        iDestruct "Hstate" as (ρ Mx) "[Hρ Hstate]".
+        iDestruct (sts_full_state_std with "Hfull Hρ") as %Hx''.
+        rewrite -(close_list_std_sta_same_monotemp _ k _) in Hx''; auto.
+        rewrite  Hx''. iFrame.
+        iDestruct "Hrev" as %Hrev. inversion Hrev as [Heq]. subst ρ.
+        iMod (sts_update_std _ _ _ Monotemporary with "Hfull Hρ") as "[Hfull Hρ] /=". iFrame.
+        iModIntro. iExists M,(<[x:=Monotemporary]> Mρ). rewrite HMeq.
+        iDestruct (region_map_delete_nonstatic with "Hr") as "Hr";[intros m; by rewrite Mx|].
+        iDestruct (region_map_insert_nonstatic Monotemporary with "Hr") as "Hr";auto.
+        rewrite /region_map_def.
+        iDestruct (big_sepM_delete _ _ x with "[Hρ Hr Hx Hmono Hφ]") as "$"; [apply lookup_insert|..].
+        { do 2 (rewrite delete_insert;[|apply lookup_delete]).
+          iSplitR "Hr".
+          - iExists Monotemporary. iFrame. iSplit;[iPureIntro;apply lookup_insert|].
+            rewrite /future_pub_mono. iExists γpred,p,φ.
+            repeat (iSplit; auto). iExists a. iSplit;auto.
+            iAssert (future_pub_a_mono x φ a) as "#Hmono'".
+            { destruct (pwl p); iDestruct "Hmono" as "#Hmono"; iModIntro.
+              - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). auto.
+              - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). iPureIntro.
+                eapply related_sts_pub_plus_priv_world,related_sts_a_pub_plus_world; eauto.
+            }
+            iFrame "# ∗".
+            iNext. iApply "Hmono'"; iFrame.
+            iPureIntro. apply related_sts_pub_a_world.
+            assert (<[x:=Monotemporary]> (close_list_std_sta_monotemp k Wstd_sta) = close_list_std_sta_monotemp (x::k) Wstd_sta) as ->.
+            2: apply close_list_related_sts_pub_cons_monotemp,close_list_related_sts_pub_monotemp.
+            simpl. rewrite Hx''. auto.
+          - iApply (big_sepM_mono with "Hr").
+            iIntros (a' γp Hsome) "Hρ /=". iDestruct "Hρ" as (ρ Ha) "[Hstate Hρ]".
+            iExists ρ. iFrame. iSplit;[auto|]. destruct ρ; auto.
+            + iDestruct "Hρ" as (γpred' p' φ0 Heq Hpers) "(#Hpred & Hρ)".
+              iDestruct "Hρ" as (v) "(HO & Ha' & Hmono & Hφ0)".
+              iExists _,_,_.
+              iAssert (future_pub_a_mono x φ0 v) as "#Hmono'".
+              { destruct (pwl p'); iDestruct "Hmono" as "#Hmono"; iModIntro.
+                - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). iPureIntro.
+                  eapply related_sts_a_pub_plus_world;eauto.
+                - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). iPureIntro.
+                  apply related_sts_pub_plus_priv_world. eapply related_sts_a_pub_plus_world. eauto.
+              } iFrame. repeat (iSplit;eauto). iExists _. iFrame.
+              iNext. iApply ("Hmono'" with "[] Hφ0"). iPureIntro.
+              apply related_sts_pub_a_world.
+              apply close_list_related_sts_pub_insert_monotemp'; auto.
+            + iDestruct "Hρ" as (γpred' p' φ0 Heq' Hpers) "(#Hpred & Hρ)".
+              iDestruct "Hρ" as (v) "Hρ".
+              assert (Persistent (if pwl p' then future_pub_a_mono a' φ0 v else future_priv_mono φ0 v)). destruct (pwl p'); apply _.
+              iDestruct "Hρ" as "(HO & Ha' & #Hmono & Hφ0)".
+              iExists _,_,_. iFrame "∗ #". repeat iSplit;auto.
+              iExists _; iFrame "∗ #". iNext. destruct (pwl p'); iApply ("Hmono" with "[] Hφ0"). all: iPureIntro.
+              2: apply related_sts_pub_plus_priv_world; apply related_sts_a_pub_plus_world with a'.
+              all: apply related_sts_pub_a_world.
+              all: apply close_list_related_sts_pub_insert_monotemp'; eauto.
+            + iDestruct "Hρ" as (γpred' p' φ0 Heq' Hpers) "(#Hpred & Hρ)".
+              iDestruct "Hρ" as (v) "Hρ".
+              iDestruct "Hρ" as "(HO & Ha' & #Hmono & Hφ0)".
+              iExists _,_,_. iFrame "∗ #". repeat iSplit;auto.
+              iExists _; iFrame "∗ #". iNext. iApply ("Hmono" with "[] Hφ0"). iPureIntro.
+              apply related_sts_pub_plus_priv_world; apply related_sts_a_pub_plus_world with a'.
+              apply related_sts_pub_a_world.
+              apply close_list_related_sts_pub_insert_monotemp'; eauto.
+        }
+        do 2 (rewrite -HMeq). iFrame. iPureIntro.
+        (* The domains remain equal *)
+        split.
+        { rewrite -Hdom. rewrite dom_insert_L.
+          assert (x ∈ dom (gset Addr) M) as Hin.
+          { apply elem_of_gmap_dom. rewrite HMeq. rewrite lookup_insert. eauto. }
+          rewrite Hdom. set_solver.
+        }
+        rewrite dom_insert_L. assert (x ∈ dom (gset Addr) Mρ) as Hin;[apply elem_of_gmap_dom;eauto|].
+        rewrite -Hdom'. set_solver.
+
+    - simpl in Hdup. apply NoDup_cons in Hdup as [Hnin Hdup].
+      apply not_elem_of_app in Hnin as [Hninl Hnink].
       iDestruct "Hl" as "[ [Hx #[Hrel Hrev] ] Hl]".
       rewrite /close_list region_eq /region_def /std /=.
-      iMod ("IH" $! Hnin with "Hl Hfull Hr") as "(Hfull & Hr)"; auto.
+      iMod ("IH" $! k _ Hdup with "Hl Hk Hfull Hr") as "(Hfull & Hr)"; auto.
+      apply NoDup_app in Hdup as (Hdup1 & Hdisj' & Hdup2).
       iClear "IH".
       destruct W as [ Wstd_sta Wloc].
       iDestruct "Hx" as (a HO) "(Hx & Hmono & Hφ)".
@@ -2355,8 +2566,11 @@ Section heap.
       iDestruct (big_sepM_delete _ _ x with "Hr") as "[Hstate Hr]"; [apply lookup_insert|].
       iDestruct "Hstate" as (ρ Mx) "[Hρ Hstate]".
       iDestruct (sts_full_state_std with "Hfull Hρ") as %Hx''.
-      rewrite -(close_list_std_sta_same _ l _) in Hx''; auto.
-      rewrite  Hx''. iFrame.
+      rewrite -(close_list_std_sta_same_temp _ l _) in Hx''; auto.
+      rewrite  Hx''.
+      rewrite -close_list_std_sta_same_monotemp in Hx''; auto.
+      rewrite Hx''. iFrame.
+
       iDestruct "Hrev" as %Hrev. inversion Hrev as [Heq]. subst ρ.
       iMod (sts_update_std _ _ _ Temporary with "Hfull Hρ") as "[Hfull Hρ] /=". iFrame.
       iModIntro. iExists M,(<[x:=Temporary]> Mρ). rewrite HMeq.
@@ -2371,12 +2585,15 @@ Section heap.
           repeat (iSplit; auto). iExists a. iSplit;auto.
           iAssert (future_pub_mono φ a) as "#Hmono'".
           { destruct (pwl p); iDestruct "Hmono" as "#Hmono"; iModIntro.
-            - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). auto.
+            - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). iPureIntro. apply related_sts_pub_pub_plus_world. auto.
             - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). iPureIntro. apply related_sts_pub_priv_world. auto.
           }
           iFrame "# ∗".
           iNext. iApply "Hmono'"; iFrame.
-          iPureIntro. apply close_list_related_sts_pub_insert; auto.
+          iPureIntro. eapply related_sts_pub_trans_world.
+          apply close_list_related_sts_pub;apply Hdisj.
+          rewrite /close_list /= -close_list_std_sta_same_monotemp// Hx''.
+          apply related_sts_pub_refl_world.
         - iApply (big_sepM_mono with "Hr").
           iIntros (a' γp Hsome) "Hρ /=". iDestruct "Hρ" as (ρ Ha) "[Hstate Hρ]".
           iExists ρ. iFrame. destruct ρ; auto.
@@ -2385,17 +2602,31 @@ Section heap.
             iSplit;auto. iExists _,_,_.
             iAssert (future_pub_mono φ0 v) as "#Hmono'".
             { destruct (pwl p'); iDestruct "Hmono" as "#Hmono"; iModIntro.
-              - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). auto.
+              - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). iPureIntro. apply related_sts_pub_pub_plus_world; auto.
               - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). iPureIntro. apply related_sts_pub_priv_world. auto.
             } iFrame. repeat (iSplit;eauto). iExists _. iFrame.
             iNext. iApply ("Hmono'" with "[] Hφ0"). iPureIntro.
-            apply close_list_related_sts_pub_insert'; auto.
+            apply close_list_related_sts_pub_insert_temp'; auto.
+            rewrite -!close_list_std_sta_same_monotemp//.
           + iDestruct "Hρ" as (γpred' p' φ0 Heq' Hpers) "(#Hpred & Hρ)".
-            iDestruct "Hρ" as (v) "(HO & Ha' & #Hmono & Hφ0)".
+            iDestruct "Hρ" as (v) "Hρ".
+            assert (Persistent (if pwl p' then future_pub_a_mono a' φ0 v else future_priv_mono φ0 v)). destruct (pwl p'); apply _.
+            iDestruct "Hρ" as "(HO & Ha' & #Hmono & Hφ0)".
+            iSplit;auto. iExists _,_,_. iFrame "∗ #". repeat iSplit;auto.
+            iExists _; iFrame "∗ #". iNext. destruct (pwl p');iApply ("Hmono" with "[] Hφ0");iPureIntro.
+            1: apply related_sts_pub_a_world.
+            2: apply related_sts_pub_priv_world.
+            all: apply close_list_related_sts_pub_insert_temp'; auto.
+            all: rewrite -!close_list_std_sta_same_monotemp//.
+          + iDestruct "Hρ" as (γpred' p' φ0 Heq' Hpers) "(#Hpred & Hρ)".
+            iDestruct "Hρ" as (v) "Hρ".
+            iDestruct "Hρ" as "(HO & Ha' & #Hmono & Hφ0)".
             iSplit;auto. iExists _,_,_. iFrame "∗ #". repeat iSplit;auto.
             iExists _; iFrame "∗ #". iNext. iApply ("Hmono" with "[] Hφ0"). iPureIntro.
-            apply related_sts_pub_priv_world.
-            apply close_list_related_sts_pub_insert'; auto.
+            apply related_sts_pub_plus_priv_world; apply related_sts_a_pub_plus_world with a'.
+            apply related_sts_pub_a_world.
+            apply close_list_related_sts_pub_insert_temp'; eauto.
+            rewrite -!close_list_std_sta_same_monotemp//.
       }
       do 2 (rewrite -HMeq). iFrame. iPureIntro.
       (* The domains remain equal *)
@@ -2407,44 +2638,113 @@ Section heap.
       }
       rewrite dom_insert_L. assert (x ∈ dom (gset Addr) Mρ) as Hin;[apply elem_of_gmap_dom;eauto|].
       rewrite -Hdom'. set_solver.
+      Unshelve. by apply disjoint_weak in Hdisj.
   Qed.
 
-  Lemma monotone_revoked_close_sub W l p φ `{forall Wv, Persistent (φ Wv)} :
+  Lemma monotone_revoked_close_sub W l k p φ `{forall Wv, Persistent (φ Wv)} :
     ([∗ list] a ∈ l, temp_resources (revoke W) φ a p ∗ rel a p φ
                                     ∗ ⌜(std (revoke W)) !! a = Some Revoked⌝)
+    ∗ ([∗ list] a ∈ k, monotemp_resources (revoke W) φ a p ∗ rel a p φ
+                                    ∗ ⌜(std (revoke W)) !! a = Some Revoked⌝)
     ∗ sts_full_world (revoke W) ∗ region (revoke W) ==∗
-    sts_full_world (close_list l (revoke W))
-    ∗ region (close_list l (revoke W)).
+    sts_full_world (close_list l k (revoke W))
+    ∗ region (close_list l k (revoke W)).
   Proof.
-    iIntros "(Hl & Hfull & Hr)".
+    iIntros "(Hl & Hk & Hfull & Hr)".
     iApply monotone_close; eauto.
-    iFrame.
+    iFrame "Hfull Hr Hl Hk".
   Qed.
 
   (* However, we also want to be able to close regions that were valid in some world W, and which will be valid again
      in a public future world close l W' ! This is slightly more tricky: we must first update the region monotonically,
      after which it will be possible to consolidate the full_sts and region *)
 
-  Lemma close_list_consolidate W W' (l' l : list Addr) :
-    ⊢ ⌜l' ⊆+ l⌝ →
-     ⌜related_sts_pub_world W (close_list_std_sta l (std W'), loc W')⌝ →
-     (region (close_list l W') ∗ sts_full_world W'
-            ∗ ([∗ list] a ∈ l', ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ temp_resources W φ a p ∗ rel a p φ))
-       ==∗ (sts_full_world (close_list l' W') ∗ region (close_list l W')).
+  Lemma close_list_consolidate W W' (l' l k' k: list Addr) :
+    ⊢ ⌜l' ⊆+ l⌝ → ⌜k' ⊆+ k⌝ →
+     ⌜related_sts_pub_world W (close_list_std_sta_temp l (close_list_std_sta_monotemp k (std W')), loc W')⌝ →
+     (region (close_list l k W') ∗ sts_full_world W'
+             ∗ ([∗ list] a ∈ l', ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ temp_resources W φ a p ∗ rel a p φ)
+             ∗ ([∗ list] a ∈ k', ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ monotemp_resources W φ a p ∗ rel a p φ))
+       ==∗ (sts_full_world (close_list l' k' W') ∗ region (close_list l k W')).
   Proof.
-    iIntros (Hsub Hrelated) "(Hr & Hsts & Htemps)".
+    iIntros (Hsub Hsub' Hrelated) "(Hr & Hsts & Htemps & Htempsk)".
+    iAssert (⌜l' ## k'⌝)%I as %Hdisj.
+    { rewrite elem_of_disjoint. iIntros (x Hx Hy).
+      iDestruct (big_sepL_elem_of with "Htemps") as (p φ pers) "(Htemp & _)";eauto.
+      iDestruct (big_sepL_elem_of with "Htempsk") as (p' φ' pers') "(Htemps' & _)";eauto.
+      iDestruct "Htemp" as (v Hne) "(Hv & _)".
+      iDestruct "Htemps'" as (w Hne') "(Hw & _)".
+      iApply bi.False_elim;iApply (cap_duplicate_false with "[$Hv $Hw]"); auto.
+    }
     iInduction l' as [|x l'] "IH".
-    - simpl. iFrame. done.
+    - simpl. iInduction k' as [|x k'] "IH".
+      + iFrame. done.
+      + simpl. iDestruct "Htempsk" as "[Hx Htempsk]".
+        assert (k' ⊆+ k) as Hsub''.
+        { apply submseteq_cons_l in Hsub' as [k'' [Hperm Hsub''] ]. rewrite Hperm.
+          apply submseteq_cons_r. left. auto. }
+        iMod ("IH" $! Hsub'' with "[] Hr Hsts Htemps Htempsk") as "[Hsts Hr]".
+        iPureIntro. apply disjoint_nil_l. done.
+        iClear "IH".
+        rewrite /close_list /=.
+        iDestruct "Hx" as (p φ Hpers) "(Htemp & Hrel)".
+        iDestruct "Htemp" as (v) "(Hne & Hx' & Hmono & Hφ)".
+        destruct (std W' !! x) eqn:Hsome;[|iFrame;done].
+        destruct (decide (Revoked = r)).
+        * subst.
+          assert (x ∈ k) as Hinl.
+          { apply elem_of_submseteq with (x0:=x) in Hsub';[auto|apply elem_of_cons;by left]. }
+          rewrite region_eq /region_def /region_map_def.
+          iDestruct "Hr" as (M Mρ) "(HM & #Hdom & #Hdom' & Hr)".
+          iDestruct "Hdom" as %Hdom. iDestruct "Hdom'" as %Hdom'.
+          rewrite RELS_eq rel_eq /RELS_def /rel_def REL_eq /REL_def.
+          iDestruct "Hrel" as (γpred) "#[Hrel Hsaved]".
+          iDestruct (reg_in with "[$HM $Hrel]") as %HMeq. rewrite HMeq.
+          iDestruct (big_sepM_delete _ _ x with "Hr") as "[Hx Hr]";[apply lookup_insert|].
+          rewrite delete_insert;[|apply lookup_delete].
+          iDestruct "Hx" as (ρ Hx) "[Hstate Hx]".
+          destruct ρ.
+          1,2,3: iDestruct "Hx" as (γpred' p' φ' Heq Hpers') "(_ & Hx)".
+          5: iDestruct "Hx" as (γpred' p' φ' Heq Hpers') "(_ & Hx)";
+            iDestruct "Hx" as (v' ? Hne) "(Hx & _)".
+          1,2,3: iDestruct "Hx" as (v' Hne) "(Hx & _)".
+          1,2,3,5: inversion Heq; subst.
+          1,2,3,4: iApply bi.False_elim;iApply (cap_duplicate_false with "[$Hx' $Hx]"); auto.
+          2,3: iDestruct "Hx" as (γpred' p' φ' Heq Hpers') "(_ & Hx)".
+          2: iDestruct "Hx" as (v' ? Hne) "(Hx & _)".
+          3: iDestruct "Hx" as (Hne) "Hx".
+          2,3: inversion Heq; subst.
+          2,3: iApply bi.False_elim;iApply (cap_duplicate_false with "[$Hx' $Hx]"); auto.
+          (* if it is revoked *)
+          iMod (sts_update_std _ _ _ Monotemporary with "Hsts Hstate") as "[Hsts Hstate]". rewrite HMeq.
+          iDestruct (region_map_delete_nonstatic with "Hr") as "Hr";[intros m;by rewrite Hx|].
+          iDestruct (region_map_insert_nonstatic Monotemporary with "Hr") as "Hr"; auto.
+          iDestruct (big_sepM_delete _ _ x with "[Hne Hx' Hmono Hφ Hstate $Hr]") as "Hr";[apply lookup_insert|..].
+          { iExists Monotemporary. iFrame. rewrite lookup_insert. iSplit;auto. iExists γpred,p,φ. repeat (iSplit;auto).
+            destruct (pwl p).
+            - iDestruct "Hmono" as "#Hmono". iExists _. iFrame "∗#".
+              iApply ("Hmono" with "[] Hφ"). iPureIntro. apply related_sts_pub_a_world. auto. 
+            - iDestruct "Hmono" as "#Hmono". iExists _. iFrame "∗#".
+              iApply ("Hmono" with "[] Hφ"). iPureIntro.
+              apply related_sts_pub_priv_world; auto.
+          }
+          iFrame. iExists M,_. rewrite -HMeq. iFrame. rewrite -HMeq. iFrame. iModIntro. iSplit; auto.
+          iPureIntro. rewrite dom_insert_L. rewrite -Hdom'.
+          assert (x ∈ dom (gset Addr) Mρ);[apply elem_of_gmap_dom;eauto|]. set_solver.
+        * iFrame. destruct r; done.
     - iDestruct "Htemps" as "[Hx Htemps]".
-      assert (l' ⊆+ l) as Hsub'.
-      { apply submseteq_cons_l in Hsub as [k [Hperm Hsub] ]. rewrite Hperm.
+      assert (l' ⊆+ l) as Hsub''.
+      { apply submseteq_cons_l in Hsub as [l'' [Hperm Hsub] ]. rewrite Hperm.
         apply submseteq_cons_r. left. auto. }
-      iMod ("IH" $! Hsub' with "Hr Hsts Htemps") as "[Hsts Hr]".
+      assert (l' ## k') as Hdisj'.
+      { apply disjoint_weak in Hdisj. auto. }
+      iMod ("IH" $! Hsub'' Hdisj' with "Hr Hsts Htemps Htempsk") as "[Hsts Hr]".
       iClear "IH".
       rewrite /close_list /=.
       iDestruct "Hx" as (p φ Hpers) "(Htemp & Hrel)".
       iDestruct "Htemp" as (v) "(Hne & Hx' & Hmono & Hφ)".
-      destruct (std W' !! x) eqn:Hsome;[|iFrame;done].
+      destruct (std W' !! x) eqn:Hsome.
+      2: { eapply close_list_std_sta_monotemp_None in Hsome as ->. iFrame. done. }
       destruct (decide (Revoked = r)).
       + subst.
         assert (x ∈ l) as Hinl.
@@ -2459,18 +2759,18 @@ Section heap.
         rewrite delete_insert;[|apply lookup_delete].
         iDestruct "Hx" as (ρ Hx) "[Hstate Hx]".
         destruct ρ.
-        { iDestruct "Hx" as (γpred' p' φ' Heq Hpers') "(_ & Hx)".
-          iDestruct "Hx" as (v' Hne) "(Hx & _)".
-          inversion Heq; subst.
-          iApply bi.False_elim. iApply (cap_duplicate_false with "[$Hx' $Hx]"); auto. }
-        { iDestruct "Hx" as (γpred' p' φ' Heq Hpers') "(_ & Hx)".
-          iDestruct "Hx" as (v' Hne) "(Hx & _)".
-          inversion Heq; subst.
-          iApply bi.False_elim. iApply (cap_duplicate_false with "[$Hx' $Hx]"); auto. }
-        2 : {
-          iDestruct "Hx" as (γpred' p' φ' Heq Hpers') "(_ & Hx)".
-          iDestruct "Hx" as (v' Hge Hne') "(Hx & _)". iDestruct "Hne" as %Hne.
-          iApply bi.False_elim. iApply (cap_duplicate_false with "[$Hx' $Hx]"); split; auto. }
+        1,2,3: iDestruct "Hx" as (γpred' p' φ' Heq Hpers') "(_ & Hx)".
+        5: iDestruct "Hx" as (γpred' p' φ' Heq Hpers') "(_ & Hx)";
+          iDestruct "Hx" as (v' ? Hne) "(Hx & _)".
+        1,2,3: iDestruct "Hx" as (v' Hne) "(Hx & _)".
+        1,2,3,5: inversion Heq; subst.
+        1,2,3,4: iApply bi.False_elim;iApply (cap_duplicate_false with "[$Hx' $Hx]"); auto.
+        2,3: iDestruct "Hx" as (γpred' p' φ' Heq Hpers') "(_ & Hx)".
+        2: iDestruct "Hx" as (v' ? Hne) "(Hx & _)".
+        3: iDestruct "Hx" as (Hne) "Hx".
+        2,3: inversion Heq; subst.
+        2,3: iApply bi.False_elim;iApply (cap_duplicate_false with "[$Hx' $Hx]"); auto.
+        (* if it is revoked *)
         iMod (sts_update_std _ _ _ Temporary with "Hsts Hstate") as "[Hsts Hstate]". rewrite HMeq.
         iDestruct (region_map_delete_nonstatic with "Hr") as "Hr";[intros m;by rewrite Hx|].
         iDestruct (region_map_insert_nonstatic Temporary with "Hr") as "Hr"; auto.
@@ -2478,30 +2778,45 @@ Section heap.
         { iExists Temporary. iFrame. rewrite lookup_insert. iSplit;auto. iExists γpred,p,φ. repeat (iSplit;auto).
           destruct (pwl p).
           - iDestruct "Hmono" as "#Hmono". iExists _. iFrame "∗#".
-            iApply ("Hmono" with "[] Hφ"). auto.
+            iApply ("Hmono" with "[] Hφ"). iPureIntro. apply related_sts_pub_pub_plus_world;auto.
           - iDestruct "Hmono" as "#Hmono". iExists _. iFrame "∗#".
             iApply ("Hmono" with "[] Hφ"). iPureIntro.
             apply related_sts_pub_priv_world; auto.
         }
+        assert (x ∉ k') as Hnin.
+        { apply disjoint_cons with l';auto. }
+        rewrite -close_list_std_sta_same_monotemp// Hsome.
         iFrame. iExists M,_. rewrite -HMeq. iFrame. rewrite -HMeq. iFrame. iModIntro. iSplit; auto.
         iPureIntro. rewrite dom_insert_L. rewrite -Hdom'.
         assert (x ∈ dom (gset Addr) Mρ);[apply elem_of_gmap_dom;eauto|]. set_solver.
-      + iFrame. destruct r; done.
+      + assert (x ∉ k') as Hnin.
+        { apply disjoint_cons with l';auto. }
+        rewrite -close_list_std_sta_same_monotemp// Hsome.
+        destruct r;iFrame;try done. 
   Qed.
 
-  Lemma monotone_close_list_region W W' (l : list Addr) :
-    ⊢ ⌜related_sts_pub_world W (close_list l W')⌝ -∗
+  Lemma monotone_close_list_region W W' (l k : list Addr) :
+    ⊢ ⌜related_sts_pub_world W (close_list l k W')⌝ -∗
       sts_full_world W' ∗ region W'
       ∗ ([∗ list] a ∈ l, ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ temp_resources W φ a p ∗ rel a p φ)
-       ==∗ (sts_full_world (close_list l W') ∗ region (close_list l W')).
+      ∗ ([∗ list] a ∈ k, ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ monotemp_resources W φ a p ∗ rel a p φ)
+       ==∗ (sts_full_world (close_list l k W') ∗ region (close_list l k W')).
   Proof.
-    iIntros (Hrelated) "(Hsts & Hr & Htemp)".
-    assert (related_sts_pub_world W' (close_list l W')) as Hrelated'.
+    iIntros (Hrelated) "(Hsts & Hr & Htemp & Htemps)".
+    iAssert (⌜l ## k⌝)%I as %Hdisj.
+    { rewrite elem_of_disjoint. iIntros (x Hx Hy).
+      iDestruct (big_sepL_elem_of with "Htemps") as (p φ pers) "(Hx & _)";eauto.
+      iDestruct (big_sepL_elem_of with "Htemp") as (p' φ' pers') "(Hx' & _)";eauto.
+      iDestruct "Hx" as (v Hne) "(Hv & _)".
+      iDestruct "Hx'" as (w Hne') "(Hw & _)".
+      iApply bi.False_elim;iApply (cap_duplicate_false with "[$Hv $Hw]"); auto.
+    }
+    assert (related_sts_pub_world W' (close_list l k W')) as Hrelated'.
     { apply close_list_related_sts_pub; auto. }
-    assert (dom (gset Addr) (std W') = dom (gset Addr) (std (close_list l W'))) as Heq.
-    { apply close_list_dom_eq. }
+    assert (dom (gset Addr) (std W') = dom (gset Addr) (std (close_list l k W'))) as Heq.
+    { rewrite /close_list. rewrite -close_list_dom_eq_temp -close_list_dom_eq_monotemp. auto. }
     iDestruct (region_monotone _ _ Heq Hrelated' with "Hr") as "Hr". clear Hrelated'.
-    iMod (close_list_consolidate _ _ l with "[] [] [$Hr $Hsts $Htemp]") as "[Hsts Hr]";[auto|eauto|iFrame;done].
-  Qed.*)
+    iMod (close_list_consolidate _ _ l l k k with "[] [] [] [$Hr $Hsts $Htemp $Htemps]") as "[Hsts Hr]";[auto|eauto|eauto|iFrame;done].
+  Qed.
 
 End heap.
