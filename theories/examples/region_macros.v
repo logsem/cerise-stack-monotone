@@ -169,7 +169,7 @@ Section region_macros.
      (∃ a', (a + (Z.of_nat n))%a = Some a') →
      region_addrs_aux a n ## l ->
      pwl p = true ->
-     (Forall (λ a, (std W) !! a = Some Temporary) (region_addrs_aux a n)) ->
+     (Forall (λ a, (std W) !! a = Some Monotemporary) (region_addrs_aux a n)) ->
      open_region_many l W
      -∗ sts_full_world W
      -∗ ([∗ list] a0 ∈ region_addrs_aux a n, read_write_cond a0 p (fixpoint interp1))
@@ -177,8 +177,8 @@ Section region_macros.
          (∃ w : Word, a0 ↦ₐ[p] w
                          ∗ ▷ (fixpoint interp1) W w
                          ∗ ⌜p ≠ O⌝
-                         ∗ ▷ future_pub_mono (λ Wv, (fixpoint interp1) Wv.1 Wv.2) w
-                         ∗ sts_state_std a0 Temporary))
+                         ∗ ▷ future_pub_a_mono a0 (λ Wv, (fixpoint interp1) Wv.1 Wv.2) w
+                         ∗ sts_state_std a0 Monotemporary))
      ∗ open_region_many (region_addrs_aux a n ++ l) W
      ∗ sts_full_world W.
    Proof.
@@ -188,7 +188,7 @@ Section region_macros.
      - iIntros (Hne Hdisj Hpwl Hforall) "Hr Hsts #Hinv /=".
        iDestruct "Hinv" as "[Ha Hinv]".
        simpl in *.
-       iDestruct (region_open_next_temp_pwl with "[$Ha $Hr $Hsts]") as (v) "(Hr & Hsts & Hstate & Ha0 & #Hp & #Hmono & Hav)"; auto.
+       iDestruct (region_open_next_monotemp_pwl with "[$Ha $Hr $Hsts]") as (v) "(Hr & Hsts & Hstate & Ha0 & #Hp & #Hmono & Hav)"; auto.
        { by apply disjoint_cons with (region_addrs_aux (get_addr_from_option_addr (a + 1)%a) n). }
        { apply Forall_inv in Hforall. done. }
        (* apply subseteq_difference_r with _ _ (↑logN.@a) in HleE; auto.  *)
@@ -211,8 +211,8 @@ Section region_macros.
    Qed.
 
    Lemma region_state_pwl_forall_temp W (l : list Addr) (φ : Addr → iProp Σ) :
-     (([∗ list] a ∈ l, φ a ∧ ⌜region_state_pwl W a⌝) -∗
-     ⌜Forall (λ a, (std W) !! a = Some Temporary) l⌝).
+     (([∗ list] a ∈ l, φ a ∧ ⌜region_state_pwl_mono W a⌝) -∗
+     ⌜Forall (λ a, (std W) !! a = Some Monotemporary) l⌝).
    Proof.
      iIntros "Hl".
      iInduction (l) as [|x l] "IH".
@@ -226,17 +226,17 @@ Section region_macros.
    Lemma region_addrs_open W l a b p :
      (∃ a', (a + region_size a b)%a = Some a') →
      region_addrs a b ## l →
-     pwl p = true ->
+     pwl p = true →
      open_region_many l W
      -∗ sts_full_world W
      -∗ ([∗ list] a0 ∈ region_addrs a b, read_write_cond a0 p (fixpoint interp1)
-                                         ∧ ⌜region_state_pwl W a0⌝)
+                                         ∧ ⌜region_state_pwl_mono W a0⌝)
      -∗ ([∗ list] a0 ∈ region_addrs a b,
              (∃ w : Word, a0 ↦ₐ[p] w
                          ∗ ▷ (fixpoint interp1) W w
                          ∗ ⌜p ≠ O⌝
-                         ∗ ▷ future_pub_mono (λ Wv, (fixpoint interp1) Wv.1 Wv.2) w
-                         ∗ sts_state_std a0 Temporary))
+                         ∗ ▷ future_pub_a_mono a0 (λ Wv, (fixpoint interp1) Wv.1 Wv.2) w
+                         ∗ sts_state_std a0 Monotemporary))
      ∗ open_region_many (region_addrs a b ++ l) W
      ∗ sts_full_world W.
    Proof.

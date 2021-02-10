@@ -120,9 +120,9 @@ Section definitionsS.
   Program Definition related_sts_a (fs gs : STS_std_states A B) (a : A) : Prop :=
     dom (gset A) fs ⊆ dom (gset A) gs ∧
     ∀ (i : A) (x y : B), fs !! i = Some x → gs !! i = Some y →
-                         rtc (λ x y, if (decide(Decision:=le_a_decision i a) (le_a i a))
-                                     then (Rpub x y)
-                                     else (Rpub x y ∨ Rpubp x y)) x y.
+                         rtc (λ x y, if (decide(Decision:=le_a_decision a i) (le_a a i))
+                                     then (Rpub x y ∨ Rpubp x y)
+                                     else (Rpub x y)) x y.
 
   Definition related_sts_pub (fs gs : STS_states) (fr gr : STS_rels) : Prop :=
     dom (gset positive) fs ⊆ dom (gset positive) gs ∧
@@ -396,12 +396,12 @@ Section STS.
     specialize (Ha i x y Hx Hy).
     eapply rtc_implies;[|eauto].
     intros r q Hr.
-    destruct (decide (le_a i a')).
-    - assert (le_a i a) as Hle.
-      { assert (Transitive le_a) as Htrans;[eapply PreOrder_Transitive|trans a';auto]. }
-      rewrite decide_True in Hr;auto.
-    - destruct (decide (le_a i a));auto.
-      Unshelve. apply le_a_preorder.
+    destruct (decide (le_a a' i)).
+    - destruct (decide (le_a a i));auto.
+    - destruct (decide (le_a a i));auto.
+      exfalso. apply n.
+      assert (Transitive le_a) as Htrans;[eapply PreOrder_Transitive|trans a;auto].
+      Unshelve. apply compare_a.
   Qed.
 
   Lemma related_sts_a_weak_world W W' a a' :
@@ -420,9 +420,9 @@ Section STS.
     intros [Hdom Hrel]. split;auto.
     intros i x y Hx Hy.
     specialize (Hrel i x y Hx Hy).
-    destruct (decide (le_a i a)).
-    - apply rtc_or_intro. auto.
+    destruct (decide (le_a a i)).
     - auto.
+    - apply rtc_or_intro. auto.
   Qed.
 
   Lemma related_sts_pub_a fsd gsd a :
@@ -431,9 +431,9 @@ Section STS.
     intros [Hdom Hrel].
     split;auto. intros i x y Hx Hy.
     specialize (Hrel i x y Hx Hy).
-    destruct (decide (le_a i a)).
-    - auto.
+    destruct (decide (le_a a i)).
     - apply rtc_or_intro. auto.
+    - auto.
   Qed. 
 
   Lemma related_sts_a_pub_plus_world W W' a :

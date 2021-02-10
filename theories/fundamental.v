@@ -195,7 +195,7 @@ Section fundamental.
       simpl. destruct Hra as [-> | [-> | ->] ];auto.
   Qed.
 
-  Lemma fundamental_from_interp W p g b e a r :
+  Lemma fundamental_from_interp_correctPC W p g b e a r :
     p = RX ∨ p = RWX ∨ (p = RWLX ∧ g = Monotone) →
     ⊢ interp W (inr (p, g, b, e, a)) →
       interp_expression r W (inr (p,g,b,e,a)).
@@ -204,5 +204,103 @@ Section fundamental.
     rewrite fixpoint_interp1_eq.
     destruct Hp as [-> | [-> | [ -> -> ] ] ]; eauto.
   Qed.
+
+  Lemma fundamental_not_correctPC r W p g b e a :
+    ⊢ ⌜¬ isCorrectPC (inr ((p,g),b,e,a))⌝ →
+    interp_expression r W (inr ((p,g),b,e,a)).
+  Proof.
+    iIntros (Hnvpc). iIntros "(H1 & Hmreg & H3 & H4 & H5)".
+    iSplit;auto. rewrite /interp_conf.
+    iDestruct ((big_sepM_delete _ _ PC) with "Hmreg") as "[HPC Hmap]";
+      first apply (lookup_insert _ _ (inr (p, g, b, e, a))).
+    iApply (wp_bind (fill [SeqCtx])).
+    iApply (wp_notCorrectPC with "HPC"); eauto.
+    iNext. iIntros "HPC /=".
+    iApply wp_pure_step_later; auto.
+    iApply wp_value.
+    iNext. iIntros (Hcontr); inversion Hcontr.
+  Qed.
+
+  Corollary fundamental_from_interp r W p g b e a :
+    interp W (inr (p, g, b, e, a)) -∗
+    interp_expression r W (inr (p,g,b,e,a)).
+  Proof.
+    iIntros "Hinterp".
+    destruct (decide (isCorrectPC (inr (p,g,b,e,a)))).
+    - assert (p = RX ∨ p = RWX ∨ p = RWLX) as Hp;[inversion i;auto|].
+      iAssert (⌜p = RWLX → g = Monotone⌝)%I as %Hmono.
+      { iIntros (->). iDestruct (writeLocalAllowed_implies_local with "Hinterp") as %Hmono;[auto|destruct g;auto]. }
+      iApply (fundamental_from_interp_correctPC with "Hinterp").
+      destruct Hp as [-> | [-> | ->] ];auto.
+    - iApply fundamental_not_correctPC. auto.
+  Qed.
+
+  Lemma updatePcPerm_RX w g b e a :
+    inr (RX, g, b, e, a) = updatePcPerm w ->
+    w = inr (RX, g, b, e, a) ∨ w = inr (E, g, b, e, a).
+  Proof.
+    intros Hperm.
+    destruct w;inversion Hperm.
+    destruct c,p,p,p,p;simplify_eq;auto.
+  Qed.
+
+  Lemma exec_wp W p g b e a :
+    isCorrectPC (inr (p, g, b, e, a)) ->
+    exec_cond W b e g p interp -∗
+    ∀ r W', future_world g e W W' → ▷ ((interp_expr interp r) W') (inr (p, g, b, e, a)).
+  Proof.
+    iIntros (Hvpc) "Hexec".
+    rewrite /exec_cond /enter_cond.
+    iIntros (r W'). rewrite /future_world.
+    assert (a ∈ₐ[[b,e]])%I as Hin.
+    { rewrite /in_range. inversion Hvpc; subst. auto. }
+    destruct g.
+    - iIntros (Hrelated).
+      iSpecialize ("Hexec" $! a r W' Hin Hrelated).
+      iFrame.
+    - iIntros (Hrelated).
+      iSpecialize ("Hexec" $! a r W' Hin Hrelated).
+      iFrame.
+    - iIntros (Hrelated).
+      iSpecialize ("Hexec" $! a r W' Hin Hrelated).
+      iFrame.
+  Qed.
+
+  (* The following lemma is to assist with a pattern when jumping to unknown valid capablities *)
+  Lemma jmp_or_fail_spec W w φ :
+     (interp W w
+    -∗ (if decide (isCorrectPC (updatePcPerm w)) then
+          (∃ p g b e a, ⌜w = inr (p,g,b,e,a)⌝
+          ∗ □ ∀ r W', future_world g e W W' → ▷ ((interp_expr interp r) W') (updatePcPerm w))
+        else
+          φ FailedV ∗ PC ↦ᵣ updatePcPerm w -∗ WP Seq (Instr Executable) {{ φ }} )).
+  Proof.
+    iIntros "#Hw".
+    destruct (decide (isCorrectPC (updatePcPerm w))).
+    - inversion i.
+      destruct w;inversion H. destruct c,p0,p0,p0; inversion H.
+      destruct H1 as [-> | [-> | ->] ].
+      + destruct p0; simpl in H; simplify_eq.
+        * iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
+          iDestruct (interp_exec_cond with "Hw") as "Hexec";[auto|].
+          iApply exec_wp;auto.
+        * iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
+          rewrite /= fixpoint_interp1_eq /=.
+          iExact "Hw".
+      + destruct p0; simpl in H; simplify_eq.
+        iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
+        iDestruct (interp_exec_cond with "Hw") as "Hexec";[auto|].
+        iApply exec_wp;auto.
+      + destruct p0; simpl in H; simplify_eq.
+        iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
+        iDestruct (interp_exec_cond with "Hw") as "Hexec";[auto|].
+        iApply exec_wp;auto.
+    - iIntros "[Hfailed HPC]".
+      iApply (wp_bind (fill [SeqCtx])).
+      iApply (wp_notCorrectPC with "HPC");eauto.
+      iNext. iIntros "_". iApply wp_pure_step_later;auto.
+      iNext. iApply wp_value. iFrame.
+  Qed.
+
 
 End fundamental.

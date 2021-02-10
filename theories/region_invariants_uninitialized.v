@@ -29,7 +29,7 @@ Section heap.
       + simplify_map_eq.
         right with Temporary;[left;constructor|].
         eright;[|left].
-        right. constructor.
+        right. right. constructor.
       + simplify_map_eq. left.
   Qed.
 
@@ -46,7 +46,7 @@ Section heap.
       + simplify_map_eq.
         right with Temporary;[left;constructor|].
         eright;[|left].
-        right. constructor.
+        right. right. constructor.
       + simplify_map_eq. left.
   Qed.
 
@@ -241,16 +241,38 @@ Section heap.
            { subst r. rewrite override_uninitializedW_lookup_nin in Hp; [|eapply not_elem_of_dom; eauto].
              rewrite A1 in Hp; inv Hp. rewrite lookup_insert in Hq.
              inv Hq. destruct p; try congruence.
-             - eright. right; constructor.
+             - eright. right; right; constructor.
+               left.
+             - right with Temporary. right;right; constructor.
+               eright. right; right; constructor.
                left.
              - eright. left; constructor.
-               eright. right; constructor.
+               eright. right; right; constructor.
                left.
              - eright. left; constructor.
-               eright. right; constructor.
-               left. }
+               eright. right;right; constructor.
+               left.
+             - eright. left;constructor.
+               right with Temporary. right;right;constructor.
+               eright. right;right;constructor. left.
+             - eright. left;constructor.
+               right with Temporary. right;right;constructor.
+               eright. right;right;constructor. left. 
+           }
            { simplify_map_eq. left. }
    Qed.
+
+   Lemma region_map_insert_singleton ρ M Mρ W l :
+    (∃ w, ρ = Static {[l:=w]}) →
+    region_map_def (delete l M) (delete l Mρ) W -∗
+    region_map_def (delete l M) (<[ l := ρ ]> Mρ) W.
+  Proof.
+    iIntros (?) "HH".
+    rewrite {1}(_: delete l Mρ = delete l (<[ l := ρ ]> Mρ)). 2: by rewrite delete_insert_delete//.
+    iDestruct (region_map_undelete_singleton with "HH") as "HH".
+    { simplify_map_eq. naive_solver. }
+    auto.
+  Qed.
 
    (* following lemma takes a map of addresses to words, where the addresses are in a revoked state, and makes them
       uninitialized *)
@@ -285,7 +307,13 @@ Section heap.
         iDestruct (cap_duplicate_false with "[$Hx $Hx']") as "Hf"; auto. }
       { iDestruct "HX" as (v' Hne') "[Hx' _]".
         iDestruct (cap_duplicate_false with "[$Hx $Hx']") as "Hf"; auto. }
+      { iDestruct "HX" as (v' Hne') "[Hx' _]".
+        iDestruct (cap_duplicate_false with "[$Hx $Hx']") as "Hf"; auto. }
       2: { iDestruct "HX" as (v' Hx' Hne') "[Hx' _]".
+           iDestruct (cap_duplicate_false with "[$Hx $Hx']") as "Hf"; auto. }
+      2: { iDestruct "HX" as (v' Hx' Hne') "[Hx' _]".
+           iDestruct (cap_duplicate_false with "[$Hx $Hx']") as "Hf"; auto. }
+      2: { iDestruct "HX" as "[? Hx']".
            iDestruct (cap_duplicate_false with "[$Hx $Hx']") as "Hf"; auto. }
       iDestruct (region_map_delete_nonstatic with "Hr") as "Hr";[rewrite Hρ; auto|].
       iDestruct (region_map_insert_singleton (Static {[a:=w]}) with "Hr") as "Hr";[eauto|].
@@ -350,7 +378,7 @@ Section heap.
       { iPureIntro. apply related_sts_priv_world_uninit_to_revoked with w.
         rewrite std_sta_update_multiple_lookup_same_i //.
         rewrite /revoke /revoke_std_sta lookup_fmap Hw /=. reflexivity. }
-      { rewrite std_update_multiple_revoke_commute. iFrame. auto. }
+      { rewrite std_update_multiple_revoke_commute. iFrame. auto. auto. }
 
       iMod (sts_update_std _ _ _ (Revoked) with "Hfull Hstate") as "[Hfull Hstate] /=".
       iDestruct (region_map_delete_singleton with "Hr") as "Hr";[rewrite Hρ';eauto|].
@@ -398,7 +426,7 @@ Section heap.
                                  ∗ ⌜p ≠ O⌝
                                  ∗ ▷ φ (W',w)
                                  ∗ rel a p φ
-                                 ∗ (if pwl p then future_pub_mono φ w
+                                 ∗ (if pwl p then future_pub_plus_mono φ w
                                     else future_priv_mono φ w))
         -∗ open_region_many l W'
         -∗ sts_full_world W
@@ -481,7 +509,7 @@ Section heap.
                                  ∗ ⌜p ≠ O⌝
                                  ∗ ▷ φ (W',w)
                                  ∗ rel a p φ
-                                 ∗ (if pwl p then future_pub_mono φ w
+                                 ∗ (if pwl p then future_pub_plus_mono φ w
                                     else future_priv_mono φ w))
         -∗ region W'
         -∗ sts_full_world W
@@ -534,7 +562,7 @@ Section heap.
                                  ∗ ⌜p ≠ O⌝
                                  ∗ ▷ φ ((std_update_multiple W (elements (dom (gset Addr) m)) Temporary),w)
                                  ∗ rel a p φ
-                                 ∗ (if pwl p then future_pub_mono φ w
+                                 ∗ (if pwl p then future_pub_plus_mono φ w
                                     else future_priv_mono φ w))
         -∗ region W
         -∗ sts_full_world W
@@ -634,7 +662,7 @@ Section heap.
                                  ∗ ⌜p ≠ O⌝
                                  ∗ ▷ φ (W',w)
                                  ∗ rel a p φ
-                                 ∗ (if pwl p then future_pub_mono φ w
+                                 ∗ (if pwl p then future_pub_plus_mono φ w
                                     else future_priv_mono φ w)))
     ==∗
     sts_full_world W'

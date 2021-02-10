@@ -12,6 +12,19 @@ Proof.
     + rewrite not_elem_of_list_to_set. by apply NoDup_cons_11.
 Qed.
 
+Lemma NoDup_map_to_cons {A B} `{Countable A, EqDecision A} (rmap : gmap A B) (a :list (A * B) ):
+  map_to_list rmap ≡ₚ a →
+  NoDup (map_to_list rmap).*1 →
+  NoDup a.*1.
+Proof.
+  intros HPerm HnoDup.
+  rewrite NoDup_ListNoDup in HnoDup |- * => HnoDup.
+  pose proof (fmap_Permutation (λ e , e.1) (map_to_list rmap) a HPerm) as HPerm'.
+  apply (Permutation_NoDup HPerm') in HnoDup; clear HPerm'.
+  rewrite -NoDup_ListNoDup in HnoDup |- * => HnoDup.
+  done.
+Qed.
+
 Lemma list_to_map_lookup_is_Some {A B} `{Countable A, EqDecision A} (l: list (A * B)) (a: A) :
   is_Some ((list_to_map l : gmap A B) !! a) ↔ a ∈ l.*1.
 Proof.

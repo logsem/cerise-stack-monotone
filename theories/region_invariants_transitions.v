@@ -75,7 +75,7 @@ Section transitions.
     specialize (Hf2 i x x0 Hx Hx0); simplify_eq.
     specialize (Hg2 i x0 y Hx0 Hy); simplify_eq.
     etrans;eauto. eapply rtc_implies;eauto.
-    intros r q Hr. destruct (decide (le_a i a));auto.
+    intros r q Hr. destruct (decide (le_a a i));auto.
   Qed.
 
   Lemma related_sts_std_a_refl a fsd :
@@ -97,7 +97,7 @@ Section transitions.
     specialize (Hf2 i x x0 Hx Hx0); simplify_eq.
     specialize (Hg2 i x0 y Hx0 Hy); simplify_eq.
     etrans;eauto. eapply rtc_implies;[|apply Hf2].
-    intros r q Hr. destruct (decide (le_a i a));auto.
+    intros r q Hr. destruct (decide (le_a a i));auto.
   Qed.
 
   Lemma related_sts_std_a_priv_trans a fsd gsd hsd :
@@ -112,7 +112,7 @@ Section transitions.
     specialize (Hf2 i x x0 Hx Hx0); simplify_eq.
     specialize (Hg2 i x0 y Hx0 Hy); simplify_eq.
     etrans;eauto. eapply rtc_implies;[|apply Hf2].
-    intros r q. destruct (decide (le_a i a));auto.
+    intros r q. destruct (decide (le_a a i));auto.
     intros [? | ?];auto. 
   Qed.
 

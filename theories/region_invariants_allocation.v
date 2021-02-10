@@ -34,11 +34,29 @@ Section region_alloc.
     rewrite lookup_insert_ne;auto.
   Qed.
 
+  Lemma monostatic_extend_preserve W (M : relT) (Mρ : gmap Addr region_type) (l : Addr) g ρ :
+    l ∉ dom (gset Addr) (std W) ->
+    dom (gset Addr) (std W) = dom (gset Addr) M ->
+    dom (gset Addr) Mρ = dom (gset Addr) M ->
+    (∀ a' : Addr, a' ∈ dom (gset Addr) g → Mρ !! a' = Some (Monostatic g)) ->
+    ∀ a' : Addr, a' ∈ dom (gset Addr) g → <[l:=ρ]> Mρ !! a' = Some (Monostatic g).
+  Proof.
+    intros Hl Hdom1 Hdom2 Hall.
+    intros a' Hin. pose proof (Hall _ Hin) as Hcontr.
+    assert (a' ∈ dom (gset Addr) Mρ) as Hincontr;[apply elem_of_gmap_dom;eauto|].
+    rewrite Hdom2 in Hincontr. apply elem_of_gmap_dom in Hincontr. clear Hcontr.
+    assert (is_Some (std W !! a')) as Hcontr.
+    { apply elem_of_gmap_dom. rewrite Hdom1. apply elem_of_gmap_dom. eauto. }
+    apply elem_of_gmap_dom in Hcontr.
+    assert (a' ≠ l) as Hne';[intros Heq;subst;contradiction|].
+    rewrite lookup_insert_ne;auto.
+  Qed.
+
   Lemma extend_region_temp_pwl E W l p v φ `{∀ Wv, Persistent (φ Wv)}:
      p ≠ O →
      l ∉ dom (gset Addr) (std W) →
      (pwl p) = true →
-     future_pub_mono φ v -∗
+     future_pub_plus_mono φ v -∗
      sts_full_world W -∗ region W -∗ l ↦ₐ[p] v -∗ φ (W,v) ={E}=∗ region (<s[l := Temporary ]s>W)
                                                               ∗ rel l p φ
                                                               ∗ sts_full_world (<s[l := Temporary ]s>W).
@@ -84,7 +102,8 @@ Section region_alloc.
         iExists γpred,_,φ. iSplitR;[auto|]. iFrame "∗ #".
         iSplitR;[auto|]. iExists v. iFrame.
         rewrite Hpwl. iFrame "#". iSplitR;[auto|].
-        iNext. iApply "Hmono"; eauto.
+        iNext. iApply "Hmono"; eauto. iPureIntro.
+        apply related_sts_pub_pub_plus_world. auto.
       }
       iApply (big_sepM_mono with "Hpreds'").
       iIntros (a x Ha) "Hρ".
@@ -97,6 +116,10 @@ Section region_alloc.
       iDestruct "Hl" as (v0 Hg Hne') "[Ha #Hall]". iDestruct "Hall" as %Hall.
       iExists _,_,_. repeat iSplit;eauto. iExists v0. iFrame. iSplit;auto. iPureIntro. split;auto.
       eapply static_extend_preserve; eauto.
+      iDestruct "Hρ" as (γpred0 p0 φ0 Heq Hpers) "[Hsaved Hl]".
+      iDestruct "Hl" as (v0 Hg Hne') "[Ha #Hall]". iDestruct "Hall" as %Hall.
+      iExists _,_,_. repeat iSplit;eauto. iExists v0. iFrame. iSplit;auto. iPureIntro. split;auto.
+      eapply monostatic_extend_preserve; eauto.
     - iExists γpred. iFrame "#".
       rewrite REL_eq /REL_def.
       done.
@@ -166,6 +189,10 @@ Section region_alloc.
       iDestruct "Hl" as (v0 Hg Hne') "[Ha #Hall]". iDestruct "Hall" as %Hall.
       iExists _,_,_. repeat iSplit;eauto. iExists v0. iFrame. iSplit;auto. iPureIntro. split;auto.
       eapply static_extend_preserve; eauto.
+      iDestruct "Hρ" as (γpred0 p0 φ0 Heq Hpers) "[Hsaved Hl]".
+      iDestruct "Hl" as (v0 Hg Hne') "[Ha #Hall]". iDestruct "Hall" as %Hall.
+      iExists _,_,_. repeat iSplit;eauto. iExists v0. iFrame. iSplit;auto. iPureIntro. split;auto.
+      eapply monostatic_extend_preserve; eauto.
     - iExists γpred. iFrame "#".
       rewrite REL_eq /REL_def.
       done.
@@ -233,6 +260,10 @@ Section region_alloc.
       iDestruct "Hl" as (v0 Hg Hne') "[Ha #Hall]". iDestruct "Hall" as %Hall.
       iExists _,_,_. repeat iSplit;eauto. iExists v0. iFrame. iSplit;auto. iPureIntro. split;auto.
       eapply static_extend_preserve; eauto.
+      iDestruct "Hρ" as (γpred0 p0 φ0 Heq Hpers) "[Hsaved Hl]".
+      iDestruct "Hl" as (v0 Hg Hne') "[Ha #Hall]". iDestruct "Hall" as %Hall.
+      iExists _,_,_. repeat iSplit;eauto. iExists v0. iFrame. iSplit;auto. iPureIntro. split;auto.
+      eapply monostatic_extend_preserve; eauto.
     - iExists γpred. iFrame "#".
       rewrite REL_eq /REL_def.
       done.
@@ -298,6 +329,10 @@ Section region_alloc.
       iDestruct "Hl" as (v0 Hg Hne') "[Ha #Hall]". iDestruct "Hall" as %Hall.
       iExists _,_,_. repeat iSplit;eauto. iExists v0. iFrame. iSplit;auto. iPureIntro. split;auto.
       eapply static_extend_preserve; eauto.
+      iDestruct "Hρ" as (γpred0 p0 φ0 Heq Hpers) "[Hsaved Hl]".
+      iDestruct "Hl" as (v0 Hg Hne') "[Ha #Hall]". iDestruct "Hall" as %Hall.
+      iExists _,_,_. repeat iSplit;eauto. iExists v0. iFrame. iSplit;auto. iPureIntro. split;auto.
+      eapply monostatic_extend_preserve; eauto.
     - iExists γpred. iFrame "#".
       rewrite REL_eq /REL_def.
       done.
@@ -398,6 +433,10 @@ Section region_alloc.
       iDestruct "Hl" as (v0 Hg Hne') "[Ha #Hall]". iDestruct "Hall" as %Hall.
       iExists _,_,_. repeat iSplit;eauto. iExists v0. iFrame. iSplit;auto. iPureIntro. split;auto.
       eapply static_extend_preserve; eauto.
+      iDestruct "Hρ" as (γpred0 p0 φ0 Heq Hpers) "[Hsaved Hl]".
+      iDestruct "Hl" as (v0 Hg Hne') "[Ha #Hall]". iDestruct "Hall" as %Hall.
+      iExists _,_,_. repeat iSplit;eauto. iExists v0. iFrame. iSplit;auto. iPureIntro. split;auto.
+      eapply monostatic_extend_preserve; eauto.
     - iExists γpred. iFrame "#".
       rewrite REL_eq /REL_def.
       done.

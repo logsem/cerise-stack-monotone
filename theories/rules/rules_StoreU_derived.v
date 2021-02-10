@@ -79,16 +79,17 @@ Section cap_lang_rules.
 
     iApply (wp_storeU _ pc_p with "[$Hmap $Hmem]"); eauto; simplify_map_eq; eauto.
     { by rewrite !dom_insert; set_solver+. }
-    { rewrite HU HstoreU. erewrite wb_implies_verify_access; eauto.
-      by simplify_map_eq. }
+    { rewrite addr_add_0. apply andb_true_iff in Hwb as [Hle%Z.leb_le Hlt%Z.ltb_lt].
+      rewrite !decide_True//;[|clear;solve_addr].
+      rewrite HU HstoreU /=. simplify_map_eq. auto. }
     iNext. iIntros (regs' mem' retv) "(#Hspec & Hmem & Hmap)".
     iDestruct "Hspec" as %Hspec.
 
     destruct Hspec as [ | * Hfail ].
      { (* Success *)
-       iApply "Hφ".
-       simplify_map_eq.
-       erewrite wb_implies_verify_access in H11; eauto. simplify_eq.
+       iApply "Hφ". destruct H9 as (?&?&?&?&?&?).
+       simplify_map_eq. rewrite addr_add_0 in H8. simplify_eq.
+       rewrite decide_True in H12;[|clear;solve_addr].
        rewrite insert_commute // insert_insert.
        iDestruct (memMap_resource_2ne with "Hmem") as "[Hpc_a Ha]";auto.
        destruct (addr_eq_dec a'0 a'0);[|contradiction].
@@ -100,7 +101,8 @@ Section cap_lang_rules.
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
        all: try congruence.
-       erewrite wb_implies_verify_access in e6; eauto. simplify_eq.
+       erewrite wb_implies_verify_access in e4; eauto. simplify_eq. congruence.
+       erewrite wb_implies_verify_access in e4; eauto. simplify_eq.
        Unshelve. all:auto.
      }
   Qed.
@@ -138,16 +140,16 @@ Section cap_lang_rules.
 
     iApply (wp_storeU _ pc_p with "[$Hmap $Hmem]"); eauto; simplify_map_eq; eauto.
     { by rewrite !dom_insert; set_solver+. }
-    { unfold canStoreU. rewrite HU HstoreU. erewrite wb_implies_verify_access; eauto.
-      by simplify_map_eq. }
+    { rewrite addr_add_0. apply andb_true_iff in Hwb as [Hle%Z.leb_le Hlt%Z.ltb_lt].
+      rewrite !decide_True//;[|clear;solve_addr].
+      unfold canStoreU. rewrite HU HstoreU /=. simplify_map_eq. auto. }
     iNext. iIntros (regs' mem' retv) "(#Hspec & Hmem & Hmap)".
     iDestruct "Hspec" as %Hspec.
 
     destruct Hspec as [ | * Hfail ].
      { (* Success *)
-       iApply "Hφ".
-       simplify_map_eq.
-       erewrite wb_implies_verify_access in H9; eauto. simplify_eq.
+       iApply "Hφ". destruct H7 as (?&?&?&?&?&?).
+       simplify_map_eq. rewrite addr_add_0 in H6;simplify_eq. simplify_map_eq.
        rewrite insert_commute // insert_insert.
        iDestruct (memMap_resource_2ne with "Hmem") as "[Hpc_a Ha]";auto.
        destruct (addr_eq_dec a'0 a'0);[|contradiction].
@@ -159,7 +161,8 @@ Section cap_lang_rules.
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
        all: try congruence.
-       erewrite wb_implies_verify_access in e6; eauto. simplify_eq.
+       erewrite wb_implies_verify_access in e4; eauto. simplify_eq. congruence.
+       erewrite wb_implies_verify_access in e4; eauto. simplify_eq.
        Unshelve. all:auto.
      }
   Qed.
@@ -203,9 +206,8 @@ Section cap_lang_rules.
 
     destruct Hspec as [ | * Hfail ].
      { (* Success *)
-       iApply "Hφ".
-       simplify_map_eq.
-       erewrite wb_implies_verify_access in H9; eauto. simplify_eq.
+       iApply "Hφ". destruct H7 as (?&?&?&?&?&?).
+       simplify_map_eq. rewrite addr_add_0 in H6;simplify_eq.
        rewrite insert_commute // insert_insert.
        iDestruct (memMap_resource_2ne with "Hmem") as "[Hpc_a Ha]";auto.
        destruct (addr_eq_dec a'0 a'0);[|contradiction].
@@ -216,7 +218,7 @@ Section cap_lang_rules.
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
        all: try congruence.
-       erewrite wb_implies_verify_access in e6; eauto. simplify_eq.
+       erewrite wb_implies_verify_access in e4; eauto. simplify_eq.
        Unshelve. all:auto.
      }
   Qed.

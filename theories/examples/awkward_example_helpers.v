@@ -117,7 +117,7 @@ Section awkward_helpers.
   Lemma exec_wp W p g b e a :
     isCorrectPC (inr (p, g, b, e, a)) ->
     exec_cond W b e g p interp -∗
-    ∀ r W', future_world g W W' → ▷ ((interp_expr interp r) W') (inr (p, g, b, e, a)).
+    ∀ r W', future_world g e W W' → ▷ ((interp_expr interp r) W') (inr (p, g, b, e, a)).
   Proof.
     iIntros (Hvpc) "Hexec".
     rewrite /exec_cond /enter_cond.
@@ -131,6 +131,9 @@ Section awkward_helpers.
     - iIntros (Hrelated).
       iSpecialize ("Hexec" $! a r W' Hin Hrelated).
       iFrame.
+    - iIntros (Hrelated).
+      iSpecialize ("Hexec" $! a r W' Hin Hrelated).
+      iFrame.
   Qed.
 
   (* The following lemma is to assist with a pattern when jumping to unknown valid capablities *)
@@ -138,7 +141,7 @@ Section awkward_helpers.
      (interp W w
     -∗ (if decide (isCorrectPC (updatePcPerm w)) then
           (∃ p g b e a, ⌜w = inr (p,g,b,e,a)⌝
-          ∗ □ ∀ r W', future_world g W W' → ▷ ((interp_expr interp r) W') (updatePcPerm w))
+          ∗ □ ∀ r W', future_world g e W W' → ▷ ((interp_expr interp r) W') (updatePcPerm w))
         else
           φ FailedV ∗ PC ↦ᵣ updatePcPerm w -∗ WP Seq (Instr Executable) {{ φ }} )).
   Proof.
@@ -178,7 +181,7 @@ Section awkward_helpers.
                                                              ∗ ⌜p ≠ O⌝
                                                              ∗ φ (W,w)
                                                              ∗ rel a p φ
-                                                             ∗ (if pwl p then future_pub_mono φ w
+                                                             ∗ (if pwl p then future_pub_plus_mono φ w
                                                                 else future_priv_mono φ w))
                           ∗ ⌜Forall (λ a, std (revoke W) !! a = Some Revoked) l⌝
                           ∗ ([∗ list] a;w ∈ l;ws, ∃ p φ, a ↦ₐ[p] w ∗ rel a p φ).
@@ -188,7 +191,7 @@ Section awkward_helpers.
      iAssert ([∗ list] a ∈ l, ∃ (v : Word), (∃ (p : Perm) (φ : WORLD * Word → iPropI Σ),
                             ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
                             ∗ ⌜p ≠ O⌝
-                            ∗ a ↦ₐ[p] v ∗ (if pwl p then future_pub_mono φ v else future_priv_mono φ v) ∗ φ (W, v)
+                            ∗ a ↦ₐ[p] v ∗ (if pwl p then future_pub_plus_mono φ v else future_priv_mono φ v) ∗ φ (W, v)
                             ∗ rel a p φ ∗ ⌜std (revoke W) !! a = Some Revoked⌝))%I
        with "[Hl]" as "Hl".
      { iApply (big_sepL_mono with "Hl").
@@ -204,7 +207,7 @@ Section awkward_helpers.
                                                              ∗ ⌜p ≠ O⌝
                                                              ∗ φ (W,w)
                                                              ∗ rel a p φ
-                                                             ∗ (if pwl p then future_pub_mono φ w
+                                                             ∗ (if pwl p then future_pub_plus_mono φ w
                                                                 else future_priv_mono φ w))%I
          with "[Hl]" as "Hl".
        { iApply (big_sepL2_mono with "Hl").
@@ -222,7 +225,7 @@ Section awkward_helpers.
                                                  ∗ y2.2 (W, y2.1.1)
                                                    ∗ rel y1 y2.1.2 y2.2
                                                      ∗ (if pwl y2.1.2
-                                                        then future_pub_mono y2.2 y2.1.1
+                                                        then future_pub_plus_mono y2.2 y2.1.1
                                                         else future_priv_mono y2.2 y2.1.1)))%I
          with "[Hl]" as "Hl".
        { iApply (big_sepL2_mono with "Hl").
@@ -248,7 +251,7 @@ Section awkward_helpers.
                                     ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
                                     ∗ ⌜p ≠ O⌝
                                       ∗ a0 ↦ₐ[p] c0
-                                        ∗ (if pwl p then future_pub_mono φ c0 else future_priv_mono φ c0)
+                                        ∗ (if pwl p then future_pub_plus_mono φ c0 else future_priv_mono φ c0)
                                           ∗ φ (W, c0)
                                             ∗ rel a0 p φ)
                                               ∗ ⌜std (revoke W) !! a0 = Some Revoked⌝)%I
@@ -320,7 +323,7 @@ Section awkward_helpers.
      left. eapply rtc_rel_pub; eauto.
    Qed.
 
-   Definition awk_W W i : WORLD := (W.1,(<[i:=encode false]>W.2.1,<[i:=(convert_rel awk_rel_pub,convert_rel awk_rel_priv)]>W.2.2)).
+   Definition awk_W W i : WORLD := (W.1,(<[i:=encode false]>W.2.1,<[i:=(convert_rel awk_rel_pub,convert_rel awk_rel_pub,convert_rel awk_rel_priv)]>W.2.2)).
 
    (* namespace definitions for the regions *)
    Definition regN : namespace := nroot .@ "regN".
@@ -330,31 +333,31 @@ Section awkward_helpers.
       are related *)
    Lemma related_priv_local_1 W i :
      W.2.1 !! i = Some (encode true) ->
-     W.2.2 !! i = Some (convert_rel awk_rel_pub, convert_rel awk_rel_priv) ->
+     W.2.2 !! i = Some (convert_rel awk_rel_pub,convert_rel awk_rel_pub, convert_rel awk_rel_priv) ->
      related_sts_priv_world W (W.1, (<[i:=encode false]> W.2.1, W.2.2)).
    Proof.
      intros Hlookup Hrel.
      split;[apply related_sts_std_priv_refl|simpl].
      split;[apply dom_insert_subseteq|split;[auto|] ].
-     intros j r1 r2 r1' r2' Hr Hr'.
+     intros j r1 r2 r3 r1' r2' r3' Hr Hr'.
      rewrite Hr in Hr'. inversion Hr'; subst; repeat (split;auto).
      intros x y Hx Hy.
      destruct (decide (i = j)).
      - subst. rewrite lookup_insert in Hy; inversion Hy; subst.
        rewrite Hrel in Hr. rewrite Hlookup in Hx. inversion Hr; inversion Hx; subst.
        right with (encode false);[|left].
-       right. exists true,false. repeat (split;auto).
+       right. right. exists true,false. repeat (split;auto).
      - rewrite lookup_insert_ne in Hy;auto. rewrite Hx in Hy; inversion Hy; subst. left.
    Qed.
 
    Lemma related_pub_local_1 Wloc i (x : bool) :
      Wloc.1 !! i = Some (encode x) ->
-     Wloc.2 !! i = Some (convert_rel awk_rel_pub, convert_rel awk_rel_priv) ->
+     Wloc.2 !! i = Some (convert_rel awk_rel_pub,convert_rel awk_rel_pub, convert_rel awk_rel_priv) ->
      related_sts_pub Wloc.1 (<[i:=encode true]> Wloc.1) Wloc.2 Wloc.2.
    Proof.
      intros Hx Hrel.
      split;[apply dom_insert_subseteq|split;[auto|] ].
-     intros j r1 r2 r1' r2' Hr Hr'.
+     intros j r1 r2 r3 r1' r2' r3' Hr Hr'.
      rewrite Hr in Hr'. inversion Hr'; subst; repeat (split;auto).
      intros x' y Hx' Hy.
      destruct (decide (i = j)).
@@ -369,7 +372,7 @@ Section awkward_helpers.
    Lemma related_pub_lookup_local W W' i x :
      related_sts_pub_world W W' ->
      W.2.1 !! i = Some (encode true) ->
-     W.2.2 !! i = Some (convert_rel awk_rel_pub, convert_rel awk_rel_priv) ->
+     W.2.2 !! i = Some (convert_rel awk_rel_pub, convert_rel awk_rel_pub, convert_rel awk_rel_priv) ->
      W'.2.1 !! i = Some (encode x) -> x = true.
    Proof.
      intros Hrelated Hi Hr Hi'.
@@ -377,8 +380,8 @@ Section awkward_helpers.
      assert (is_Some (W'.2.2 !! i)) as [r' Hr'].
      { apply elem_of_gmap_dom. apply elem_of_subseteq in Hdom2. apply Hdom2.
        apply elem_of_gmap_dom. eauto. }
-     destruct r' as [r1' r2'].
-     specialize (Htrans i _ _ _ _ Hr Hr') as [Heq1 [Heq2 Htrans] ].
+     destruct r' as [(r1' & r2') r3'].
+     specialize (Htrans i _ _ _ _ _ _ Hr Hr') as [Heq1 [Heq2 [Heq3 Htrans] ] ].
      subst. specialize (Htrans _ _ Hi Hi').
      apply rtc_rel_pub'; auto.
    Qed.

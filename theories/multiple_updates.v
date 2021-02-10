@@ -244,12 +244,12 @@ Section std_updates.
      rewrite /std /=. rewrite lookup_insert. auto.
    Qed.
 
-   Lemma std_update_temp_multiple_lookup W l k y :
-     l !! k = Some y →
-     region_state_pwl (std_update_temp_multiple W l) y.
-   Proof.
-     apply std_update_multiple_lookup.
-   Qed.
+   (* Lemma std_update_temp_multiple_lookup W l k y : *)
+   (*   l !! k = Some y → *)
+   (*   region_state_pwl (std_update_temp_multiple W l) y. *)
+   (* Proof. *)
+   (*   apply std_update_multiple_lookup. *)
+   (* Qed. *)
 
 
    (* Multiple updates does not change dom, as long as the updated elements are a subset of original dom *)
@@ -381,7 +381,7 @@ Section std_updates.
        { apply std_update_multiple_lookup with n. auto. }
        assert (std (std_update_multiple (std_update W a' i) (region_addrs a b) ρ) !! l = Some ρ) as Hpwl'.
        { apply std_update_multiple_lookup with n. auto. }
-       rewrite /region_state_pwl /= in Hpwl. rewrite /region_state_pwl /= in Hpwl'.
+       (* rewrite /region_state_pwl /= in Hpwl. rewrite /region_state_pwl /= in Hpwl'. *)
        rewrite -Hpwl in Hpwl'. rewrite Hpwl'.
        rewrite lookup_insert_ne; auto.
      - rewrite std_sta_update_multiple_lookup_same_i; auto.
@@ -414,17 +414,17 @@ Section std_updates.
    (* commuting updates and revoke *)
 
    Lemma std_update_multiple_revoke_commute W (l: list Addr) ρ :
-     ρ ≠ Temporary →
+     ρ ≠ Temporary → ρ ≠ Monotemporary →
      std_update_multiple (revoke W) l ρ = revoke (std_update_multiple W l ρ).
    Proof.
-     intros Hne.
+     intros Hne Hne'.
      induction l; auto; simpl.
      rewrite IHl.
      rewrite /std_update /revoke /loc /std /=. repeat f_equiv.
      eapply (map_leibniz (M:=gmap Addr) (A:=region_type)). intros i. apply leibniz_equiv_iff.
      destruct (decide (a = i)).
      - subst. rewrite lookup_insert revoke_monotone_lookup_same;rewrite lookup_insert; auto.
-       intros Hcontr; inversion Hcontr as [Hcontr']. done.
+       all: intros Hcontr; inversion Hcontr as [Hcontr']. all:done.
      - rewrite lookup_insert_ne;auto.
        apply revoke_monotone_lookup. rewrite lookup_insert_ne;auto. Unshelve. apply _.
    Qed.
@@ -465,16 +465,20 @@ Section std_updates.
    (* Qed. *)
 
    (* multiple updates and private relation *)
+   (* This does not hold anymore, we must also make sure we cannot go from temporary layer to monotemporary layer *)
+   (*
    Lemma rtc_rel_priv x y:
     x <> Permanent ->
-    rtc (λ x y : region_type, Rpub x y ∨ Rpriv x y) x y.
+    rtc (λ x y : region_type, Rpub x y ∨ Rpubp x y ∨ Rpriv x y) x y.
   Proof.
     intros; destruct x, y; try congruence;
       repeat
         (match goal with
-         | |- rtc (λ x y : region_type, Rpub x y ∨ Rpriv x y) ?X ?X => left
-         | |- rtc (λ x y : region_type, Rpub x y ∨ Rpriv x y) Temporary ?X => eright; [try (left; constructor); right; constructor|left]
-         | |- rtc (λ x y : region_type, Rpub x y ∨ Rpriv x y) ?X ?Y => right with Temporary; [try (left; constructor); right; constructor|]
+         | |- rtc (λ x y : region_type, Rpub x y ∨ Rpubp x y ∨ Rpriv x y) ?X ?X => left
+         | |- rtc (λ x y : region_type, Rpub x y ∨ Rpubp x y ∨ Rpriv x y) Temporary ?X => eright; [(left; constructor); right; right; constructor|left]
+         | |- rtc (λ x y : region_type, Rpub x y ∨ Rpubp x y ∨ Rpriv x y) Monotemporary ?X => eright; [(left; constructor); right; constructor|left]
+         | |- rtc (λ x y : region_type, Rpub x y ∨ Rpubp x y ∨ Rpriv x y) ?X ?Y => try (right with Temporary; [(left; constructor); right; constructor|])
+         | |- rtc (λ x y : region_type, Rpub x y ∨ Rpubp x y ∨ Rpriv x y) ?X ?Y => try (right with Monotemporary; [(left; constructor); right; constructor|])
          | _ => idtac
          end).
   Qed.
@@ -503,6 +507,6 @@ Section std_updates.
                rewrite Hi in Hx0. inversion Hx0; subst.
                eapply rtc_rel_priv; auto.
            +++ rewrite /= lookup_insert_ne in Hy;auto. rewrite Hx0 in Hy; inversion Hy; subst; left.
-  Qed.
+  Qed.*)
 
 End std_updates.

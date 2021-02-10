@@ -54,7 +54,7 @@ Section monotone.
   Qed.
 
   Lemma region_state_nwl_monotone_a W W' (a a' : Addr) l :
-    (a <= a')%a →
+    (a < a')%a →
     related_sts_a_world W W' a' →
     region_state_nwl W a l -> region_state_nwl W' a l.
   Proof.
@@ -67,7 +67,7 @@ Section monotone.
       specialize (Hrelated a Permanent y Hstate Hy).
       eapply rtc_implies in Hrelated.
       apply std_rel_pub_plus_rtc_Permanent in Hrelated; subst; auto.
-      intros r q. destruct (decide (a <= a')%a);auto. 
+      intros r q. destruct (decide (a' <= a)%a);auto. 
     - destruct Hrelated as [ [Hdom_sta Hrelated] _]. simpl in *.
       assert (is_Some (W'.1 !! a)) as [y Hy].
       { apply elem_of_gmap_dom. apply elem_of_subseteq in Hdom_sta. apply Hdom_sta. apply elem_of_gmap_dom.
@@ -77,12 +77,12 @@ Section monotone.
         specialize (Hrelated _ Temporary y HTemp Hy).
         eapply rtc_implies in Hrelated.
         apply std_rel_pub_plus_rtc_Temporary in Hrelated; subst;auto.
-        intros r q. destruct (decide (a <= a')%a);auto. 
+        intros r q. destruct (decide (a' <= a)%a);auto. 
       + right.
         specialize (Hrelated _ Permanent y HPerm Hy).
         eapply rtc_implies in Hrelated.
         apply std_rel_pub_plus_rtc_Permanent in Hrelated; subst; auto.
-        intros r q. destruct (decide (a <= a')%a);auto.  
+        intros r q. destruct (decide (a' <= a)%a);auto.  
     - destruct Hrelated as [ [Hdom_sta Hrelated] _]. simpl in *.
       assert (is_Some (W'.1 !! a)) as [y Hy].
       { apply elem_of_gmap_dom. apply elem_of_subseteq in Hdom_sta. apply Hdom_sta. apply elem_of_gmap_dom.
@@ -91,17 +91,17 @@ Section monotone.
       + specialize (Hrelated _ Monotemporary y Hmono Hy).
         eapply rtc_implies in Hrelated.
         apply std_rel_pub_rtc_Monotemporary in Hrelated; subst;auto.
-        intros r q. rewrite decide_True;auto.
+        intros r q. rewrite decide_False;auto. solve_addr.
       + right. left.
         specialize (Hrelated _ Temporary y Htemp Hy).
         eapply rtc_implies in Hrelated.
         apply std_rel_pub_rtc_Temporary in Hrelated; subst;auto.
-        intros r q. rewrite decide_True;auto.
+        intros r q. rewrite decide_False;auto. solve_addr.
       + right. right.
         specialize (Hrelated _ Permanent y Hperm Hy).
         eapply rtc_implies in Hrelated.
         apply std_rel_pub_rtc_Permanent in Hrelated; subst; auto.
-        intros r q. rewrite decide_True;auto.
+        intros r q. rewrite decide_False;auto. solve_addr.
   Qed.
 
   Lemma region_state_nwl_monotone_nm W W' a :
@@ -162,7 +162,7 @@ Section monotone.
   Qed.
 
   Lemma region_state_pwl_monotone_a W W' a a' :
-    (a <= a')%a →
+    (a < a')%a →
     related_sts_a_world W W' a' →
     region_state_pwl_mono W a -> region_state_pwl_mono W' a.
   Proof.
@@ -174,7 +174,7 @@ Section monotone.
     specialize (Hrelated _ Monotemporary y Hstate Hy).
     eapply rtc_implies in Hrelated. 
     apply std_rel_pub_rtc_Monotemporary in Hrelated; subst; auto.
-    intros r q. rewrite decide_True;auto. 
+    intros r q. rewrite decide_False;auto. solve_addr.
   Qed.
 
   Lemma region_state_U_monotone W W' a :
@@ -274,17 +274,17 @@ Section monotone.
     destruct Hstate as [Hstate|[? Hstate] ].
     - specialize (Hrelated _ Monotemporary y Hstate Hy).
       destruct (decide (y = Monotemporary)); subst; auto. left;auto. 
-      destruct (decide (a <= a')%a). 
-      + apply std_rel_pub_rtc_Monotemporary in Hrelated; subst;auto. contradiction.
+      destruct (decide (a' <= a)%a).
       + apply std_rel_pub_plus_rtc_Monotemporary in Hrelated; subst;auto. 
         destruct Hrelated as [-> | [? ->] ];
-        rewrite /region_state_U_pwl_mono;eauto.
+          rewrite /region_state_U_pwl_mono;eauto.
+      + apply std_rel_pub_rtc_Monotemporary in Hrelated; subst;auto. contradiction.
     - specialize (Hrelated _ (Uninitialized x) y Hstate Hy).
-      destruct (decide (a <= a')%a). 
-      + eapply std_rel_pub_rtc_Uninitialized in Hrelated; eauto.
-        destruct Hrelated; subst y; [left | right]; eauto.
+      destruct (decide (a' <= a)%a). 
       + eapply std_rel_pub_plus_rtc_Uninitialized in Hrelated; eauto.
         destruct Hrelated as [Hy' | [w' Hy'] ]; subst y; [left | right]; eauto.
+      + eapply std_rel_pub_rtc_Uninitialized in Hrelated; eauto.
+        destruct Hrelated; subst y; [left | right]; eauto.
   Qed.
 
   (* The following lemma is not required for monotonicity, but is interesting for use in examples *)
@@ -501,7 +501,7 @@ Section monotone.
 
   Lemma region_addrs_lookup_le b e a n :
     region_addrs b e !! n = Some a →
-    (a <= e)%a.
+    (a < e)%a.
   Proof.
     intros Hlookup.
     assert (a ∈ (region_addrs b e)) as Hin.
