@@ -15,6 +15,15 @@ Section stack_macros.
 
   Definition pushU_r a1 p r_stk r : iProp Σ := (a1 ↦ₐ[p] pushU_r_instr r_stk r)%I.
 
+  Definition isMonotone_word (w:Word) :=
+    match w with
+    | inl _ => false
+    | inr (_,l,_,_,_) => match l with
+                        | Monotone => true
+                        | _ => false
+                        end
+    end.
+
   Lemma pushU_r_spec a1 a2 w w' r p p' p_a g b e stk_b stk_e stk_a stk_a' φ :
     isCorrectPC (inr ((p,g),b,e,a1)) →
     PermFlows p p' ->
@@ -22,7 +31,7 @@ Section stack_macros.
     withinBounds ((URWLX,Monotone),stk_b,stk_e,stk_a) = true →
     (a1 + 1)%a = Some a2 →
     (stk_a + 1)%a = Some stk_a' →
-    (canReadUpTo w' <=? stk_a)%a = true →
+    (isMonotone_word w' = true → (canReadUpTo w' <=? stk_a)%a = true) →
 
       ▷ pushU_r a1 p' r_stk r
     ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a1)

@@ -415,32 +415,44 @@ Section heap.
 
   Lemma valid_uninitialized_condition W m a p g b e :
     pwlU p = true → isU p = true →
-    (∀ a' : Addr, is_Some (m !! a') ↔ (W.1 !! a' = Some Monotemporary) ∧ (a <= a')%a) →
-    interp W (inr (p,g,b,e,a)) -∗ ⌜∀ a', (addr_reg.max b a <= a' < e)%a → (∃ w, (uninitialize W m).1 !! a' = Some (Uninitialized w))⌝.
+    (∀ a' : Addr, is_Some (m !! a') ↔ (W.1 !! a' = Some Monotemporary) ∧ (b <= a')%a) →
+    interp W (inr (p,g,b,e,a)) -∗ ⌜∀ a', (b <= a' < e)%a → (∃ w, (uninitialize W m).1 !! a' = Some (Uninitialized w))⌝.
   Proof.
     iIntros (HpwlU HU Hcond) "#Hv".
     iIntros (a' [Hle Hlt]).
     iDestruct (writeLocalAllowedU_implies_local with "Hv") as %Hmono;auto.
     destruct g;inversion Hmono.
     destruct p;inversion HU;inversion HpwlU.
-    - rewrite fixpoint_interp1_eq /=. iDestruct "Hv" as "[_ Hv]".
-      iDestruct (big_sepL_elem_of _ _ a' with "Hv") as (p Hflows) "[Hcond #Hreg]".
-      { apply elem_of_region_addrs. auto. }
-      iDestruct "Hreg" as %[Hreg | [? Hreg] ].
-      { assert (is_Some (m !! a')) as [v Hv];[apply Hcond;split;auto;solve_addr|].
-        rewrite (uninitialize_std_sta_lookup_in _ _ _ v);eauto. }
-      { assert (m !! a' = None) as Hv;[|rewrite uninitialize_std_sta_None_lookup//;rewrite Hreg;eauto].
-        destruct (m !! a') eqn:Hsome;auto. assert (is_Some (m!!a')) as Hissome;eauto.
-        apply Hcond in Hissome as [Heq ?]. rewrite Heq in Hreg;inversion Hreg. }
-    - rewrite fixpoint_interp1_eq /=. iDestruct "Hv" as "[_ Hv]".
-      iDestruct (big_sepL_elem_of _ _ a' with "Hv") as (p Hflows) "[Hcond #Hreg]".
-      { apply elem_of_region_addrs. auto. }
-      iDestruct "Hreg" as %[Hreg | [? Hreg] ].
-      { assert (is_Some (m !! a')) as [v Hv];[apply Hcond;split;auto;solve_addr|].
-        rewrite (uninitialize_std_sta_lookup_in _ _ _ v);eauto. }
-      { assert (m !! a' = None) as Hv;[|rewrite uninitialize_std_sta_None_lookup//;rewrite Hreg;eauto].
-        destruct (m !! a') eqn:Hsome;auto. assert (is_Some (m!!a')) as Hissome;eauto.
-        apply Hcond in Hissome as [Heq ?]. rewrite Heq in Hreg;inversion Hreg. }
+    - rewrite fixpoint_interp1_eq /=. iDestruct "Hv" as "[Hv' Hv]".
+      destruct (decide (a <= a'))%a.
+      + iDestruct (big_sepL_elem_of _ _ a' with "Hv") as (p Hflows) "[Hcond #Hreg]".
+        { apply elem_of_region_addrs. solve_addr. }
+        iDestruct "Hreg" as %[Hreg | [? Hreg] ].
+        { assert (is_Some (m !! a')) as [v Hv];[apply Hcond;split;auto;solve_addr|].
+          rewrite (uninitialize_std_sta_lookup_in _ _ _ v);eauto. }
+        { assert (m !! a' = None) as Hv;[|rewrite uninitialize_std_sta_None_lookup//;rewrite Hreg;eauto].
+          destruct (m !! a') eqn:Hsome;auto. assert (is_Some (m!!a')) as Hissome;eauto.
+          apply Hcond in Hissome as [Heq ?]. rewrite Heq in Hreg;inversion Hreg. }
+      + iDestruct (big_sepL_elem_of _ _ a' with "Hv'") as (p Hflows) "[Hcond #Hreg]".
+        { apply elem_of_region_addrs. solve_addr. }
+        iDestruct "Hreg" as %Hreg.
+        assert (is_Some (m !! a')) as [v Hv];[apply Hcond;split;auto;solve_addr|].
+        rewrite (uninitialize_std_sta_lookup_in _ _ _ v);eauto.
+    - rewrite fixpoint_interp1_eq /=. iDestruct "Hv" as "[Hv' Hv]".
+      destruct (decide (a <= a'))%a.
+      + iDestruct (big_sepL_elem_of _ _ a' with "Hv") as (p Hflows) "[Hcond #Hreg]".
+        { apply elem_of_region_addrs. solve_addr. }
+        iDestruct "Hreg" as %[Hreg | [? Hreg] ].
+        { assert (is_Some (m !! a')) as [v Hv];[apply Hcond;split;auto;solve_addr|].
+          rewrite (uninitialize_std_sta_lookup_in _ _ _ v);eauto. }
+        { assert (m !! a' = None) as Hv;[|rewrite uninitialize_std_sta_None_lookup//;rewrite Hreg;eauto].
+          destruct (m !! a') eqn:Hsome;auto. assert (is_Some (m!!a')) as Hissome;eauto.
+          apply Hcond in Hissome as [Heq ?]. rewrite Heq in Hreg;inversion Hreg. }
+      + iDestruct (big_sepL_elem_of _ _ a' with "Hv'") as (p Hflows) "[Hcond #Hreg]".
+        { apply elem_of_region_addrs. solve_addr. }
+        iDestruct "Hreg" as %Hreg.
+        assert (is_Some (m !! a')) as [v Hv];[apply Hcond;split;auto;solve_addr|].
+        rewrite (uninitialize_std_sta_lookup_in _ _ _ v);eauto.
   Qed.
 
   Lemma region_map_uninitialized_monotone W W' M Mρ a :
