@@ -215,6 +215,18 @@ Proof.
   rewrite lookup_delete_ne; auto.
 Qed.
 
+Lemma delete_list_None {K V : Type} `{Countable K, EqDecision K}
+      (ks : list K) (m : gmap K V) (l : K) :
+  l ∈ ks →
+  (delete_list ks m) !! l = None.
+Proof.
+  intros HH;induction ks;[inversion HH|].
+  apply elem_of_cons in HH as [-> | Hin];auto.
+  - simpl. rewrite lookup_delete. auto.
+  - simpl. destruct (decide (a = l));[subst;rewrite lookup_delete;auto|].
+    rewrite lookup_delete_ne// IHks;auto.
+Qed.
+
 Lemma delete_list_permutation {A B} `{Countable A, EqDecision A}
       (l1 l2: list A) (m: gmap A B):
   l1 ≡ₚ l2 → delete_list l1 m = delete_list l2 m.

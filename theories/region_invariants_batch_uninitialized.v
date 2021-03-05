@@ -222,7 +222,7 @@ Section heap.
       iMod (sts_update_std _ _ _ (Uninitialized v) with "Hsts Hstate") as "[Hsts Hstate]".
       iDestruct (region_map_delete_nonstatic with "Hmap") as "Hmap".
       { intros m'. rewrite Hlookup. auto. }
-      iDestruct (region_map_insert_nonstatic (Uninitialized v) with "Hmap") as "Hmap";auto.
+      iDestruct (region_map_insert_nonmonostatic (Uninitialized v) with "Hmap") as "Hmap";auto.
       iDestruct (big_sepM_insert _ _ addr_reg.top with "[$Hmap Ha Hstate]") as "Hmap";[apply lookup_delete|..].
       { iExists (Uninitialized v). rewrite lookup_insert. iSplit;auto. iFrame. iExists _,_,_. iSplit;eauto. }
       rewrite insert_delete. rewrite (insert_id M);[|auto]. iModIntro.
@@ -296,7 +296,7 @@ Section heap.
         iMod (sts_update_std _ _ _ (Uninitialized v) with "Hsts Hstate") as "[Hsts Hstate]".
         iDestruct (region_map_delete_nonstatic with "Hmap") as "Hmap".
         { intros m'. rewrite Hlookup. auto. }
-        iDestruct (region_map_insert_nonstatic (Uninitialized v) with "Hmap") as "Hmap";auto.
+        iDestruct (region_map_insert_nonmonostatic (Uninitialized v) with "Hmap") as "Hmap";auto.
         iDestruct (big_sepM_insert _ _ a with "[$Hmap Ha Hstate]") as "Hmap";[apply lookup_delete|..].
         { iExists (Uninitialized v). rewrite lookup_insert. iSplit;auto. iFrame. iExists _,_,_. iSplit;eauto. }
         rewrite insert_delete. rewrite (insert_id M);[|auto]. iModIntro.
@@ -344,7 +344,7 @@ Section heap.
         rewrite Hρ in Hmin. inversion Hmin;subst ρ. iFrame.
       + assert (m !! a' = None) as Hnone.
         { apply eq_None_not_Some. intros Hcontr%Hcond. destruct Hcontr as [? ?]; contradiction. }
-        rewrite uninitialize_std_sta_None_lookup in Hρ;auto. 
+        rewrite uninitialize_std_sta_None_lookup in Hρ;auto.
         rewrite e in Hρ. inversion Hρ;subst ρ.
         iDestruct "Hres" as (v Hne) "Hres".
         assert (Persistent (if pwl p then future_pub_a_mono a' φ v else future_priv_mono φ v)) as Hpers';[destruct (pwl p);apply _|].
@@ -358,20 +358,15 @@ Section heap.
     - assert (m !! a' = None) as Hnone.
       { apply eq_None_not_Some. intros Hcontr%Hcond. destruct Hcontr as [ ? ?]; contradiction. }
       rewrite uninitialize_std_sta_None_lookup in Hρ;auto.
-      rewrite Hρ in n. 
+      rewrite Hρ in n.
       destruct ρ;auto;try contradiction.
       * iDestruct "Hres" as (v Hne) "Ha".
         assert (Persistent (if pwl p then future_pub_plus_mono φ v else future_priv_mono φ v)) as Hpers';[destruct (pwl p);apply _|].
         iDestruct "Ha" as "(Ha & #Hmono & #Hφ)".
         iExists v. iFrame "∗ #". iSplit;auto. iNext.
         destruct (pwl p). all: iApply ("Hmono" with "[] Hφ"). all: iPureIntro.
-        2: apply related_sts_pub_plus_priv_world.
+        1,2: apply related_sts_pub_plus_priv_world.
         all: apply related_sts_a_pub_plus_world with a. all: apply uninitialize_related_pub_a; auto.
-      * iDestruct "Hres" as (v Hne) "(Ha & #Hmono & #Hφ)".
-        iExists v. iFrame "∗ #". iSplit;auto. iNext.
-        iApply ("Hmono" with "[] Hφ"). iPureIntro.
-        apply related_sts_pub_plus_priv_world.
-        apply related_sts_a_pub_plus_world with a. apply uninitialize_related_pub_a; auto.
   Qed.
 
   Lemma uninitialize_region W (a : Addr) :
@@ -466,16 +461,6 @@ Section heap.
     iDestruct "Hm" as (ρ Hρ) "[Hstate Hm]".
     iExists ρ. iFrame. iSplitR;[auto|].
     destruct ρ.
-    - iDestruct "Hm" as (γpred p φ Heq Hpers) "(#Hsavedφ & Hl)".
-      iDestruct "Hl" as (v Hne) "(Hl & Hmono & Hφ)".
-      iExists _,_,_. do 2 (iSplitR;[eauto|]).
-      iFrame "#". iExists _. iSplitR;eauto.
-      destruct (pwl p);
-      (iDestruct "Hmono" as "#Hmono"; iFrame "∗ #";
-       iApply "Hmono"; iFrame; auto).
-      + iPureIntro. eapply related_sts_a_pub_plus_world;eauto.
-      + iPureIntro. apply related_sts_pub_plus_priv_world.
-        eapply related_sts_a_pub_plus_world;eauto.
     - destruct (decide (a' <= a))%a.
       2: { exfalso. assert (a <= a')%a as Hle;[solve_addr|].
            apply Hcond in Hle as ?. congruence. }
@@ -497,7 +482,6 @@ Section heap.
       iPureIntro.
       apply related_sts_pub_plus_priv_world.
       eapply related_sts_a_pub_plus_world;eauto.
-    - done.
     - done.
     - done.
     - done.
@@ -559,7 +543,7 @@ Section heap.
         iDestruct "Ha'" as (ρ' Hlookup) "[Hρ' _]".
         iDestruct (sts_full_state_std with "Hsts Hρ'") as %Hρ'. rewrite Ha' in Hρ'. inversion Hρ'. auto. }
 
-    iDestruct (region_map_insert_nonstatic (Uninitialized w) with "Hpreds") as "Hpreds";[intros;auto|].
+    iDestruct (region_map_insert_nonmonostatic (Uninitialized w) with "Hpreds") as "Hpreds";[intros;auto|].
     iDestruct (region_map_uninitialized_monotone _ (<s[a':=Uninitialized w]s>W) _ _ a with "Hpreds") as "Hpreds".
     { apply related_sts_a_uninitialized;auto. rewrite Hρ. eauto. }
     { intros a'' Ha''. destruct (decide (a'' = a')); subst;simplify_map_eq;eauto.

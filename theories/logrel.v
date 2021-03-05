@@ -89,8 +89,8 @@ Section logrel.
 
   Definition future_world g l W W' : iProp Σ :=
     (match g with
-    | Local => ⌜related_sts_pub_plus_world W W'⌝
-    | Global => ⌜related_sts_priv_world W W'⌝
+    (* | Local => ⌜related_sts_pub_plus_world W W'⌝ *)
+    | Local | Global => ⌜related_sts_priv_world W W'⌝
     | Monotone => ⌜related_sts_a_world W W' l⌝
      end)%I.
 
@@ -118,16 +118,17 @@ Section logrel.
 
   Definition interp_cap_O : D := λne _ _, True%I.
 
+
   (*
       -------------------------------------------------------------
       |          |         nwl           |          pwl           |
       |          | - < a    |    a ≤ -   |  - < a    |    a ≤ -   |
       -------------------------------------------------------------
-      | Monotone | {M,T,P} | {M,T,P,U,F}|    {M}    |    {M,U}    |
+      | Monotone | {M,P}    | {M,P,U}    |    {M}    |    {M,U}   |
       |-----------------------------------------------------------|
-      | Local    | {T,P}   | {T,P,F}     |           N/A          |
+      | Local    |       {P}             |           N/A          |
       |-----------------------------------------------------------|
-      | Global   |        {P}            |           N/A          |
+      | Global   |       {P}             |           N/A          |
       -------------------------------------------------------------
 
    *)
@@ -140,24 +141,18 @@ Section logrel.
 
   Definition region_state_nwl W (a : Addr) (l : Locality) : Prop :=
     match l with
-     | Local => (std W) !! a = Some Temporary
-               ∨ (std W) !! a = Some Permanent
+     | Local => (std W) !! a = Some Permanent
      | Global => (std W) !! a = Some Permanent
      | Monotone => (std W) !! a = Some Monotemporary
-                  ∨ (std W) !! a = Some Temporary
                   ∨ (std W) !! a = Some Permanent
     end.
 
   Definition region_state_U W (a : Addr) : Prop :=
-    (std W) !! a = Some Temporary
-    \/ (std W) !! a = Some Permanent
-    ∨ (exists w, (std W) !! a = Some (Static {[a:=w]})).
-
+    (std W) !! a = Some Permanent.
+  
   Definition region_state_U_mono W (a : Addr) : Prop :=
     (std W) !! a = Some Monotemporary
-    ∨ (std W) !! a = Some Temporary
     \/ (std W) !! a = Some Permanent
-    ∨ (exists w, (std W) !! a = Some (Static {[a:=w]}))
     ∨ (exists w, (std W) !! a = Some (Uninitialized w)).
 
   (* Definition region_state_U_pwl W (a : Addr) : Prop := *)
@@ -619,7 +614,7 @@ Section logrel.
     readAllowed p = true ->
     withinBounds (p, l, b, e, a) = true ->
     interp W (inr (p, l, b, e, a)) -∗
-           ⌜∃ ρ, std W !! a = Some ρ ∧ ρ <> Revoked ∧ (∀ g, ρ ≠ Static g) ∧ (∀ g, ρ ≠ Monostatic g) ∧ (∀ w, ρ ≠ Uninitialized w)⌝.
+           ⌜∃ ρ, std W !! a = Some ρ ∧ ρ <> Revoked ∧ (∀ g, ρ ≠ Monostatic g) ∧ (∀ w, ρ ≠ Uninitialized w)⌝.
   Proof.
     intros Hp Hb. iIntros "H".
     eapply withinBounds_le_addr in Hb.
@@ -627,24 +622,24 @@ Section logrel.
     destruct p; simpl in Hp; try congruence.
     - iDestruct (extract_from_region_inv with "H") as (p ?) "[_ H]"; eauto.
       iDestruct "H" as %HH. iPureIntro. destruct l; eauto;simpl in HH.
-      eexists;eauto. destruct HH;eexists;eauto. destruct HH as [? | [? | ?] ]; eexists;eauto.
+      destruct HH;eauto; eexists;eauto.
     - iDestruct (extract_from_region_inv with "H") as (p ?) "[_ H]"; eauto.
       iDestruct "H" as %HH. iPureIntro. destruct l; eauto; simpl in HH.
-      eexists;eauto. destruct HH;eexists;eauto. destruct HH as [? | [? | ?] ]; eexists;eauto.
+      destruct HH;eexists;eauto.
     - destruct l; auto.
       iDestruct (extract_from_region_inv with "H") as (p ?) "[_ %]"; eauto.
-      iPureIntro. eexists;split;eauto. 
+      iPureIntro. eexists;split;eauto.
     - iDestruct (extract_from_region_inv with "H") as (p ?) "[_ H]"; eauto.
       iDestruct "H" as %HH. iPureIntro. destruct l; eauto. simpl in HH.
-      eexists;eauto. destruct HH;eexists;eauto. destruct HH as [? | [? | ?] ]; eexists;eauto. 
+      destruct HH;eexists;eauto.
     - iDestruct (extract_from_region_inv with "H") as (p ?) "[_ H]"; eauto.
       iDestruct "H" as %HH. iPureIntro. destruct l; eauto. simpl in HH.
-      eexists; eauto. destruct HH;eexists;eauto. destruct HH as [? | [? | ?] ]; eexists;eauto.
+      destruct HH;eexists;eauto.
     - destruct l;auto.
       iDestruct (extract_from_region_inv with "H") as (p ?) "[_ %]"; eauto.
       rewrite H1. iPureIntro. eexists;eauto.
   Qed.
-  
+
   Definition region_conditions W p g b e:=
   ([∗ list] a ∈ (region_addrs b e), ∃ p', ⌜PermFlows p p'⌝ ∗ (read_write_cond a p' interp)
                                           ∧ ⌜if pwl p

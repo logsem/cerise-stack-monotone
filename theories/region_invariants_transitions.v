@@ -247,7 +247,7 @@ Section transitions.
     split.
     - apply related_sts_std_a_refl.
     - apply related_sts_pub_plus_refl.
-  Qed. 
+  Qed.
 
   (* --------------------------------------------------------------------------------- *)
   (* ------------------------- LEMMAS ABOUT STD TRANSITIONS -------------------------- *)
@@ -318,29 +318,6 @@ Section transitions.
     induction Hrtc;auto.
     subst. apply IHHrtc. apply std_rel_priv_Revoked; auto.
   Qed.
-  
-  Lemma std_rel_priv_Temporary x :
-    std_rel_priv Temporary x → x = Permanent ∨ x = Revoked ∨ (∃ g, x = Static g).
-  Proof.
-    intros Hrel.
-    inversion Hrel;eauto.
-  Qed.
-
-  Lemma std_rel_priv_Static x g :
-    std_rel_priv (Static g) x → x = Static g.
-  Proof.
-    intros Hrel.
-    inversion Hrel; done.
-  Qed.
-
-  Lemma std_rel_priv_rtc_Static x y g :
-    x = Static g →
-    rtc std_rel_priv x y → y = Static g.
-  Proof.
-    intros Hx Hrtc.
-    induction Hrtc;auto.
-    subst. apply IHHrtc. apply std_rel_priv_Static; auto.
-  Qed.
 
   Lemma std_rel_priv_Monostatic x g :
     std_rel_priv (Monostatic g) x → x = Monostatic g.
@@ -357,19 +334,7 @@ Section transitions.
     induction Hrtc;auto.
     subst. apply IHHrtc. apply std_rel_priv_Monostatic; auto.
   Qed.
-  
-  Lemma std_rel_priv_rtc_Temporary x y :
-    x = Temporary →
-    rtc std_rel_priv x y → y = Temporary ∨ y = Permanent ∨ y = Revoked ∨ (∃ g, y = Static g).
-  Proof.
-    intros Hx Hrtc.
-    induction Hrtc;auto.
-    subst. apply std_rel_priv_Temporary in H0 as [-> | [-> | [? ->] ] ].
-    - apply std_rel_priv_rtc_Permanent in Hrtc;auto.
-    - apply std_rel_priv_rtc_Revoked in Hrtc;auto.
-    - eapply std_rel_priv_rtc_Static in Hrtc;eauto.
-  Qed.
-  
+
   Lemma std_rel_rtc_Permanent x y :
     x = Permanent →
     rtc (λ x0 y0 : region_type, std_rel_pub x0 y0 ∨ std_rel_pub_plus x0 y0 ∨ std_rel_priv x0 y0) x y →
@@ -381,40 +346,6 @@ Section transitions.
     - apply std_rel_pub_Permanent in Hrel. auto.
     - apply std_rel_pub_plus_Permanent in Hrel. auto.
     - apply std_rel_priv_Permanent in Hrel. auto.
-  Qed.
-
-  Lemma std_rel_pub_Temporary x :
-    std_rel_pub Temporary x → x = Temporary.
-  Proof.
-    intros Hrel.
-    inversion Hrel.
-  Qed.
-
-  Lemma std_rel_pub_plus_Temporary x :
-    std_rel_pub_plus Temporary x → x = Temporary.
-  Proof.
-    intros Hrel.
-    inversion Hrel.
-  Qed.
-
-  Lemma std_rel_pub_plus_rtc_Temporary x y :
-    x = Temporary →
-    rtc (λ x0 y0 : region_type, std_rel_pub x0 y0 ∨ std_rel_pub_plus x0 y0) x y → y = Temporary.
-  Proof.
-    intros Hx Hrtc.
-    induction Hrtc ;auto.
-    subst. destruct H0 as [Hrel | Hrel].
-    - apply IHHrtc. apply std_rel_pub_Temporary; auto.
-    - apply IHHrtc. apply std_rel_pub_plus_Temporary; auto.
-  Qed.
-
-  Lemma std_rel_pub_rtc_Temporary x y :
-    x = Temporary →
-    rtc std_rel_pub x y → y = Temporary.
-  Proof.
-    intros Hx Hrtc.
-    induction Hrtc ;auto.
-    subst. apply IHHrtc. apply std_rel_pub_Temporary; auto.
   Qed.
 
   Lemma std_rel_pub_Monotemporary x :
@@ -434,7 +365,7 @@ Section transitions.
   Qed.
 
   Lemma std_rel_pub_Revoked x :
-    std_rel_pub Revoked x → x = Temporary ∨ x = Permanent ∨ x = Monotemporary.
+    std_rel_pub Revoked x → x = Permanent ∨ x = Monotemporary.
   Proof.
     intros Hrel.
     inversion Hrel; auto.
@@ -442,35 +373,20 @@ Section transitions.
 
   Lemma std_rel_pub_rtc_Revoked x y :
     x = Revoked →
-    rtc std_rel_pub x y → y = Temporary ∨ y = Permanent ∨ y = Monotemporary ∨ y = Revoked.
+    rtc std_rel_pub x y → y = Permanent ∨ y = Monotemporary ∨ y = Revoked.
   Proof.
     intros Hx Hrtc.
     inversion Hrtc; subst; auto.
-    apply std_rel_pub_Revoked in H0 as [-> | [-> | ->] ];auto. 
-    - left. eapply std_rel_pub_rtc_Temporary;eauto.
-    - right. left. eapply std_rel_pub_rtc_Permanent;eauto.
-    - right. right. left. eapply std_rel_pub_rtc_Monotemporary;eauto.
-  Qed.
-  
-  Lemma std_rel_pub_Static x g :
-    std_rel_pub (Static g) x → x = Temporary.
-  Proof.
-    intros Hrel.
-    inversion Hrel. auto. 
-  Qed.
-
-  Lemma std_rel_pub_plus_Static x g :
-    std_rel_pub_plus (Static g) x → x = Temporary.
-  Proof.
-    intros Hrel.
-    inversion Hrel. 
+    apply std_rel_pub_Revoked in H0 as [-> | ->];auto.
+    - left. eapply std_rel_pub_rtc_Permanent;eauto.
+    - right. left. eapply std_rel_pub_rtc_Monotemporary;eauto.
   Qed.
 
   Lemma std_rel_pub_Monostatic x g :
-    std_rel_pub (Monostatic g) x → x = Monotemporary.
+    std_rel_pub (Monostatic g) x → x = Monostatic g.
   Proof.
     intros Hrel.
-    inversion Hrel. auto. 
+    inversion Hrel. 
   Qed.
 
   Lemma std_rel_pub_Uninitialized x w :
@@ -478,16 +394,6 @@ Section transitions.
   Proof.
     intros Hrel.
     inversion Hrel. auto. 
-  Qed.
-
-  Lemma std_rel_pub_rtc_Static x y g :
-    x = (Static g) →
-    rtc std_rel_pub x y → y = Temporary ∨ y = (Static g).
-  Proof.
-    intros Hx Hrtc.
-    inversion Hrtc; subst; auto. left.
-    apply std_rel_pub_Static in H0. 
-    eapply std_rel_pub_rtc_Temporary;eauto.
   Qed.
 
   Lemma std_rel_pub_rtc_Uninitialized x y w :
@@ -500,33 +406,20 @@ Section transitions.
     eapply std_rel_pub_rtc_Monotemporary;eauto.
   Qed.
 
-  Lemma std_rel_pub_plus_rtc_Static x y g :
-    x = (Static g) →
-    rtc (λ x0 y0, std_rel_pub x0 y0 ∨ std_rel_pub_plus x0 y0) x y → y = Temporary ∨ y = (Static g).
-  Proof.
-    intros Hx Hrtc.
-    induction Hrtc ;auto.
-    subst. destruct H0 as [Hrel | Hrel].
-    - apply std_rel_pub_Static in Hrel; auto. subst. 
-      eapply std_rel_pub_plus_rtc_Temporary in Hrtc;eauto.
-    - apply std_rel_pub_plus_Static in Hrel; auto. subst.
-      eapply std_rel_pub_plus_rtc_Temporary in Hrtc;eauto.
-  Qed.
-
   Lemma std_rel_pub_rtc_Monostatic x y g :
     x = (Monostatic g) →
-    rtc std_rel_pub x y → y = Monotemporary ∨ y = (Monostatic g).
+    rtc std_rel_pub x y → y = (Monostatic g).
   Proof.
     intros Hx Hrtc.
-    inversion Hrtc; subst; auto. left.
-    apply std_rel_pub_Monostatic in H0. 
-    eapply std_rel_pub_rtc_Monotemporary;eauto.
+    induction Hrtc; subst; auto.
+    apply std_rel_pub_Monostatic in H0 as ->.
+    auto.
   Qed.
 
   Lemma std_rel_pub_plus_Monostatic x g :
-    std_rel_pub_plus (Monostatic g) x → x = (Monostatic g).
+    std_rel_pub_plus (Monostatic g) x → x = Monotemporary.
   Proof.
-    intros Hrel; inversion Hrel. Qed.
+    intros Hrel; inversion Hrel. auto. Qed.
 
   Lemma std_rel_pub_plus_Uninitialized x w :
     std_rel_pub_plus (Uninitialized w) x → x = (Uninitialized w).

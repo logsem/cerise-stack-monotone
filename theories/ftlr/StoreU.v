@@ -30,7 +30,7 @@ Section fundamental.
       → ⊢ (interp W) (inr (p, g, b, e, a))
       → ∃ p' : Perm, ⌜PermFlows (promote_perm p) p'⌝ ∗ read_write_cond a' p' interp
                      ∧ ⌜(∃ ρ : region_type, std W !! a' = Some ρ
-                                            ∧ ρ ≠ Revoked /\ (∀ g, ρ ≠ Static g) ∧ (∀ g, ρ ≠ Monostatic g) ∧ (∀ w, ρ ≠ Uninitialized w))⌝.
+                                            ∧ ρ ≠ Revoked ∧ (∀ g, ρ ≠ Monostatic g) ∧ (∀ w, ρ ≠ Uninitialized w))⌝.
   Proof.
     intros. rewrite /interp fixpoint_interp1_eq /=. iIntros "H".
     assert (p = URW \/ p = URWL \/ p = URWX \/ p = URWLX) as [-> | [-> | [-> | ->] ] ] by (destruct p; simpl in H0; auto; congruence); simpl.
@@ -39,23 +39,23 @@ Section fundamental.
         iSplit;auto. iPureIntro; auto. rewrite H2. eexists;eauto.
       + iDestruct "H" as "[B C]".
         iDestruct (extract_from_region_inv with "B") as (p' ?) "[D %]"; try (iExists p'; iFrame); auto.
-        iSplit;auto. iPureIntro; auto. destruct H2; eexists;eauto.
+        iSplit;auto. iPureIntro; eauto.
       + iDestruct "H" as "[B C]".
         iDestruct (extract_from_region_inv with "B") as (p' ?) "[D %]"; try (iExists p'; iFrame); auto.
-        iSplit;auto. iPureIntro; auto. destruct H2 as [? | [? | ?] ]; eexists;eauto.
+        iSplit;auto. iPureIntro; auto. destruct H2 as [? | ?]; eexists;eauto.
     - destruct g; auto.
       iDestruct "H" as "[B C]".
       iDestruct (extract_from_region_inv with "B") as (p' ?) "[D %]"; try (iExists p'; iFrame); auto.
-      iPureIntro; split;eauto. eexists;eauto.
+      iPureIntro; split;eauto.
     - destruct g.
       + iDestruct (extract_from_region_inv with "H") as (p' Hfl) "[D %]"; try (iExists p'; iFrame); auto; [solve_addr|].
         iSplit;auto. iPureIntro; auto. eexists; eauto.
       + iDestruct "H" as "[B C]".
         iDestruct (extract_from_region_inv with "B") as (p' Hfl) "[E %]"; try (iExists p'; iFrame); auto.
-        iSplit;auto. iPureIntro; auto. destruct H1; eexists;eauto.
+        iSplit;auto. iPureIntro; eauto.
       + iDestruct "H" as "[B C]".
         iDestruct (extract_from_region_inv with "B") as (p' Hfl) "[E %]"; try (iExists p'; iFrame); auto.
-        iSplit;auto. iPureIntro; auto. destruct H1 as [? | [? | ?] ]; eexists;eauto.
+        iSplit;auto. iPureIntro; auto. destruct H1 as [? | ?]; eexists;eauto.
     - destruct g; auto.
       iDestruct "H" as "[B C]".
       iDestruct (extract_from_region_inv with "B") as (p' Hfl) "[D %]"; try (iExists p'; iFrame); auto.
@@ -69,40 +69,38 @@ Section fundamental.
       → ⊢ (interp W) (inr (p, g, b, e, a))
       → ∃ p' : Perm, ⌜PermFlows (promote_perm p) p'⌝ ∗ read_write_cond a' p' interp
                      ∧ ⌜(∃ ρ : region_type, std W !! a' = Some ρ
-                                            ∧ ρ ≠ Revoked ∧ (∀ g, ρ ≠ Monostatic g) ∧ (forall g, ρ = Static g -> ∃ w, g = {[a':=w]}))⌝.
+                                            ∧ ρ ≠ Revoked ∧ (∀ g, ρ ≠ Monostatic g))⌝.
   Proof.
-    intros. iIntros "H". 
+    intros. iIntros "H".
     destruct (decide (a' < addr_reg.min a e))%a.
-    { iDestruct (isU_inv _ a' with "H") as (p') "(?&?&H)";[solve_addr|auto|]. iDestruct "H" as %(?&?&?&?&?&?).
-      iExists p'. iFrame. iPureIntro;eauto. eexists;split;eauto. repeat split;auto.
-      intros g0 Hcontr. congruence. }
-    assert (addr_reg.min a e <= a' < e)%a;[solve_addr|]. 
+    { iDestruct (isU_inv _ a' with "H") as (p') "(?&?&H)";[solve_addr|auto|]. iDestruct "H" as %(?&?&?&?&?).
+      iExists p'. iFrame. iPureIntro;eauto. }
+    assert (addr_reg.min a e <= a' < e)%a;[solve_addr|].
     rewrite /interp fixpoint_interp1_eq /=.
     assert (p = URW \/ p = URWL \/ p = URWX \/ p = URWLX) as [-> | [-> | [-> | ->] ] ] by (destruct p; simpl in H0; auto; congruence); simpl.
     - destruct g.
       + iDestruct (extract_from_region_inv with "H") as (p' ?) "[C %]";try (iExists p'; iFrame; auto);[solve_addr|].
-        iSplit;auto. iPureIntro; auto. eexists;repeat split;eauto. intros. congruence. 
+        iSplit;auto. iPureIntro; auto. eexists;repeat split;eauto.
       + iDestruct "H" as "[B C]".
         iDestruct (extract_from_region_inv with "C") as (p' ?) "[D %]"; try (iExists p'; iFrame);[solve_addr|].
-        iSplit;auto. iPureIntro; auto. destruct H3 as [-> |[-> | [? ->] ] ]; eexists;repeat split;eauto;intros ? Hcontr;inversion Hcontr;eauto.
+        iSplit;auto. iPureIntro; eauto.
       + iDestruct "H" as "[B C]".
         iDestruct (extract_from_region_inv with "C") as (p' ?) "[D %]"; try (iExists p'; iFrame); [solve_addr|].
-        iSplit;auto. iPureIntro; auto. destruct H3 as [? | [? | [? | [ [? ?] | [? ?] ] ] ] ];
+        iSplit;auto. iPureIntro; auto. destruct H3 as [? | [? | [? ?] ] ];
                                          eexists;repeat split;eauto;intros ? Hcontr;inversion Hcontr;eauto.
     - destruct g; auto.
       iDestruct "H" as "[B C]".
       iDestruct (extract_from_region_inv with "C") as (p' ?) "[D %]"; try (iExists p'; iFrame); [solve_addr|].
       iPureIntro; split;eauto. destruct H3 as [? | [? ?] ]; eexists;repeat split;eauto;intros ? Hcontr;inversion Hcontr;eauto.
     - destruct g.
-      + iDestruct (extract_from_region_inv with "H") as (p' Hfl) "[D %]"; try (iExists p'; iFrame); auto. 
+      + iDestruct (extract_from_region_inv with "H") as (p' Hfl) "[D %]"; try (iExists p'; iFrame); auto.
         iSplit;auto. iPureIntro; auto. eexists;repeat split;eauto;intros ? Hcontr;inversion Hcontr;eauto.
       + iDestruct "H" as "[B C]".
         iDestruct (extract_from_region_inv with "C") as (p' Hfl) "[E %]"; try (iExists p'; iFrame);[solve_addr|].
-        iSplit;auto. iPureIntro; auto. destruct H2 as [? | [? | [? ?] ] ];
-                                         eexists;repeat split;eauto;intros ? Hcontr;inversion Hcontr;eauto.
+        iSplit;auto. iPureIntro; eauto.
       + iDestruct "H" as "[B C]".
         iDestruct (extract_from_region_inv with "C") as (p' Hfl) "[E %]"; try (iExists p'; iFrame); [solve_addr|].
-        iSplit;auto. iPureIntro; auto. destruct H2 as [? | [? | [? | [ [? ?] | [? ?] ] ] ] ];
+        iSplit;auto. iPureIntro; auto. destruct H2 as [? | [? | [? ?] ] ];
                                          eexists;repeat split;eauto;intros ? Hcontr;inversion Hcontr;eauto.
     - destruct g; auto.
       iDestruct "H" as "[B C]".
@@ -117,17 +115,17 @@ Section fundamental.
       → ⊢ (interp W) (inr (p, g, b, e, a))
       → ∃ p' : Perm, ⌜PermFlows (promote_perm p) p'⌝ ∗ read_write_cond a' p' interp
                      ∧ ⌜(∃ ρ : region_type, std W !! a' = Some ρ
-                                            ∧ ρ ≠ Revoked ∧ (∀ g, ρ ≠ Monostatic g) ∧ (forall g, ρ = Static g -> ∃ w, g = {[a':=w]}) ∧
+                                            ∧ ρ ≠ Revoked ∧ (∀ g, ρ ≠ Monostatic g) ∧
                                             if (a' =? addr_reg.min a e)%Z
                                             then True
-                                            else (∀ g, ρ ≠ Static g) ∧ (∀ w, ρ ≠ Uninitialized w))⌝.
+                                            else (∀ w, ρ ≠ Uninitialized w))⌝.
   Proof.
     intros. iIntros "H". 
     destruct (a' =? addr_reg.min a e)%Z eqn:Heq.
-    - iDestruct (isU_inv_all _ a' with "H") as (p') "(?&?&H)";[solve_addr|auto|]. iDestruct "H" as %(?&?&?&?&?).
+    - iDestruct (isU_inv_all _ a' with "H") as (p') "(?&?&H)";[solve_addr|auto|]. iDestruct "H" as %(?&?&?&?).
       iExists p'. iFrame. iPureIntro;eexists;eauto.
-    - apply Z.eqb_neq in Heq. iDestruct (isU_inv _ a' with "H") as (p') "(?&?&H)";[solve_addr|auto|]. iDestruct "H" as %(?&?&?&?&?&?).
-      iExists p'. iFrame. iPureIntro;eexists;repeat split;eauto. intros. congruence. 
+    - apply Z.eqb_neq in Heq. iDestruct (isU_inv _ a' with "H") as (p') "(?&?&H)";[solve_addr|auto|]. iDestruct "H" as %(?&?&?&?&?).
+      iExists p'. iFrame. iPureIntro;eexists;repeat split;eauto. 
   Qed.
 
   Lemma execcPC_implies_interp W p g b e a0:
@@ -153,8 +151,7 @@ Section fundamental.
     ∗ ⌜std W !! l = Some ρ⌝
     ∗ ⌜ρ ≠ Revoked⌝
     ∗ ⌜(∀ g, ρ ≠ Monostatic g)⌝
-    ∗ ⌜(∀ g, ρ = Static g → ∃ w, g = {[l:=w]})⌝
-    ∗ ⌜if condb then True else (forall g, ρ ≠ Static g) ∧ (forall w, ρ ≠ Uninitialized w)⌝
+    ∗ ⌜if condb then True else (forall w, ρ ≠ Uninitialized w)⌝
     ∗ open_region_many (l :: ls) W
     ∗ ⌜p ≠ O⌝
     ∗ rel l p φ)%I.
@@ -256,13 +253,9 @@ Section fundamental.
         rewrite /read_write_cond.
         iDestruct (region_open_prepare with "Hr") as "Hr".
 
-        destruct H as (ρ & Hρ & Hnotrevoked & Hnotmonostatic & Hstatic & Hdec).
+        destruct H as (ρ & Hρ & Hnotrevoked & Hnotmonostatic & Hdec).
         assert (addr_reg.min a0 e0 = a0) as Heq;[solve_addr|]. rewrite Heq in Hdec. 
         destruct ρ; try congruence.
-        * iDestruct (region_open_next _ _ _ a1 p0' Temporary with "[$Hrel' $Hr $Hsts]") as (w0) "($ & Hstate' & Hr & Ha0 & % & Hfuture & #Hval)";
-            auto;[intros [g1 Hcontr];done..| |].
-          { apply not_elem_of_cons. split; auto. apply not_elem_of_nil. }
-          iExists _,_. iFrame. iSplitR; auto. iExists Temporary. iFrame "∗ % #".
         * iDestruct (region_open_next _ _ _ a1 p0' Monotemporary with "[$Hrel' $Hr $Hsts]") as (w0) "($ & Hstate' & Hr & Ha0 & % & Hfuture & #Hval)";
             auto;[intros [g1 Hcontr];done..| |].
           { apply not_elem_of_cons. split; auto. apply not_elem_of_nil. }
@@ -270,18 +263,13 @@ Section fundamental.
         * iDestruct (region_open_next _ _ _ a1 p0' Permanent with "[$Hrel' $Hr $Hsts]") as (w0) "($ & Hstate' & Hr & Ha0 & % & Hfuture & #Hval)";
             auto;[intros [g1 Hcontr];done..| |].
           { apply not_elem_of_cons. split; auto. apply not_elem_of_nil. }
-          iExists _,_. iFrame. iSplitR; auto. iExists Permanent. iFrame "∗ % #". 
-        * destruct Hstatic with g1 as [w Hw];auto.
-          iDestruct (region_open_next_uninit _ w _ a1 with "[$Hrel' $Hr $Hsts]") as "($ & $ & Hstate & Ha & %)";eauto.
-          { apply not_elem_of_cons. split; auto. apply not_elem_of_nil. }
-          { rewrite Hρ Hw;eauto. }
-          iExists _,_. iFrame. iSplitR; auto. subst. iExists _. iFrame "∗ % #". 
+          iExists _,_. iFrame. iSplitR; auto. iExists Permanent. iFrame "∗ % #".
         * iDestruct (region_open_next_monouninit_w _ w _ a1 with "[$Hrel' $Hr $Hsts]") as "($ & $ & Hstate & Ha & %)";eauto.
           { apply not_elem_of_cons. split; auto. apply not_elem_of_nil. }
           iExists _,_;iFrame. iSplit;auto. iExists _;iFrame. iFrame "% #".
       + subst a1. iFrame. iApply (interp_hpf_eq W r r1 p0 g0 b0 e0 a0 a p g b e p' storev storev with "Hreg");eauto.
         eapply PermFlows_trans;eauto. destruct p;simpl;inversion Hnu;apply PermFlows_refl. 
-    - iFrame. 
+    - iFrame.
   Qed.
 
   Lemma store_res_implies_mem_map:
@@ -423,7 +411,6 @@ Section fundamental.
          if (a1 =? a0)%Z
          then match std W !! a1 with
               | Some (Uninitialized _) => (<[a1:=Monotemporary]> W.1,W.2)
-              | Some (Static _) => (<[a1:=Temporary]> W.1,W.2)
               | _ => W
               end
          else W
@@ -433,12 +420,8 @@ Section fundamental.
      end.
 
    Lemma new_worldU_pub W a0 pc_p pc_g pc_b pc_e pc_a r offs :
-     (∀ g z a, z_of_argument (<[PC:=inr (pc_p, pc_g, pc_b, pc_e, pc_a)]> r) offs = Some z ∧
-               (a0 + z)%a = Some a ∧
-               W.1 !! a = Some (Static g) → ∃ w, g = {[a:=w]} ) →
      related_sts_pub_world W (new_worldU W a0 pc_p pc_g pc_b pc_e pc_a r offs).
    Proof.
-     intros Hcond. 
      unfold new_worldU.
      destruct (z_of_argument (<[PC:=inr (pc_p, pc_g, pc_b, pc_e, pc_a)]> r) offs);
        [|apply related_sts_pub_refl_world].
@@ -446,14 +429,11 @@ Section fundamental.
      destruct (a =? a0)%Z;[|apply related_sts_pub_refl_world].
      destruct (std W !! a) eqn:Hsome;[|apply related_sts_pub_refl_world].
      destruct r0;try apply related_sts_pub_refl_world. 
-     - destruct Hcond with g z a as [w ->];auto.
-       apply uninitialized_related_sts_pub_world in Hsome;auto.
-     - apply uninitialized_w_mono_related_sts_pub_world in Hsome;auto. 
+     apply uninitialized_w_mono_related_sts_pub_world in Hsome;auto. 
    Qed.
 
    Definition new_state ρ :=
      match ρ with
-     | Static _ => Temporary
      | Uninitialized _ => Monotemporary
      | _ => ρ
      end. 
@@ -476,7 +456,7 @@ Section fundamental.
     ∀ (W : WORLD) (r : Reg) (p' : Perm)
        (pc_w : Word) (r1 : RegName) (r2 offs : Z + RegName) (offz : Z) (p0 p'0 pc_p pc_p' : Perm)
        (g0 pc_g : Locality) (b0 e0 a0 a1 pc_b pc_e pc_a : Addr) (mem0 : PermMem) (oldv storev : Word) (ρ : region_type)
-       (Hnotstatic : ∀ g, ρ ≠ Static g) (Hnotuninitialized : ∀ w, ρ ≠ Uninitialized w), 
+       (Hnotuninitialized : ∀ w, ρ ≠ Uninitialized w), 
         word_of_argument (<[PC:=inr (pc_p, pc_g, pc_b, pc_e, pc_a)]> r) r2 = Some storev
       → z_of_argument (<[PC:=inr (pc_p, pc_g, pc_b, pc_e, pc_a)]> r) offs = Some offz (* necessary for successful store *)
       → (a0 + offz)%a = Some a1 (* necessary for successful store *)
@@ -499,7 +479,7 @@ Section fundamental.
                             ∗ monotonicity_guarantees_region ρ pc_a v pc_p' interpC
                             ∗ ⌜related_sts_pub_world W (new_worldU W a0 pc_p pc_g pc_b pc_e pc_a r offs)⌝.
    Proof.
-     intros W r p' pc_w r1 r2 offs offz p0 p'0 pc_p pc_p' g0 pc_g b0 e0 a0 a1 pc_b pc_e pc_a mem0 oldv storev ρ Hnotstatic Hnotuninitialized
+     intros W r p' pc_w r1 r2 offs offz p0 p'0 pc_p pc_p' g0 pc_g b0 e0 a0 a1 pc_b pc_e pc_a mem0 oldv storev ρ Hnotuninitialized
             Hwoa Hz Hnext Hpcperm Hras Hstdst Ha0.
     iIntros "HStoreMem #Hreg #HVPCr #Hpc_w Hpcmono Hmem Hsts".
     iDestruct "HStoreMem" as (p1 g1 b1 e1 a1' storev1) "[% [% HStoreRes] ]".
@@ -530,63 +510,43 @@ Section fundamental.
         destruct Hallows as [Hrinr [Hwa [Hwb Hloc] ] ].
         iDestruct "HStoreRes" as (p'1 w') "[-> [% HLoadRes] ]".
         rewrite lookup_insert in Ha0; inversion Ha0; clear Ha0; subst.
-        iDestruct "HLoadRes" as (ρ1) "(Hstate' & % & % & % & % & % & Hr & % & Hrel')".
+        iDestruct "HLoadRes" as (ρ1) "(Hstate' & % & % & % & % & Hr & % & Hrel')".
         rewrite insert_insert memMap_resource_2ne; last auto. iDestruct "Hmem" as  "[Ha1 $]".
         iDestruct (storev_interp_mono with "HVr1") as "Hr1Mono"; eauto.
         destruct ((a1 =? a0)%Z) eqn:Heqa.
         assert (related_sts_pub_world W (new_worldU W a0 pc_p pc_g pc_b pc_e pc_a r offs)) as Hpub.
-        { apply new_worldU_pub.
-          intros. destruct H7 as (?&?&?). simplify_eq. rewrite H1 in H9. inversion H9. eauto. }
+        { apply new_worldU_pub. }
         iDestruct (storev_interp_mono (new_worldU W a0 pc_p pc_g pc_b pc_e pc_a r offs) with "[HVr1]") as "Hr1Mono2";
           [eauto..|eapply new_worldU_lookup;eauto| |].
         { iApply interp_monotone;[|iFrame "#"]. iPureIntro. auto. }
         iDestruct (interp_monotone with "[] Hpc_w") as "Hpc_w'";[iPureIntro;apply Hpub|]. 
         apply Z.eqb_eq,z_of_eq in Heqa as ->.
         * rewrite H1. iFrame.
-          destruct (decide (ρ1 = Temporary ∨ ρ1 = Monotemporary ∨ ρ1 = Permanent)). 
+          destruct (decide (ρ1 = Monotemporary ∨ ρ1 = Permanent)). 
           ** iDestruct (region_close_next with "[$Hr $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono]") as "Hr"; eauto;
-               [intros [g Hcontr];destruct o as [o |[o | o] ]; subst;try done..| |].
+               [intros [g Hcontr];destruct o as [o | o]; subst;try done..| |].
              { apply not_elem_of_cons; split; [auto|apply not_elem_of_nil]. }
-             destruct o as [-> |[-> | ->] ]; iDestruct (region_open_prepare with "Hr") as "$"; iFrame; iFrame "Hpc_w";
+             destruct o as [-> | ->]; iDestruct (region_open_prepare with "Hr") as "$"; iFrame; iFrame "Hpc_w";
              iPureIntro;apply related_sts_pub_refl_world. 
           ** apply Decidable.not_or in n as [Hne1 n].
-             apply Decidable.not_or in n as [Hne2 Hne3].
              destruct ρ1;try congruence.
-             { (* ρ1 = Static g *)
-               unfold monotonicity_guarantees_region.
-               iSimpl in "Hr1Mono2". edestruct H4 as [w ->];auto.
-               destruct (pwl p'0) eqn:Hpwl. 
-               - iMod (region_close_next_uninit_pwl with "[$Hr $Hsts $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono2]") as "[Hr Hsts]";eauto.
-                 { apply not_elem_of_cons; split; [auto|apply not_elem_of_nil]. }
-                 iModIntro. iDestruct (region_open_prepare with "Hr") as "$". iFrame. unfold new_worldU.
-                 rewrite Hz Hnext H1 Z.eqb_refl. iFrame "Hpc_w'".
-                 rewrite /new_worldU Hz Hnext H1 Z.eqb_refl in Hpub. auto. 
-               - iMod (region_close_next_uninit_nwl with "[$Hr $Hsts $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono2]") as "[Hr Hsts]";eauto.
+             (* ρ1 = Uninitialized w *)
+             unfold monotonicity_guarantees_region.
+             iSimpl in "Hr1Mono2". 
+             destruct (pwl p'0) eqn:Hpwl. 
+             *** iMod (region_close_next_mono_uninit_w_pwl with "[$Hr $Hsts $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono2]") as "[Hr Hsts]";eauto.
                  { apply not_elem_of_cons; split; [auto|apply not_elem_of_nil]. }
                  iModIntro. iDestruct (region_open_prepare with "Hr") as "$". iFrame. unfold new_worldU.
                  rewrite Hz Hnext H1 Z.eqb_refl. iFrame "Hpc_w'".
                  rewrite /new_worldU Hz Hnext H1 Z.eqb_refl in Hpub. auto.
-             }
-             { (* ρ1 = Uninitialized w *)
-               unfold monotonicity_guarantees_region.
-               iSimpl in "Hr1Mono2". 
-               destruct (pwl p'0) eqn:Hpwl. 
-               - iMod (region_close_next_mono_uninit_w_pwl with "[$Hr $Hsts $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono2]") as "[Hr Hsts]";eauto.
+             *** iMod (region_close_next_mono_uninit_w_nwl with "[$Hr $Hsts $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono2]") as "[Hr Hsts]";eauto.
                  { apply not_elem_of_cons; split; [auto|apply not_elem_of_nil]. }
                  iModIntro. iDestruct (region_open_prepare with "Hr") as "$". iFrame. unfold new_worldU.
                  rewrite Hz Hnext H1 Z.eqb_refl. iFrame "Hpc_w'".
                  rewrite /new_worldU Hz Hnext H1 Z.eqb_refl in Hpub. auto.
-               - iMod (region_close_next_mono_uninit_w_nwl with "[$Hr $Hsts $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono2]") as "[Hr Hsts]";eauto.
-                 { apply not_elem_of_cons; split; [auto|apply not_elem_of_nil]. }
-                 iModIntro. iDestruct (region_open_prepare with "Hr") as "$". iFrame. unfold new_worldU.
-                 rewrite Hz Hnext H1 Z.eqb_refl. iFrame "Hpc_w'".
-                 rewrite /new_worldU Hz Hnext H1 Z.eqb_refl in Hpub. auto.
-             }
-        * destruct H5 as [? ?].
-          iDestruct (region_close_next with "[$Hr $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono]") as "Hr"; eauto.
-          { intros [g Hcontr]. specialize (H5 g). done. }
+        * iDestruct (region_close_next with "[$Hr $Ha1 $Hrel' $Hstate' $HVstorev1 $Hr1Mono]") as "Hr"; eauto.
           { intros [g Hcontr]. specialize (H3 g). done. }
-          { intros [g Hcontr]. specialize (H7 g). done. }
+          { intros [g Hcontr]. specialize (H4 g). done. }
           { apply not_elem_of_cons; split; [auto|apply not_elem_of_nil]. }
           iDestruct (region_open_prepare with "Hr") as "$". iFrame. iFrame "Hpc_w".
           iPureIntro. apply related_sts_pub_refl_world. 
@@ -598,7 +558,6 @@ Section fundamental.
         iDestruct (storev_interp_mono with "HVr1") as "Hr1Mono"; eauto.
         destruct (pc_a =? a0)%Z eqn:Heqa0.
         * destruct ρ; iFrame "∗ #"; try by (iPureIntro;apply related_sts_pub_refl_world).
-          exfalso. specialize (Hnotstatic g);done.
           exfalso. specialize (Hnotuninitialized w);done. 
         * iModIntro. iFrame "∗ #". iPureIntro. apply related_sts_pub_refl_world. 
     - by exfalso.
@@ -632,17 +591,7 @@ Section fundamental.
          assert (addr_reg.min a0 e0 = a0) as ->;[solve_addr|].
          assert (addr_reg.max b0 a' = a') as ->;[solve_addr|].
          assert (addr_reg.max b0 a0 = a0) as ->;[solve_addr|].
-         rewrite (region_addrs_single a' a0);auto. simpl.
-         iDestruct "Hval21" as "[Hval21 _]".
-         iDestruct "Hval21" as (p0 Hflows) "[Hrel %]".
-         iSplit;auto. iExists p0. repeat iSplit;auto. iPureIntro.
-
-         unfold region_state_U in H0. destruct H2 as [-> | [-> | [w Hstatic] ] ];auto.
-         unfold new_worldU in Hstatic. rewrite Hzoff Ha' Z.eqb_refl in Hstatic.
-         unfold new_worldU. rewrite Hzoff Ha' Z.eqb_refl.
-         destruct (std W !! a') eqn:Hsome;[|congruence]. 
-         destruct r0;inversion Hstatic; try congruence.
-         simplify_map_eq. simplify_map_eq.
+         rewrite (region_addrs_single a' a0);auto. 
        + iDestruct "Hvalid'" as "[Hval1 Hval2]".
          assert (addr_reg.min a' e0 <= addr_reg.min a0 e0)%Z;[solve_addr|].
          assert (b0 <= (addr_reg.min a' e0))%Z;[solve_addr|].
@@ -660,7 +609,7 @@ Section fundamental.
          iDestruct "Hval21" as (p0 Hflows) "[Hrel %]".
          iSplit;auto. iExists p0. repeat iSplit;auto. iPureIntro.
 
-         unfold region_state_U in H0. destruct H2 as [-> | [-> | [ -> | [ [w Hstatic] | [w Hstatic] ] ] ] ];auto.
+         unfold region_state_U in H0. destruct H2 as [-> | [ -> | [w Hstatic] ] ];auto.
          all: unfold new_worldU in Hstatic;rewrite Hzoff Ha' Z.eqb_refl in Hstatic.
          all: unfold new_worldU;rewrite Hzoff Ha' Z.eqb_refl.
          all: destruct (std W !! a') eqn:Hsome;[|congruence]. 
@@ -689,7 +638,7 @@ Section fundamental.
        unfold new_worldU. rewrite Hzoff Ha' Z.eqb_refl.
        destruct (std W !! a') eqn:Hsome;[|congruence]. 
        destruct r0;inversion Hstatic; try congruence.
-       simplify_map_eq. simplify_map_eq.
+       simplify_map_eq. 
      - destruct g0;try done.
        + iDestruct "Hvalid'" as "[Hval1 Hval2]".
          assert (addr_reg.min a' e0 <= addr_reg.min a0 e0)%Z;[solve_addr|].
@@ -703,17 +652,7 @@ Section fundamental.
          assert (addr_reg.min a0 e0 = a0) as ->;[solve_addr|].
          assert (addr_reg.max b0 a' = a') as ->;[solve_addr|].
          assert (addr_reg.max b0 a0 = a0) as ->;[solve_addr|].
-         rewrite (region_addrs_single a' a0);auto. simpl.
-         iDestruct "Hval21" as "[Hval21 _]".
-         iDestruct "Hval21" as (p0 Hflows) "[Hrel %]".
-         iSplit;auto. iExists p0. repeat iSplit;auto. iPureIntro.
-
-         unfold region_state_U in H0. destruct H2 as [-> | [-> | [w Hstatic] ] ];auto.
-         unfold new_worldU in Hstatic. rewrite Hzoff Ha' Z.eqb_refl in Hstatic.
-         unfold new_worldU. rewrite Hzoff Ha' Z.eqb_refl.
-         destruct (std W !! a') eqn:Hsome;[|congruence]. 
-         destruct r0;inversion Hstatic; try congruence.
-         simplify_map_eq. simplify_map_eq.
+         rewrite (region_addrs_single a' a0);auto. 
        + iDestruct "Hvalid'" as "[Hval1 Hval2]".
          assert (addr_reg.min a' e0 <= addr_reg.min a0 e0)%Z;[solve_addr|].
          assert (b0 <= (addr_reg.min a' e0))%Z;[solve_addr|].
@@ -731,7 +670,7 @@ Section fundamental.
          iDestruct "Hval21" as (p0 Hflows) "[Hrel %]".
          iSplit;auto. iExists p0. repeat iSplit;auto. iPureIntro.
 
-         unfold region_state_U in H0. destruct H2 as [-> | [-> | [ -> | [ [w Hstatic] | [w Hstatic] ] ] ] ];auto.
+         unfold region_state_U in H0. destruct H2 as [-> | [ -> | [w Hstatic] ] ];auto.
          all: unfold new_worldU in Hstatic;rewrite Hzoff Ha' Z.eqb_refl in Hstatic.
          all: unfold new_worldU;rewrite Hzoff Ha' Z.eqb_refl.
          all: destruct (std W !! a') eqn:Hsome;[|congruence]. 
@@ -760,13 +699,13 @@ Section fundamental.
        unfold new_worldU. rewrite Hzoff Ha' Z.eqb_refl.
        destruct (std W !! a') eqn:Hsome;[|congruence]. 
        destruct r0;inversion Hstatic; try congruence.
-       simplify_map_eq. simplify_map_eq.
+       simplify_map_eq. 
    Qed. 
 
    Lemma storeU_case (W : WORLD) (r : leibnizO Reg) (p p' : Perm) (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (rdst : RegName) (offs rsrc : Z + RegName):
     ftlr_instr W r p p' g b e a w (StoreU rdst offs rsrc) ρ.
   Proof.
-    intros Hp Hsome i Hbae Hfp Hpwl Hregion Hnotrevoked Hnotstatic Hnotmonostatic Hnotuninitialized HO Hi.
+    intros Hp Hsome i Hbae Hfp Hpwl Hregion Hnotrevoked Hnotmonostatic Hnotuninitialized HO Hi.
     iIntros "#IH #Hinv #Hreg #Hinva Hmono #Hw Hsts Hown".
     iIntros "Hr Hstate Ha HPC Hmap".
     rewrite delete_insert_delete.
@@ -837,7 +776,7 @@ Section fundamental.
         iDestruct (switch_monotonicity_formulation with "Hmono") as "Hmono"; auto.
 
         iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
-        { destruct ρ;auto;[|specialize (Hnotstatic g1)|specialize (Hnotmonostatic g1)|specialize (Hnotuninitialized w1)];try contradiction. }
+        { destruct ρ;auto;[|specialize (Hnotmonostatic g1)|specialize (Hnotuninitialized w1)];try contradiction. }
         simplify_map_eq.
 
         iApply wp_wand_r.
@@ -890,9 +829,9 @@ Section fundamental.
         iDestruct (switch_monotonicity_formulation with "Hmono") as "Hmono"; auto.
 
         iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
-        { destruct ρ;auto;[|specialize (Hnotstatic g1)|specialize (Hnotmonostatic g1)|specialize (Hnotuninitialized w1)];try contradiction. }
+        { destruct ρ;auto;[|specialize (Hnotmonostatic g1)|specialize (Hnotuninitialized w1)];try contradiction. }
         simplify_map_eq.
-        
+
         iApply wp_wand_r.
         iSplitL. iApply ("IH" $! (new_worldU W a0 x x0 x1 x2 x3 r offs) with "[%] [] [$Hmap] [$Hr] [$Hsts] [$Hown]"); auto.
         { iIntros (r1 Hne). destruct (decide (rdst = r1)).

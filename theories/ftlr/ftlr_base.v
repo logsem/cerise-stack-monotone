@@ -30,7 +30,6 @@ Section fundamental.
     → (if pwl p then region_state_pwl_mono W a else region_state_nwl W a g)
     → std W !! a = Some ρ
     → ρ ≠ Revoked
-    → (∀ g : Mem, ρ ≠ Static g)
     → (∀ g : Mem, ρ ≠ Monostatic g)
     → (∀ w, ρ ≠ Uninitialized w)
     → p' ≠ O
@@ -55,11 +54,9 @@ Section fundamental.
                                            else region_state_nwl W a0 g⌝)
     -∗ (∀ r1 : RegName, ⌜r1 ≠ PC⌝ → ((fixpoint interp1) W) (r !r! r1))
     -∗ read_write_cond a p' interp
-    -∗ (▷ if decide (ρ = Temporary ∧ pwl p' = true)
-          then future_pub_plus_mono (λ Wv : WORLD * (leibnizO Word), ((fixpoint interp1) Wv.1) Wv.2) w
-          else if decide (ρ = Monotemporary ∧ pwl p' = true)
-               then future_pub_a_mono a (λ Wv : WORLD * (leibnizO Word), ((fixpoint interp1) Wv.1) Wv.2) w
-               else future_priv_mono (λ Wv : WORLD * (leibnizO Word), ((fixpoint interp1) Wv.1) Wv.2) w)
+    -∗ (▷ if decide (ρ = Monotemporary ∧ pwl p' = true)
+          then future_pub_a_mono a (λ Wv : WORLD * (leibnizO Word), ((fixpoint interp1) Wv.1) Wv.2) w
+          else future_priv_mono (λ Wv : WORLD * (leibnizO Word), ((fixpoint interp1) Wv.1) Wv.2) w)
     -∗ ▷ ((fixpoint interp1) W) w
     -∗ sts_full_world W
     -∗ na_own logrel_nais ⊤
