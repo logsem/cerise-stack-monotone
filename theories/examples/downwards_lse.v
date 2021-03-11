@@ -227,7 +227,7 @@ Section lse.
     { destruct (decide (p = E)).
       - subst. iClear "Hwstk_valid Hwret_valid". rewrite fixpoint_interp1_eq. iSimpl in "Hwret_valid'".
         rewrite /enter_cond. iApply "Hwret_valid'". destruct g;iPureIntro.
-        apply related_sts_priv_refl_world. apply related_sts_pub_plus_refl_world. apply related_sts_a_refl_world.
+        apply related_sts_priv_refl_world. apply related_sts_priv_refl_world. apply related_sts_a_refl_world.
       - iDestruct (fundamental_from_interp (<[PC:=inl 0%Z]> (<[r_t0:=inr (p,g,b,e,a')]> rmap')) with "Hwret_valid'") as "Hcont". iNext.
         rewrite updatePcPerm_cap_non_E//. }
 

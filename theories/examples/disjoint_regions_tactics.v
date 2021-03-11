@@ -30,7 +30,7 @@ Proof.
   intros a ?%elem_of_region_addrs. solve_addr.
 Qed.
 Hint Resolve AddrRegionRange_region_addrs : disj_regions.
-0
+
 Definition AddrRegionsRange (ll: list (list Addr)) (b e: Addr) :=
   ∀ l a, l ∈ ll → a ∈ l → (b <= a)%a ∧ (a < e)%a.
 

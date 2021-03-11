@@ -1,6 +1,6 @@
 From iris.algebra Require Import frac.
 From iris.proofmode Require Import tactics.
-From cap_machine Require Import rules logrel addr_reg_sample fundamental multiple_updates.
+From cap_machine Require Import rules logrel addr_reg_sample fundamental multiple_updates region_invariants_static.
 From cap_machine.examples Require Import contiguous stack_macros_helpers.
 From iris.base_logic Require Export na_invariants.
 
@@ -577,8 +577,8 @@ Section SimpleMalloc.
     iDestruct ("Hmono" $! _ _ Hrelated' with "Hφ") as "Hφ'".
     assert (is_Some (M !! l)) as [x Hsome].
     { apply elem_of_gmap_dom. rewrite -Hdom. apply elem_of_gmap_dom. eauto. }
-    iDestruct (region_map_delete_nonstatic with "Hr") as "Hr"; [intros m;split;intros Hcontr;congruence|].
-    iDestruct (region_map_insert_nonstatic Permanent with "Hr") as "Hr";auto.
+    iDestruct (region_map_delete_nonstatic with "Hr") as "Hr"; [intros m;intros Hcontr;congruence|].
+    iDestruct (region_map_insert_nonmonostatic Permanent with "Hr") as "Hr";auto.
     iDestruct (big_sepM_delete _ _ l _ Hsome with "[Hl Hstate $Hr]") as "Hr".
     { iExists Permanent. iFrame. iSplitR;[iPureIntro;apply lookup_insert|].
       iExists γ, p, φ. rewrite HMeq lookup_insert in Hsome.
@@ -682,19 +682,11 @@ Section SimpleMalloc.
       iDestruct (big_sepL2_extract_l with "Hbe") as "[_ Hb]";[eauto|].
       iDestruct "Hb" as (w') "Hw'".
       destruct ρ;auto. (* all the following will lead to duplicate resources for x *)
-      - iDestruct (region_open_temp_nwl with "[$Hrel $Hr $Hsts]") as (v) "(_ & _ & _ & Hw & _)";[eauto|auto|..].
-        iDestruct (cap_duplicate_false with "[$Hw' $Hw]") as "?";auto.
       - iDestruct (region_open_monotemp_nwl with "[$Hrel $Hr $Hsts]") as (v) "(_ & _ & _ & Hw & _)";[eauto|auto|..].
         iDestruct (cap_duplicate_false with "[$Hw' $Hw]") as "?";auto.
       - iDestruct (region_open_perm with "[$Hrel $Hr $Hsts]") as (v) "(_ & _ & _ & Hw & _)";[eauto|auto|..].
         iDestruct (cap_duplicate_false with "[$Hw' $Hw]") as "?";auto.
-      - iMod (region_invariants_static.region_open_static with "[$Hr $Hsts]") as "(_ & _ & ? & H & %)";[apply Hρ|..].
-        rewrite /region_invariants_static.static_resources.
-        apply elem_of_gmap_dom in H2 as [? Hx].
-        iDestruct (big_sepM_delete with "H") as "[H ?]";[apply Hx|].
-        iDestruct "H" as (? ?) "[HH Hw]". iDestruct (rel_agree _ H2 with "[$Hrel $HH]") as "(% & _)";subst. 
-        iDestruct (cap_duplicate_false with "[$Hw' $Hw]") as "?";auto.
-      - iMod (region_invariants_static.region_open_monostatic with "[$Hr $Hsts]") as "(_ & _ & ? & H & %)";[apply Hρ|..].
+      - iMod (region_open_monostatic with "[$Hr $Hsts]") as "(_ & _ & ? & H & %)";[apply Hρ|..].
         rewrite /region_invariants_static.static_resources.
         apply elem_of_gmap_dom in H2 as [? Hx].
         iDestruct (big_sepM_delete with "H") as "[H ?]";[apply Hx|].
@@ -728,8 +720,7 @@ Section SimpleMalloc.
     set regs := <[PC:=updatePcPerm (inr (p, g, b', e', a))]>
                             (<[r_t0:=inr (p, g, b', e', a)]> (<[r_t1:=inr (RWX, Global, ba, ea, ba)]> (<[r_t2:=inl 0%Z]> (<[r_t3:=inl 0%Z]> (<[r_t4:=inl 0%Z]> r))))).
     iDestruct ("Hcont'" $! regs with "[] [$Hown Hregs $Hr $Hsts]") as "[_ Hcont'']".
-    { destruct g; iPureIntro;[apply related_sts_pub_priv_world|
-                              apply related_sts_pub_pub_plus_world|
+    { destruct g; iPureIntro;[apply related_sts_pub_priv_world..|
                               apply related_sts_pub_a_world]; try apply related_sts_pub_update_multiple_perm;auto. }
     { rewrite /regs. iSplitR "Hregs".
       - iSplit.

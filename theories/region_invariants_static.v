@@ -781,22 +781,24 @@ Section heap.
   (* --------------------------------------------------------------------------------- *)
   (* ------------------ Allocate a Static region from a Revoked one ------------------ *)
 
-  Lemma related_sts_pub_world_static W W' m i :
-    (std W !! i) = Some (Static m) ->
-    related_sts_pub_world W W' ->
-    (std W' !! i) = Some (Static m) ∨ (std W' !! i) = Some Temporary.
+  Lemma related_sts_pub_a_world_static W W' m i a :
+    (std W !! i) = Some (Monostatic m) ->
+    (i < a)%a →
+    related_sts_a_world W W' a ->
+    (std W' !! i) = Some (Monostatic m).
   Proof.
-    intros Hsta [ [Hdom1 Hrelated_std] _].
+    intros Hsta Hcond [ [Hdom1 Hrelated_std] _].
     assert (is_Some (std W' !! i)) as [y Hy].
     { apply elem_of_gmap_dom. assert (i ∈ dom (gset Addr) (std W));[apply elem_of_gmap_dom;eauto|]. set_solver. }
     eapply Hrelated_std in Hsta;[|eauto].
-    eapply std_rel_pub_rtc_Static in Hsta;[|eauto].
-    destruct Hsta as [-> | ->];auto.
+    apply rtc_implies with _ Rpub _ _ in Hsta.
+    2: { intros. rewrite decide_False in H;auto. solve_addr. }
+    eapply std_rel_pub_rtc_Monostatic in Hsta;[|eauto]. subst. auto.
   Qed.
 
   Lemma related_sts_priv_world_static W l (m' : gmap Addr Word) :
     Forall (λ a : Addr, (std W) !! a = Some Revoked) l →
-    related_sts_priv_world W (std_update_multiple W l (Static m')).
+    related_sts_priv_world W (std_update_multiple W l (Monostatic m')).
   Proof.
     intros Hforall.
     induction l.
@@ -815,15 +817,15 @@ Section heap.
                rewrite std_sta_update_multiple_lookup_same_i in Hx0; auto.
                rewrite /revoke /std /= in Hi.
                rewrite Hi in Hx0. inversion Hx0; subst.
-               right with Temporary.
+               right with Monotemporary.
                { left. constructor. }
-               right with (Static m');[|left]. right. right. constructor.
+               right with (Monostatic m');[|left]. right. right. constructor.
            +++ rewrite /= lookup_insert_ne in Hy;auto. rewrite Hx0 in Hy; inversion Hy; subst; left.
   Qed.
 
   Lemma related_sts_priv_world_static2 W l (m' : gmap Addr Word) :
     Forall (λ a : Addr, ∃ ρ, (std W) !! a = Some ρ /\ ρ <> Permanent) l →
-    related_sts_priv_world W (std_update_multiple W l (Static m')).
+    related_sts_priv_world W (std_update_multiple W l (Monostatic m')).
   Proof.
     intros Hforall.
     induction l.
@@ -841,24 +843,18 @@ Section heap.
                { rewrite std_sta_update_multiple_lookup_in_i in Hx0; auto. inversion Hx0. left. }
                rewrite std_sta_update_multiple_lookup_same_i in Hx0; auto.
                rewrite /revoke /std /= in Hi.
-               destruct Hi as [ρ [Hi Hi']].
+               destruct Hi as [ρ [Hi Hi'] ].
                rewrite Hi in Hx0. inversion Hx0; subst.
                destruct x0; try congruence.
                { eright. right. right. constructor.
                  left. }
-               { right with Temporary. right;right; constructor.
+               { right with Monotemporary. left; constructor.
                  eright. right;right. constructor.
                  left. }
-               { eright. left; econstructor.
+               { eright. right;left;econstructor.
                  eright. right;right. constructor.
                  left. }
                { eright. left;constructor.
-                 eright. right;right;constructor. left. }
-               { eright. left;constructor.
-                 right with Temporary. right;right;constructor.
-                 eright. right;right;constructor. left. }
-               { eright. left;constructor.
-                 right with Temporary. right;right;constructor.
                  eright. right;right;constructor. left. }
            +++ rewrite /= lookup_insert_ne in Hy;auto. rewrite Hx0 in Hy; inversion Hy; subst; left.
   Qed.
@@ -929,14 +925,6 @@ Section heap.
           iDestruct (cap_duplicate_false with "[$Hx $Hinv]") as "Hf"; auto.
         - iApply bi.False_elim.
           iDestruct "Hinv" as (γpred' p' φ' Heqpred Hpers) "[Hsaved Hinv]"; simplify_eq.
-          iDestruct "Hinv" as (v' Hne') "[Hinv _]".
-          iDestruct (cap_duplicate_false with "[$Hx $Hinv]") as "Hf"; auto.
-        - iApply bi.False_elim.
-          iDestruct "Hinv" as (γpred' p' φ' Heqpred Hpers) "[Hsaved Hinv]"; simplify_eq.
-          iDestruct "Hinv" as (v Hlookup Hne') "[Hinv _]"; simplify_eq.
-          iDestruct (cap_duplicate_false with "[$Hx $Hinv]") as "Hf"; auto.
-        - iApply bi.False_elim.
-          iDestruct "Hinv" as (γpred' p' φ' Heqpred Hpers) "[Hsaved Hinv]"; simplify_eq.
           iDestruct "Hinv" as (v Hlookup Hne') "[Hinv _]"; simplify_eq.
           iDestruct (cap_duplicate_false with "[$Hx $Hinv]") as "Hf"; auto.
         - iApply bi.False_elim.
@@ -963,15 +951,15 @@ Section heap.
     dom (gset Addr) m ⊆ dom (gset Addr) m' ->
     (forall a ρ, m !! a = Some ρ -> m' !! a = Some ρ) ->
     (∀ a, is_Some(m !! a) -> is_Some(M !! a)) ->
-    (∀ a' : Addr, a' ∈ dom (gset Addr) (m' ∖∖ m) → ((Mρ ∖∖ m) !! a' = Some (Static m'))) ->
+    (∀ a' : Addr, a' ∈ dom (gset Addr) (m' ∖∖ m) → ((Mρ ∖∖ m) !! a' = Some (Monostatic m'))) ->
     dom (gset Addr) M ⊆ dom (gset Addr) Mρ ->
     region_map_def (M ∖∖ m) (Mρ ∖∖ m) W
     -∗ RELS M'
-    -∗ ([∗ map] a↦v ∈ m, ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ ⌜p ≠ O⌝ ∗ a ↦ₐ[p] v ∗ rel a p φ ∗ sts_state_std a (Static m'))
+    -∗ ([∗ map] a↦v ∈ m, ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ ⌜p ≠ O⌝ ∗ a ↦ₐ[p] v ∗ rel a p φ ∗ sts_state_std a (Monostatic m'))
     -∗ ∃ Mρ', region_map_def M Mρ' W
             ∗ RELS M'
             ∗ ⌜dom (gset Addr) Mρ' = dom (gset Addr) Mρ⌝
-            ∗ ⌜∀ a' : Addr, a' ∈ dom (gset Addr) m' → Mρ' !! a' = Some (Static m')⌝.
+            ∗ ⌜∀ a' : Addr, a' ∈ dom (gset Addr) m' → Mρ' !! a' = Some (Monostatic m')⌝.
   Proof.
     iIntros (HsubM Hsub Hsame HmM Hmid Hdom) "Hr HM Hmap".
     iRevert (HsubM HmM Hmid Hdom). iInduction (m) as [|x w] "IH" using map_ind forall (M Mρ) .
@@ -981,7 +969,7 @@ Section heap.
       rewrite !difference_het_insert_r !difference_het_delete_assoc.
       iDestruct (big_sepM_insert with "Hmap") as "[Hx Hmap]";auto.
       iDestruct "Hx" as (p φ Hpers Hne) "(Hx & #Hrel & Hstate)".
-      iAssert (region_map_def (delete x M ∖∖ m) (<[x:=Static m']> Mρ ∖∖ m) W) with "[Hr]" as "Hr".
+      iAssert (region_map_def (delete x M ∖∖ m) (<[x:=Monostatic m']> Mρ ∖∖ m) W) with "[Hr]" as "Hr".
       { iApply (big_sepM_mono with "Hr").
         iIntros (a y Ha) "Hr".
         iDestruct "Hr" as (ρ Ha') "[Hstate Hρ]".
@@ -991,13 +979,6 @@ Section heap.
         { rewrite difference_het_insert_l; auto. rewrite lookup_insert_ne;auto.
           rewrite -difference_het_delete_assoc lookup_delete_ne in Ha';auto. }
         destruct ρ; iFrame.
-        { iDestruct "Hρ" as (? ? ? Heq' Hpers') "[Hsaved Hρ]".
-          iDestruct "Hρ" as (v' ? ?) "[Ha #Hforall]".
-          iExists _,_,_. repeat iSplit;auto. iExists v'. repeat iSplit;auto. iDestruct "Hforall" as %Hforall.
-          iPureIntro. intros a' Hag. destruct (decide (x = a')).
-          - subst. apply Hforall in Hag. rewrite -difference_het_delete_assoc lookup_delete in Hag. done.
-          - rewrite difference_het_insert_l; auto. rewrite lookup_insert_ne;auto.
-            apply Hforall in Hag. rewrite -difference_het_delete_assoc lookup_delete_ne in Hag;auto. }
         { iDestruct "Hρ" as (? ? ? Heq' Hpers') "[Hsaved Hρ]".
           iDestruct "Hρ" as (v' ? ?) "[Ha #Hforall]".
           iExists _,_,_. repeat iSplit;auto. iExists v'. repeat iSplit;auto. iDestruct "Hforall" as %Hforall.
@@ -1034,7 +1015,7 @@ Section heap.
       iDestruct (reg_in γrel M' with "[$HM $HREL]") as %HMeq.
       rewrite HMeq in HM'x. rewrite lookup_insert in HM'x. inversion HM'x.
       iDestruct (big_sepM_insert _ _ x γp with "[$Hr Hx Hstate]") as "Hr";[by rewrite lookup_delete|..].
-      { iExists (Static m').
+      { iExists (Monostatic m').
         iSplitR.
         - iPureIntro. apply Hforall. rewrite dom_insert_L in Hsub. set_solver.
         - iFrame. iExists _,_,_. repeat iSplit;auto.
@@ -1065,9 +1046,9 @@ Section heap.
     dom (gset Addr) M = dom (gset Addr) Mρ ->
     RELS M
     -∗ region_map_def (M ∖∖ m) (Mρ ∖∖ m) W
-    -∗ ([∗ map] a↦v ∈ m, ∃ p φ, ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝ ∗ ⌜p ≠ O⌝ ∗ a ↦ₐ[p] v ∗ rel a p φ ∗ sts_state_std a (Static m))
+    -∗ ([∗ map] a↦v ∈ m, ∃ p φ, ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝ ∗ ⌜p ≠ O⌝ ∗ a ↦ₐ[p] v ∗ rel a p φ ∗ sts_state_std a (Monostatic m))
     -∗ RELS M ∗ ∃ Mρ, region_map_def M Mρ W
-                   ∗ ⌜∀ a' : Addr, a' ∈ dom (gset Addr) m → Mρ !! a' = Some (Static m)⌝
+                   ∗ ⌜∀ a' : Addr, a' ∈ dom (gset Addr) m → Mρ !! a' = Some (Monostatic m)⌝
                    ∗ ⌜dom (gset Addr) Mρ = dom (gset Addr) M⌝.
   Proof.
     iIntros (Hdom) "HM Hr Hmap".
@@ -1085,8 +1066,8 @@ Section heap.
     sts_full_world (revoke W)
     ∗ region (revoke W)
     ∗ ([∗ map] a↦v ∈ m, ∃ p φ, ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝ ∗ ⌜p ≠ O⌝ ∗ a ↦ₐ[p] v ∗ rel a p φ)
-    ==∗ (sts_full_world (std_update_multiple (revoke W) (elements (dom (gset Addr) m)) (Static m))
-      ∗ region (std_update_multiple (revoke W) (elements (dom (gset Addr) m)) (Static m))).
+    ==∗ (sts_full_world (std_update_multiple (revoke W) (elements (dom (gset Addr) m)) (Monostatic m))
+      ∗ region (std_update_multiple (revoke W) (elements (dom (gset Addr) m)) (Monostatic m))).
   Proof.
     iIntros "(Hfull & Hr & Hmap)".
     rewrite region_eq /region_def.
@@ -1128,5 +1109,6 @@ Section heap.
       apply elem_of_gmap_dom. pose proof (Hforall' _ Hx) as Hx'. eauto. }
     apply std_update_multiple_dom_equal_eq;auto.
   Qed.
+
 
 End heap.

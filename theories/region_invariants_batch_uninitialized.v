@@ -1,6 +1,6 @@
 From iris.algebra Require Import gmap agree auth.
 From iris.proofmode Require Import tactics.
-From cap_machine Require Export stdpp_extra iris_extra region_invariants region_invariants_transitions logrel region.
+From cap_machine Require Export stdpp_extra iris_extra multiple_updates region_invariants region_invariants_transitions region_invariants_revocation logrel region.
 Import uPred.
 
 Section heap.
@@ -201,8 +201,8 @@ Section heap.
         solve_addr.
   Qed.
 
-  Lemma uninitialize_region_last W :
-    region W ∗ sts_full_world W ={⊤}=∗ ∃ m, ⌜((∃ (v : Word), {[addr_reg.top:=v]} = m) ↔ W.1 !! addr_reg.top = Some Monotemporary)
+  Lemma uninitialize_region_last W E :
+    region W ∗ sts_full_world W ={E}=∗ ∃ m, ⌜((∃ (v : Word), {[addr_reg.top:=v]} = m) ↔ W.1 !! addr_reg.top = Some Monotemporary)
                                              ∧ (∅ = m <-> W.1 !! addr_reg.top ≠ Some Monotemporary)⌝
                                        ∗ region W ∗ sts_full_world (uninitialize W m).
   Proof.
@@ -235,15 +235,15 @@ Section heap.
         { intros Hcontr; contradiction. }
       * iExists _,_. iFrame. iPureIntro. rewrite HM_dom -HMρ_dom. clear -Hlookup. split;auto.
           assert (addr_reg.top ∈ dom (gset Addr) Mρ);[apply elem_of_gmap_dom;eauto|]. rewrite dom_insert_L. set_solver.
-    + iModIntro. iExists ∅. rewrite uninitialize_empty. iFrame. 
+    + iModIntro. iExists ∅. rewrite uninitialize_empty. iFrame.
       iPureIntro. split. split;intros;try contradiction. destruct H0. inversion H0.
       split;intros;auto.
   Qed.
 
 
-  Lemma uninitialize_region_states W (a : Addr) (l : list Addr) :
+  Lemma uninitialize_region_states W (a : Addr) (l : list Addr) E :
     ⌜l = region_addrs a addr_reg.top ++ [addr_reg.top]⌝ -∗
-    region W ∗ sts_full_world W ={⊤}=∗
+    region W ∗ sts_full_world W ={E}=∗
     ∃ m, ⌜∀ (a' : Addr), is_Some(m !! a') ↔ ((W.1 !! a' = Some Monotemporary) ∧ (a' ∈ l)%a)⌝
          ∗ region W ∗ sts_full_world (uninitialize W m).
   Proof.
@@ -369,8 +369,8 @@ Section heap.
         all: apply related_sts_a_pub_plus_world with a. all: apply uninitialize_related_pub_a; auto.
   Qed.
 
-  Lemma uninitialize_region W (a : Addr) :
-    region W ∗ sts_full_world W ={⊤}=∗
+  Lemma uninitialize_region W (a : Addr) E :
+    region W ∗ sts_full_world W ={E}=∗
     ∃ m, ⌜∀ (a' : Addr), is_Some(m !! a') ↔ (((std W) !! a' = Some Monotemporary) ∧ (a <= a')%a)⌝
          ∗ region (uninitialize W m) ∗ sts_full_world (uninitialize W m).
   Proof.
@@ -564,5 +564,99 @@ Section heap.
     split;clear -Hin;set_solver.
   Qed.
 
+
+  (* ------------------------------------------------------------------------------------------------- *)
+  (* ---------- Finally we will want to revoke an uninitialized region for turning it frozen --------- *)
+  (* ------------------------------------------------------------------------------------------------- *)
+
+  (* we can only turn an uninitialized region revoked on a fully revoked world *)
+  Definition uninitialized_resources l p w : iProp Σ := ⌜p ≠ O⌝ ∗ l ↦ₐ[p] w.
+
+  (* we will only apply this lemma on the local stack frame, for which we have rel *)
+  Lemma uninitialize_to_revoked_states l W E p φ :
+    NoDup l →
+    Forall (λ a, ∃ w, W.1 !! a = Some (Uninitialized w)) l →
+    ([∗ list] a ∈ l, rel a p φ) ∗
+    region (revoke W) ∗ sts_full_world (revoke W)
+    ={E}=∗
+    region (revoke W) ∗ sts_full_world (std_update_multiple (revoke W) l Revoked)
+    ∗ [∗ list] a ∈ l, ∃ w, uninitialized_resources a p w.
+  Proof.
+    iIntros (Hdup Hforall) "(#Hrel & Hr & Hsts)".
+    iInduction (l) as [|a l'] "IH";simpl.
+    - iFrame. done.
+    - iDestruct "Hrel" as "[Ha Hrel]".
+      apply Forall_cons in Hforall as [ [w Ha] Hforall].
+      apply NoDup_cons in Hdup as [Hnin Hdup].
+      iMod ("IH" with "[] [] Hrel Hr Hsts") as "(Hr & Hsts & Hres)";auto.
+      rewrite region_eq /region_def. iDestruct "Hr" as (M Mρ) "(HM & % & % & Hr)".
+      assert (is_Some (M !! a)) as [x Hx].
+      { apply elem_of_gmap_dom. rewrite -H0. apply elem_of_gmap_dom. rewrite -revoke_lookup_Some. eauto. }
+      iDestruct (big_sepM_delete _ _ a with "Hr") as "[Hx Hr]";[eauto|].
+      iDestruct "Hx" as (ρ Hρ) "[Hstate Hx]".
+      iDestruct (sts_full_state_std with "Hsts Hstate") as %Hstate.
+      assert (Ha':=Ha).
+      rewrite std_sta_update_multiple_lookup_same_i// in Hstate.
+      rewrite -revoke_monotone_lookup_same' in Ha;[|rewrite Ha';auto].
+      rewrite Ha in Hstate. inversion Hstate;subst.
+      rewrite rel_eq RELS_eq /rel_def /RELS_def REL_eq /REL_def.
+      iDestruct "Ha" as (γpred) "[HREL Hsaved]".
+      iDestruct (reg_in with "[$HM $HREL]") as %Heqm. rewrite Heqm in Hx.
+      rewrite lookup_insert in Hx.
+      iDestruct "Hx" as (γpred' p' φ' Heq Hpers) "(#Hsaved' & % & Ha)".
+      subst x. inversion Hx;subst.
+      iMod (sts_update_std _ _ _ Revoked with "Hsts Hstate") as "[Hsts Hstate]".
+      iDestruct (region_map_delete_nonstatic with "Hr") as "Hr";[rewrite Hρ;auto|].
+      iDestruct (region_map_insert_nonmonostatic Revoked with "Hr") as "Hr";[intros;auto|].
+      iDestruct (big_sepM_insert _ _ _ (_,p') with "[$Hr Hstate]") as "Hr";[apply lookup_delete| |].
+      { iExists Revoked. iFrame. iSplit;[iPureIntro;apply lookup_insert|].
+        iExists _,_,_. iFrame "#". iSplit;eauto. }
+      rewrite insert_delete.
+      iModIntro. iFrame. iSplitR "Ha".
+      + iExists _,_. iFrame. rewrite -insert_delete -Heqm. iFrame. iSplit;auto.
+        iPureIntro. rewrite -H1. assert (a ∈ dom (gset Addr) Mρ);[apply elem_of_gmap_dom;eauto|].
+        rewrite dom_insert_L. set_solver+H3.
+      + iExists _. iFrame. auto.
+  Qed.
+
+  Lemma related_sts_priv_world_std_update_multiple_Uninit_to_Rev W l :
+    Forall (λ a : Addr, ∃ w : Word, W.1 !! a = Some (Uninitialized w)) l →
+    related_sts_priv_world (revoke W) (std_update_multiple (revoke W) l Revoked).
+  Proof.
+    intros Hforall.
+    split;[|rewrite std_update_multiple_loc;apply related_sts_priv_refl].
+    split.
+    - apply std_update_multiple_sta_dom_subseteq.
+    - intros i x y Hx Hy.
+      revert Hforall; rewrite Forall_forall =>Hforall.
+      destruct (decide (i ∈ l)).
+      + rewrite std_sta_update_multiple_lookup_in_i// in Hy.
+        apply Hforall in e as [w Hw]. rewrite revoke_monotone_lookup_same' in Hx;[|rewrite Hw;auto].
+        simplify_eq. rewrite Hw in Hx. inversion Hx;subst.
+        right with Monotemporary. left;constructor.
+        eright;[|left]. right;right;constructor.
+      + rewrite std_sta_update_multiple_lookup_same_i// in Hy. rewrite Hx in Hy;inversion Hy. left.
+  Qed.
+
+  Lemma uninitialize_to_revoked l W E p φ :
+    NoDup l →
+    Forall (λ a, ∃ w, W.1 !! a = Some (Uninitialized w)) l →
+    ([∗ list] a ∈ l, rel a p φ) ∗
+    region (revoke W) ∗ sts_full_world (revoke W)
+    ={E}=∗
+    region (revoke (std_update_multiple W l Revoked)) ∗ sts_full_world (revoke (std_update_multiple W l Revoked))
+    ∗ [∗ list] a ∈ l, ∃ w, uninitialized_resources a p w.
+  Proof.
+    iIntros (Hdup Hforall) "(#Hrel & Hr & Hsts)".
+    iMod (uninitialize_to_revoked_states with "[$Hrel $Hr $Hsts]") as "(Hr & Hsts & $)";auto.
+    rewrite std_update_multiple_revoke_commute;auto.
+    rewrite region_eq /region_def. iDestruct "Hr" as (M Mρ) "(HM & % & % & Hr)".
+    iDestruct (monotone_revoke_list_region_def_mono with "[] Hsts Hr") as "[$ Hr]".
+    2: { iExists _,_. iFrame. iModIntro. iSplit;auto. iPureIntro. rewrite -std_update_multiple_revoke_commute;auto.
+         rewrite -std_update_multiple_dom_equal;auto. intros i Hi. apply elem_of_gmap_dom. rewrite -revoke_lookup_Some.
+         revert Hforall; rewrite Forall_forall =>Hforall. apply Hforall in Hi as [? Hi]. eauto. }
+    rewrite -std_update_multiple_revoke_commute;auto.
+    iPureIntro. apply related_sts_priv_world_std_update_multiple_Uninit_to_Rev;auto.
+  Qed.
 
 End heap.
