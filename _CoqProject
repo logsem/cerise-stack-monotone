@@ -58,5 +58,6 @@ theories/examples/macros/prepstack.v
 theories/examples/macros/checkbelow.v
 theories/examples/macros/fetch.v
 theories/examples/macros/assert.v
+theories/examples/macros/checkint.v
 theories/examples/macros/macros.v
 theories/examples/downwards_lse.v

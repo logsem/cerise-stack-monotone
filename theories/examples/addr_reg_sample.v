@@ -67,6 +67,7 @@ Section instr_encodings.
   Definition w_4b_U := encodeInstr (LoadU PC r_stk (inr r_t1)).
   Definition w_4c := encodeInstr (Load PC r_stk).
   (* Instruction encodings *)
+  Definition is_ptr r1 r2 := encodeInstrW (IsPtr r1 r2).
   Definition lea_z r z := encodeInstrW (Lea r (inl z)).
   Definition lea_r r1 r2 := encodeInstrW (Lea r1 (inr r2)).
   Definition store_z r z := encodeInstrW (Store r (inl z)).
