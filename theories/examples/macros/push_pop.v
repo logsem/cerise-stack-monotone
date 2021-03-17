@@ -91,16 +91,16 @@ Section stack_macros.
     isCorrectPC (inr ((p,g),b,e,a1)) →
     PermFlows p p' ->
     PermFlows URWLX p_a ->
-    withinBounds ((URWLX,Local),stk_b,stk_e,stk_a) = true →
+    withinBounds ((URWLX,Monotone),stk_b,stk_e,stk_a) = true →
     (a1 + 1)%a = Some a2 →
     (stk_a + 1)%a = Some stk_a' →
 
       ▷ pushU_z a1 p' r_stk z
     ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a1)
-    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Local),stk_b,stk_e,stk_a)
+    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a)
     ∗ ▷ stk_a ↦ₐ[p_a] w
     ∗ ▷ (PC ↦ᵣ inr ((p,g),b,e,a2) ∗ pushU_z a1 p' r_stk z ∗
-            r_stk ↦ᵣ inr ((URWLX,Local),stk_b,stk_e,stk_a') ∗ stk_a ↦ₐ[p_a] inl z
+            r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a') ∗ stk_a ↦ₐ[p_a] inl z
             -∗ WP Seq (Instr Executable) {{ φ }})
     ⊢
       WP Seq (Instr Executable) {{ φ }}.
