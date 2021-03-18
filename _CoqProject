@@ -59,5 +59,7 @@ theories/examples/macros/checkbelow.v
 theories/examples/macros/fetch.v
 theories/examples/macros/assert.v
 theories/examples/macros/checkint.v
+theories/examples/macros/checkra.v
+theories/examples/macros/scall_u.v
 theories/examples/macros/macros.v
 theories/examples/downwards_lse.v
