@@ -39,35 +39,37 @@ Section stack_macros.
     { (* Failure, done *) by iApply "Hφ". }
   Qed.
 
-  Definition prepstackU_instrs r (minsize: Z) :=
+  Definition prepstackU_instrs r (minsize paramsize: nat) :=
     reqperm_instrs r (encodePerm URWLX) ++
-    reqsize_instrs r minsize ++
+    reqsize_instrs r (minsize + paramsize) ++
     [getb r_t1 r;
     geta r_t2 r;
+    sub_r_z r_t2 r_t2 paramsize;
     sub_r_r r_t1 r_t1 r_t2;
     lea_r r r_t1;
     move_z r_t1 0;
     move_z r_t2 0].
 
-  Definition prepstackU r minsize a p : iProp Σ :=
-    ([∗ list] a_i;w_i ∈ a;(prepstackU_instrs r minsize), a_i ↦ₐ[p] w_i)%I.
+  Definition prepstackU r minsize paramsize a p : iProp Σ :=
+    ([∗ list] a_i;w_i ∈ a;(prepstackU_instrs r minsize paramsize), a_i ↦ₐ[p] w_i)%I.
 
-  Lemma prepstackU_spec r minsize a w pc_p pc_p' pc_g pc_b pc_e a_first a_last φ :
+  Lemma prepstackU_spec r minsize paramsize a w pc_p pc_p' pc_g pc_b pc_e a_first a_last φ :
     isCorrectPC_range pc_p pc_g pc_b pc_e a_first a_last ->
     PermFlows pc_p pc_p' ->
     contiguous_between a a_first a_last ->
 
-      ▷ prepstackU r minsize a pc_p'
+      ▷ prepstackU r minsize paramsize a pc_p'
     ∗ ▷ PC ↦ᵣ inr (pc_p,pc_g,pc_b,pc_e,a_first)
     ∗ ▷ r ↦ᵣ w
     ∗ ▷ (∃ w, r_t1 ↦ᵣ w)
     ∗ ▷ (∃ w, r_t2 ↦ᵣ w)
     ∗ ▷ (if isPermWord w URWLX then
            ∃ l b e a', ⌜w = inr (URWLX,l,b,e,a')⌝ ∧
-           if (minsize <? e - b)%Z then
-             if (b <=? a')%Z then
-               (PC ↦ᵣ inr (pc_p,pc_g,pc_b,pc_e,a_last) ∗ prepstackU r minsize a pc_p' ∗
-                   r ↦ᵣ inr (URWLX,l,b,e,b) ∗ r_t1 ↦ᵣ inl 0%Z ∗ r_t2 ↦ᵣ inl 0%Z
+           if (minsize + paramsize <? e - b)%Z then
+             if ((b + paramsize) <=? a')%Z then
+               ((∃ a_param, ⌜(b + paramsize)%a = Some a_param⌝ ∧
+                   PC ↦ᵣ inr (pc_p,pc_g,pc_b,pc_e,a_last) ∗ prepstackU r minsize paramsize a pc_p' ∗
+                   r ↦ᵣ inr (URWLX,l,b,e,a_param) ∗ r_t1 ↦ᵣ inl 0%Z ∗ r_t2 ↦ᵣ inl 0%Z)
                    -∗ WP Seq (Instr Executable) {{ φ }})
              else φ FailedV
            else φ FailedV
@@ -90,7 +92,7 @@ Section stack_macros.
     iPrologue_multi "Hprog" Hcont Hvpc link0.
     iApply (reqsize_spec with "[- $HPC $Hcode $Hr $Hr_t1 $Hr_t2]");
       [apply Hvpc_code0|apply Hfl|eauto|].
-    iNext. destruct (minsize <? e - b)%Z; auto.
+    iNext. destruct (minsize + paramsize <? e - b)%Z eqn:Hsize; auto.
     iIntros "H". iDestruct "H" as (w1 w2) "(Hreqsize & HPC & Hr & Hr_t1 & Hr_t2)".
     (* getb r_t1 r *)
     iDestruct (big_sepL2_length with "Hprog") as %Hlength'.
@@ -98,46 +100,53 @@ Section stack_macros.
     iPrologue "Hprog".
     iApply (wp_Get_success with "[$HPC $Hi $Hr $Hr_t1]");
       [apply decode_encode_instrW_inv|auto|apply Hfl|iCorrectPC link0 a_last|iContiguous_next Hcont 0|auto..].
-    iEpilogue "(HPC & Hi & Hr & Hr_t1) /="; iCombine "Hi" "Hprog_done" as "Hprog_done". 
+    iEpilogue "(HPC & Hi & Hr & Hr_t1) /="; iCombine "Hi" "Hprog_done" as "Hprog_done".
     (* geta r_t2 r *)
     iPrologue "Hprog".
     iApply (wp_Get_success with "[$HPC $Hi $Hr $Hr_t2]");
       [apply decode_encode_instrW_inv|auto|apply Hfl|iCorrectPC link0 a_last|iContiguous_next Hcont 1|auto..].
-    iEpilogue "(HPC & Hi & Hr & Hr_t2) /="; iCombine "Hi" "Hprog_done" as "Hprog_done". 
+    iEpilogue "(HPC & Hi & Hr & Hr_t2) /="; iCombine "Hi" "Hprog_done" as "Hprog_done".
+    (* add r_t2 r_t2 paramsize *)
+    iPrologue "Hprog".
+    iApply (wp_add_sub_lt_success_dst_z with "[$HPC $Hi $Hr_t2]");
+      [apply decode_encode_instrW_inv|auto|iContiguous_next Hcont 2|apply Hfl|iCorrectPC link0 a_last|..].
+    iEpilogue "(HPC & Hi & Hr_t2) /="; iCombine "Hi" "Hprog_done" as "Hprog_done".
     (* sub r_t1 r_t1 r_t2 *)
     iPrologue "Hprog".
     iApply (wp_add_sub_lt_success_dst_r with "[$HPC $Hi $Hr_t2 $Hr_t1]");
-      [apply decode_encode_instrW_inv|auto|iContiguous_next Hcont 2|apply Hfl|iCorrectPC link0 a_last|..].
+      [apply decode_encode_instrW_inv|auto|iContiguous_next Hcont 3|apply Hfl|iCorrectPC link0 a_last|..].
     iEpilogue "(HPC & Hi & Hr_t2 & Hr_t1) /="; iCombine "Hi" "Hprog_done" as "Hprog_done".
     (* we need to distinguish between the case where the capability is stuck, or usable *)
-    assert ((a' + (b - a'))%a = Some b) as Hlea;[solve_addr|].
-    destruct (decide (b <= a')%a).
+    assert (∃ a_param, (b + paramsize)%a = Some a_param) as [a_param Ha_param].
+    { destruct (b + paramsize)%a eqn:Hnone;eauto. exfalso. clear -Hnone Hsize. apply Z.ltb_lt in Hsize. solve_addr. }
+    assert ((a' + (b - (a' - paramsize)))%a = Some a_param) as Hlea;[clear -Ha_param; solve_addr|].
+    destruct (decide (a_param <= a')%a).
     2: { (* lea fail *)
       iPrologue "Hprog".
       iApply (wp_Lea_fail_U with "[$HPC $Hi $Hr_t1 $Hr]");
         [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link0 a_last|apply Hlea|..].
       { simpl. solve_addr. }
-      iEpilogue "_ /=". assert (b <=? a' = false)%Z as ->;[apply Z.leb_gt;solve_addr|].
+      iEpilogue "_ /=". assert (b + paramsize <=? a' = false)%Z as ->;[apply Z.leb_gt;solve_addr|].
       iApply wp_value. iApply "Hφ". }
     (* lea r r_t1 *)
     iPrologue "Hprog".
     iApply (wp_lea_success_reg with "[$HPC $Hi $Hr_t1 $Hr]");
-      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link0 a_last|iContiguous_next Hcont 3|apply Hlea|auto..].
-    iEpilogue "(HPC & Hi & Hr_t1 & Hr)"; iCombine "Hi" "Hprog_done" as "Hprog_done". 
+      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link0 a_last|iContiguous_next Hcont 4|apply Hlea|auto..].
+    iEpilogue "(HPC & Hi & Hr_t1 & Hr)"; iCombine "Hi" "Hprog_done" as "Hprog_done".
     (* move r_t1 0 *)
     iPrologue "Hprog".
-    iApply (wp_move_success_z with "[$HPC $Hi $Hr_t1]"); 
-      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link0 a_last|iContiguous_next Hcont 4|auto|..].
-    iEpilogue "(HPC & Hi & Hr_t1)"; iCombine "Hi" "Hprog_done" as "Hprog_done". 
+    iApply (wp_move_success_z with "[$HPC $Hi $Hr_t1]");
+      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link0 a_last|iContiguous_next Hcont 5|auto|..].
+    iEpilogue "(HPC & Hi & Hr_t1)"; iCombine "Hi" "Hprog_done" as "Hprog_done".
     (* move r_t2 0 *)
     iPrologue "Hprog".
-    apply contiguous_between_last with (ai:=a4) in Hcont as Hlast;[|auto].
-    iApply (wp_move_success_z with "[$HPC $Hi $Hr_t2]"); 
+    apply contiguous_between_last with (ai:=a5) in Hcont as Hlast;[|auto].
+    iApply (wp_move_success_z with "[$HPC $Hi $Hr_t2]");
       [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link0 a_last|apply Hlast|auto|..].
-    iEpilogue "(HPC & Hi & Hr_t2)"; iCombine "Hi" "Hprog_done" as "Hprog_done". 
-    assert (b <=? a' = true)%Z as ->;[apply Zle_is_le_bool;auto|].
-    iApply "Hφ". iFrame.
-    repeat (iDestruct "Hprog_done" as "[Hi Hprog_done]"; iFrame "Hi"). 
+    iEpilogue "(HPC & Hi & Hr_t2)"; iCombine "Hi" "Hprog_done" as "Hprog_done".
+    assert (b + paramsize <=? a' = true)%Z as ->;[apply Zle_is_le_bool;auto;clear -Ha_param l0;solve_addr|].
+    iApply "Hφ". iFrame. iExists a_param. iSplit;auto. iFrame.
+    repeat (iDestruct "Hprog_done" as "[Hi Hprog_done]"; iFrame "Hi").
     iFrame "Hprog_done". done.
   Qed.
 
