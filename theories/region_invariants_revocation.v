@@ -27,6 +27,8 @@ Section heap.
      monotone wrt private future world.
    *)
 
+  (* the revoke condition states that there are no Monotemporary states left *)
+  Definition revoke_condition W := ∀ a, W.1 !! a ≠ Some Monotemporary.
 
   (* Revocation only changes the states of the standard STS collection *)
   Definition revoke_std_sta : STS_STD → STS_STD :=
@@ -556,6 +558,15 @@ Section heap.
       eauto.
   Qed.
 
+  (* a revoked world satisfies the revoke condition *)
+  Lemma revoke_conditions_sat W :
+    revoke_condition (revoke W).
+  Proof.
+    intros a. destruct ((revoke W).1 !! a) eqn:Hsome;auto.
+    intros Hcontr;simplify_eq.
+    apply revoke_lookup_non_temp in Hsome. done.
+  Qed.
+
   (* --------------------------------------------------------------------------------- *)
   (* ----------- A REVOKED REGION IS MONOTONE WRT PRIVATE FUTURΕ WORLDS -------------- *)
 
@@ -798,12 +809,13 @@ Section heap.
   (* ---------------------------------------------------------------------------------------- *)
   (* ------------------- A REVOKED W IS MONOTONE WRT PRIVATE FUTURE WORLD ------------------- *)
 
-  Lemma monotone_revoke_list_region_def_mono M Mρ W W1 W2 :
+  Lemma monotone_revoke_cond_region_def_mono M Mρ W W1 W2 :
+    ⌜revoke_condition W⌝ -∗
     ⌜related_sts_priv_world W1 W2⌝ -∗
-     sts_full_world (revoke W) -∗ region_map_def M Mρ W1 -∗
-     sts_full_world (revoke W) ∗ region_map_def M Mρ W2.
+     sts_full_world W -∗ region_map_def M Mρ W1 -∗
+     sts_full_world W ∗ region_map_def M Mρ W2.
   Proof.
-    iIntros (Hrelated) "Hfull Hr".
+    iIntros (Hcond Hrelated) "Hfull Hr".
     iDestruct (big_sepM_exists with "Hr") as (m') "Hr".
     iDestruct (big_sepM2_sep with "Hr") as "[HMρ Hr]".
     iAssert (∀ a ρ, ⌜m' !! a = Some ρ⌝ → ⌜ρ ≠ Monotemporary⌝)%I as %Hmonotemp.
@@ -811,7 +823,7 @@ Section heap.
       iDestruct (big_sepM2_sep with "Hr") as "[Hstates Hr]".
       iDestruct (big_sepM2_lookup_1 _ _ _ a with "Hstates") as (γp) "[_ Hstate]"; eauto.
       iDestruct (sts_full_state_std with "Hfull Hstate") as %Hρ.
-      iPureIntro. eapply revoke_lookup_non_temp; eauto.
+      iPureIntro. intros ->. specialize (Hcond a). done.
     }
     iFrame.
     iApply big_sepM_exists. iExists m'.
@@ -827,6 +839,27 @@ Section heap.
     iExists _; iFrame "∗ #".
     iNext. iApply "Hmono";[|iFrame "#"]. auto.
     Unshelve. apply _.
+  Qed.
+
+  Lemma monotone_revoke_list_region_def_mono M Mρ W W1 W2 :
+    ⌜related_sts_priv_world W1 W2⌝ -∗
+     sts_full_world (revoke W) -∗ region_map_def M Mρ W1 -∗
+     sts_full_world (revoke W) ∗ region_map_def M Mρ W2.
+  Proof.
+    iIntros (Hrelated) "Hfull Hr".
+    pose proof (revoke_conditions_sat W).
+    iApply (monotone_revoke_cond_region_def_mono with "[] [] Hfull Hr");auto.
+  Qed.
+
+  Lemma monotone_revoke_cond_region_def_mono_same M Mρ W W' :
+    ⌜revoke_condition W⌝ -∗
+    ⌜related_sts_priv_world W W'⌝ -∗
+     sts_full_world W -∗ region_map_def M Mρ (revoke W) -∗
+     sts_full_world W ∗ region_map_def M Mρ (revoke W').
+  Proof.
+    iIntros (Hcond Hrelated) "Hfull Hr".
+    iApply (monotone_revoke_cond_region_def_mono with "[] [] Hfull Hr");auto.
+    iPureIntro. apply revoke_monotone; auto.
   Qed.
 
   Lemma monotone_revoke_list_region_def_mono_same M Mρ W W' :

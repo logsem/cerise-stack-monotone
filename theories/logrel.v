@@ -586,6 +586,31 @@ Section logrel.
     try (iDestruct (extract_from_region_inv with "Hinterp") as (p Hflows) "[Hinv _]"; [eauto|iExists _;iSplit;eauto]); done.
   Qed.
 
+  Definition readAllowedU p : bool :=
+    match p with
+    | URW | URWL | URWX | URWLX => true
+    | _ => false
+    end.
+
+  Lemma read_allowedU_inv W (a' a b e: Addr) p g :
+    (b ≤ a' ∧ a' < e)%Z →
+    readAllowedU p →
+    ⊢ interp W (inr ((p,g),b,e,a)) →
+    (∃ p', ⌜PermFlows (promote_perm p) p'⌝ ∗ (read_write_cond a' p' interp)).
+  Proof.
+    iIntros (Hin Ra) "Hinterp".
+    rewrite /interp. cbn. rewrite fixpoint_interp1_eq /=; cbn.
+    destruct p,g; try contradiction;
+    try (iDestruct "Hinterp" as "[Hinterp Hinterpe]"); try done;
+    try by (iDestruct (extract_from_region_inv with "Hinterp") as (p Hflows) "[Hinv _]";
+      [eauto|iExists _;iSplit;eauto]).
+    all: try (destruct (decide (a' < a)%a);
+    [iDestruct (extract_from_region_inv with "Hinterp") as (p Hflows) "[Hinv _]";
+      [|iExists _;iSplit;eauto];solve_addr|
+    iDestruct (extract_from_region_inv with "Hinterpe") as (p Hflows) "[Hinv _]";
+      [|iExists _;iSplit;eauto];solve_addr]).
+  Qed.
+
   Definition isMonotone l :=
     match l with
     | Monotone => true
@@ -691,6 +716,26 @@ Section logrel.
       iDestruct "Hvalid" as "[_ Hvalid]". 
       iDestruct (extract_from_region_inv _ _ a with "Hvalid") as (? ?) "[_ %]". solve_addr. 
       destruct H3 as [? | ?];auto. 
+  Qed.
+
+  Lemma writeLocalAllowedU_valid_cap_below_implies W p l b e a a':
+    pwlU p = true -> withinBounds (p, l, b, e, a') = true ->
+    (a' < a)%a →
+    interp W (inr (p, l, b, e, a)) -∗
+           ⌜std W !! a' = Some Monotemporary⌝.
+  Proof.
+    intros Hp Hlt Hb. iIntros "Hvalid".
+    iAssert (⌜isMonotone l = true⌝)%I as "%". by iApply writeLocalAllowedU_implies_local.
+    eapply withinBounds_le_addr in Hlt.
+    unfold interp; rewrite fixpoint_interp1_eq /=.
+    destruct p; simpl in Hp; try congruence; destruct l;try done;
+      try iDestruct (extract_from_region_inv _ _ a' with "Hvalid") as (? ?) "[_ %]"; eauto; try solve_addr.
+    - assert (addr_reg.max b a = a) as ->;[solve_addr|].
+      iDestruct "Hvalid" as "[Hvalid _]".
+      iDestruct (extract_from_region_inv _ _ a' with "Hvalid") as (? ?) "[_ %]". solve_addr. auto.
+    - assert (addr_reg.max b a = a) as ->;[solve_addr|].
+      iDestruct "Hvalid" as "[Hvalid _]".
+      iDestruct (extract_from_region_inv _ _ a' with "Hvalid") as (? ?) "[_ %]". solve_addr. auto.
   Qed.
 
   Lemma interp1_eq interp (W: WORLD) p l b e a:

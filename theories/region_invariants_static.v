@@ -1062,14 +1062,15 @@ Section heap.
     iDestruct "HH" as (Mρ') "(? & ? & % & ?)". iFrame. iExists _. iFrame. iPureIntro. congruence.
   Qed.
 
-  Lemma region_revoked_to_static W (m: gmap Addr Word) :
-    sts_full_world (revoke W)
-    ∗ region (revoke W)
+  Lemma region_revoked_cond_to_static W (m: gmap Addr Word) :
+    revoke_condition W →
+    sts_full_world W
+    ∗ region W
     ∗ ([∗ map] a↦v ∈ m, ∃ p φ, ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝ ∗ ⌜p ≠ O⌝ ∗ a ↦ₐ[p] v ∗ rel a p φ)
-    ==∗ (sts_full_world (std_update_multiple (revoke W) (elements (dom (gset Addr) m)) (Monostatic m))
-      ∗ region (std_update_multiple (revoke W) (elements (dom (gset Addr) m)) (Monostatic m))).
+    ==∗ (sts_full_world (std_update_multiple W (elements (dom (gset Addr) m)) (Monostatic m))
+      ∗ region (std_update_multiple W (elements (dom (gset Addr) m)) (Monostatic m))).
   Proof.
-    iIntros "(Hfull & Hr & Hmap)".
+    iIntros (Hcond) "(Hfull & Hr & Hmap)".
     rewrite region_eq /region_def.
     iDestruct "Hr" as (M Mρ) "(HM & #Hdom & #Hdom' & Hr)".
     iDestruct "Hdom" as %Hdom. iDestruct "Hdom'" as %Hdom'.
@@ -1081,7 +1082,7 @@ Section heap.
     { iApply (big_sepM_mono with "Hmap"). iIntros (a x Hx) "Hx".
       iDestruct "Hx" as (p φ Hpers Hne) "(Ha & Hrel & Hstate)".
       iFrame. iExists _,_. iFrame. auto. }
-    iAssert (⌜Forall (λ a : Addr, std (revoke W) !! a = Some (Revoked)) (elements (dom (gset Addr) m))⌝%I)
+    iAssert (⌜Forall (λ a : Addr, std W !! a = Some (Revoked)) (elements (dom (gset Addr) m))⌝%I)
       as %Hforall.
     { rewrite Forall_forall. iIntros (x Hx).
       apply elem_of_elements in Hx.
@@ -1090,7 +1091,7 @@ Section heap.
       iDestruct "Hx" as (p φ Hpers Hne) "(Hx & #Hrel)".
       iDestruct (sts_full_state_std with "Hfull Hstate") as %Hlookup. auto.
     }
-    iDestruct (monotone_revoke_list_region_def_mono with "[] Hfull Hr") as "[Hfull Hr]".
+    iDestruct (monotone_revoke_cond_region_def_mono with "[] [] Hfull Hr") as "[Hfull Hr]";auto.
     { iPureIntro. apply related_sts_priv_world_static with (m':=m). apply Hforall. }
     iDestruct (big_sepM_sep with "Hmap") as "[Hmap Hstates]".
     iMod (region_update_multiple_states _ _ with "[$Hfull $Hstates]") as "[Hfull Hstates]".
@@ -1110,5 +1111,16 @@ Section heap.
     apply std_update_multiple_dom_equal_eq;auto.
   Qed.
 
+  Lemma region_revoked_to_static W (m: gmap Addr Word) :
+    sts_full_world (revoke W)
+    ∗ region (revoke W)
+    ∗ ([∗ map] a↦v ∈ m, ∃ p φ, ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝ ∗ ⌜p ≠ O⌝ ∗ a ↦ₐ[p] v ∗ rel a p φ)
+    ==∗ (sts_full_world (std_update_multiple (revoke W) (elements (dom (gset Addr) m)) (Monostatic m))
+      ∗ region (std_update_multiple (revoke W) (elements (dom (gset Addr) m)) (Monostatic m))).
+  Proof.
+    iIntros "(Hfull & Hr & Hmap)".
+    iApply region_revoked_cond_to_static;[|iFrame].
+    apply revoke_conditions_sat.
+  Qed.
 
 End heap.
