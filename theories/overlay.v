@@ -827,14 +827,40 @@ Section opsem.
 
   Definition return_instrs r := rclear_instrs (list_difference all_registers [PC; r]) ++ [inl (encodeInstr (Jmp r))].
 
+  Lemma rclear_instrs_length:
+    forall r, r <> PC -> length (rclear_instrs (list_difference all_registers [PC; r])) = RegNum.
+  Proof.
+    destruct r; try congruence.
+    intros. rewrite /rclear_instrs.
+    do 32 (destruct n as [|n]; [simpl; reflexivity|]).
+    simpl in fin. discriminate.
+  Qed.
+
   Lemma return_instrs_length:
     forall r, r <> PC -> length (return_instrs r) = RegNum + 1.
   Proof.
-    destruct r; try congruence.
-    intros. rewrite /return_instrs /rclear_instrs.
-    rewrite app_length.
-    do 32 (destruct n as [|n]; [simpl; reflexivity|]).
-    simpl in fin. discriminate.
+    intros. rewrite /return_instrs app_length rclear_instrs_length //.
+  Qed.
+
+  Lemma return_instrs_last:
+    forall r,
+      r <> PC ->
+      return_instrs r !! RegNum = Some (inl (encodeInstr (Jmp r))).
+  Proof.
+    intros. rewrite lookup_app_r rclear_instrs_length //.
+  Qed.
+
+  Lemma return_instrs_ext_eq:
+    forall r1 r2,
+      r1 <> PC ->
+      r2 <> PC ->
+      return_instrs r1 !! RegNum = return_instrs r2 !! RegNum ->
+      r1 = r2.
+  Proof.
+    intros. rewrite !return_instrs_last // in H2.
+    inversion H2; clear H2; subst.
+    eapply encode_instr_inj in H4.
+    inversion H4; auto.
   Qed.
 
   Inductive step: Conf → Conf → Prop :=
@@ -843,14 +869,15 @@ Section opsem.
         not (isCorrectPC ((reg φ) !r! PC)) →
         step (Executable, φ) (Failed, φ)
   | step_exec_instr:
-      forall φ p g b e a i c rd rb re ra,
+      forall φ p g b e a i c,
         RegLocate (reg φ) PC = inr (Regular ((p, g), b, e, a)) ->
         isCorrectPC ((reg φ) !r! PC) →
         decodeInstrW' ((mem φ) !m! a) = i →
         exec i φ = c →
-        ~ (exists r, r <> PC /\ (reg φ !r! r = inr (Ret rd rb re ra)) /\
+        (~ (exists r rd rb re ra, r <> PC /\ (reg φ !r! r = inr (Ret rd rb re ra)) /\
                 forall i, (i <= RegNum)%nat ->
-                     exists a_i, (a + i)%a = Some a_i /\ (return_instrs r) !! i = Some ((mem φ) !m! a_i)) ->
+                     exists a_i, (a + i)%a = Some a_i /\ (return_instrs r) !! i = Some ((mem φ) !m! a_i)) \/
+        exists a', (a + RegNum)%a = Some a' /\ ~ (a' < e)%a) ->
         step (Executable, φ) (c.1, c.2)
   | step_exec_instr':
       forall φ d p b e a i c m,
@@ -877,18 +904,24 @@ Section opsem.
   (* TODO: add call, tailcall semantics and PC = Stk capability version *)
 
   Lemma is_return_dec:
-    forall reg mem rd rb re ra a,
-      {exists r, r <> PC /\ (reg !r! r = inr (Ret rd rb re ra)) /\
-             forall i, (i <= RegNum)%nat ->
-                  exists a_i, (a + i)%a = Some a_i /\ (return_instrs r) !! i = Some ((mem) !m! a_i)} +
-      {~ exists r, r <> PC /\ (reg !r! r = inr (Ret rd rb re ra)) /\
-                forall i, (i <= RegNum)%nat ->
-                     exists a_i, (a + i)%a = Some a_i /\ (return_instrs r) !! i = Some ((mem) !m! a_i)}.
+    forall reg mem a,
+      {exists r rd rb re ra, r <> PC /\ (reg !r! r = inr (Ret rd rb re ra)) /\
+                             forall i, (i <= RegNum)%nat ->
+                                  exists a_i, (a + i)%a = Some a_i /\ (return_instrs r) !! i = Some ((mem) !m! a_i)} +
+      {~ exists r rd rb re ra, r <> PC /\ (reg !r! r = inr (Ret rd rb re ra)) /\
+                               forall i, (i <= RegNum)%nat ->
+                                    exists a_i, (a + i)%a = Some a_i /\ (return_instrs r) !! i = Some ((mem) !m! a_i)}.
   Proof.
     intros. eapply exists_dec. intros.
     destruct (reg_eq_dec x PC).
-    - right. red; intros (A & B & C). congruence.
-    - assert ({reg0 !r! x = inr (Ret rd rb re ra)} + {reg0 !r! x <> inr (Ret rd rb re ra)}) by solve_decision.
+    - right. red; intros (rd & rb & re & ra & A & B & C). congruence.
+    - assert ({exists rd rb re ra, reg0 !r! x = inr (Ret rd rb re ra)} + {~ exists rd rb re ra, reg0 !r! x = inr (Ret rd rb re ra)}).
+      { destruct (reg0 !r! x).
+        - right. red; intros. destruct H0 as (? & ? & ? & ? & ?). congruence.
+        - destruct c.
+          + right. red; intros. destruct H0 as (? & ? & ? & ? & ?). congruence.
+          + right. red; intros. destruct H0 as (? & ? & ? & ? & ?). congruence.
+          + left. eauto. }
       destruct H0.
       + assert ({∀ i : nat, i ≤ RegNum → ∃ a_i : Addr, (a + i)%a = Some a_i ∧ return_instrs x !! i = Some (mem0 !m! a_i)} + {~∀ i : nat, i ≤ RegNum → ∃ a_i : Addr, (a + i)%a = Some a_i ∧ return_instrs x !! i = Some (mem0 !m! a_i)}).
         { assert ((∀ i : nat, i ≤ RegNum → ∃ a_i : Addr, (a + i)%a = Some a_i ∧ return_instrs x !! i = Some (mem0 !m! a_i)) <-> (forall i: fin (S RegNum), ∃ a_i : Addr, (a + (fin_to_nat i))%a = Some a_i ∧ return_instrs x !! (fin_to_nat i) = Some (mem0 !m! a_i))).
@@ -911,9 +944,11 @@ Section opsem.
             generalize (e0 (nat_to_fin H2)). rewrite fin_to_nat_to_fin. eauto.
           - right. red; intros. eapply n0. intros. eapply H1. generalize (fin_to_nat_lt i). lia. }
         destruct H0.
-        * left; auto.
-        * right. red; intros (A & B & C). congruence.
-      + right. red; intros (A & B & C). congruence.
+        * left. destruct e as [rd [rb [re [ra A]]]].
+          exists rd, rb, re, ra. auto.
+        * right. red; intros (rd & rb & re & ra & A & B & C). congruence.
+      + right. red; intros (rd & rb & re & ra & A & B & C).
+        eapply n0. eauto.
   Qed.
 
   Lemma normal_always_step:
@@ -921,10 +956,16 @@ Section opsem.
   Proof.
     intros. destruct (isCorrectPC_dec (RegLocate (reg φ) PC)).
     - inversion i; subst.
-      + do 2 eexists; eapply step_exec_instr; eauto.
-
+      + destruct (is_return_dec (reg φ) (mem φ) a).
+        * destruct e0 as [r [rd [rb [re [ra [A [B C]]]]]]].
+          destruct (C RegNum ltac:(clear; solve_addr)) as [a_RegNum [HA HB]].
+          destruct (Addr_lt_dec (a_RegNum) e).
+          { do 2 eexists; eapply step_exec_return; eauto. }
+          { do 2 eexists; eapply step_exec_instr; eauto. }
+        * do 2 eexists; eapply step_exec_instr; eauto.
+      + admit.
     - exists Failed, φ. constructor 1; eauto.
-  Qed.
+  Admitted.
 
   Lemma step_deterministic:
     forall c1 c2 c2' σ1 σ2 σ2',
@@ -932,11 +973,213 @@ Section opsem.
       step (c1, σ1) (c2', σ2') →
       c2 = c2' ∧ σ2 = σ2'.
   Proof.
+    Ltac inv H := inversion H; clear H; subst.
     intros * H1 H2; split; inv H1; inv H2; auto; try congruence.
+    - destruct H10.
+      + elim H0. rewrite H6 in H4; inv H4.
+        destruct H11. exists x, rd, rb, re, ra.
+        destruct H1 as [A [B C]]. repeat split; eauto.
+      + rewrite H6 in H4; inv H4.
+        destruct H0 as [a'' [A B]].
+        rewrite A in H8; inv H8. elim B; auto.
+    - destruct H13.
+      + elim H0. rewrite H6 in H4; inv H4.
+        destruct H10. exists x, rd, rb, re, ra.
+        destruct H1 as [A [B C]]. repeat split; eauto.
+      + rewrite H6 in H4; inv H4.
+        destruct H0 as [a'' [A B]].
+        rewrite A in H8; inv H8. elim B; auto.
+    - rewrite H4 in H6; inv H6.
+      rewrite H11 in H8; inv H8.
+      destruct H10 as [r1 [A [B C]]].
+      destruct H13 as [r2 [A' [B' C']]].
+      destruct (C RegNum ltac:(clear; solve_addr)) as [aa [X1 X2]].
+      destruct (C' RegNum ltac:(clear; solve_addr)) as [bb [Y1 Y2]].
+      rewrite X1 in H11; inv H11. rewrite Y1 in X1; inv X1.
+      rewrite -Y2 in X2. eapply return_instrs_ext_eq in X2; auto. subst r2.
+      rewrite B' in B; inv B. reflexivity.
+    - destruct H10.
+      + elim H0. rewrite H6 in H4; inv H4.
+        destruct H11. exists x, rd, rb, re, ra.
+        destruct H1 as [A [B C]]. repeat split; eauto.
+      + rewrite H6 in H4; inv H4.
+        destruct H0 as [a'' [A B]].
+        rewrite A in H8; inv H8. elim B; auto.
+    - destruct H13.
+      + elim H0. rewrite H6 in H4; inv H4.
+        destruct H10. exists x, rd, rb, re, ra.
+        destruct H1 as [A [B C]]. repeat split; eauto.
+      + rewrite H6 in H4; inv H4.
+        destruct H0 as [a'' [A B]].
+        rewrite A in H8; inv H8. elim B; auto.
+    - rewrite H4 in H6; inv H6.
+      rewrite H11 in H8; inv H8.
+      destruct H10 as [r1 [A [B C]]].
+      destruct H13 as [r2 [A' [B' C']]].
+      destruct (C RegNum ltac:(clear; solve_addr)) as [aa [X1 X2]].
+      destruct (C' RegNum ltac:(clear; solve_addr)) as [bb [Y1 Y2]].
+      rewrite X1 in H11; inv H11. rewrite Y1 in X1; inv X1.
+      rewrite -Y2 in X2. eapply return_instrs_ext_eq in X2; auto. subst r2.
+      rewrite B' in B; inv B. reflexivity.
   Qed.
 
+  Inductive val: Type :=
+  | HaltedV: val
+  | FailedV: val
+  | NextIV: val.
 
+  Inductive expr: Type :=
+  | Instr (c : ConfFlag)
+  | Seq (e : expr).
+  Definition state : Type := ExecConf.
 
+  Definition of_val (v: val): expr :=
+    match v with
+    | HaltedV => Instr Halted
+    | FailedV => Instr Failed
+    | NextIV => Instr NextI
+    end.
 
+  Fixpoint to_val (e: expr): option val :=
+    match e with
+    | Instr c =>
+      match c with
+      | Executable => None
+      | Halted => Some HaltedV
+      | Failed => Some FailedV
+      | NextI => Some NextIV
+      end
+    | Seq _ => None
+    end.
 
+  Lemma of_to_val:
+    forall e v, to_val e = Some v →
+           of_val v = e.
+  Proof.
+    intros * HH. destruct e; try destruct c; simpl in HH; inv HH; auto.
+  Qed.
+
+  Lemma to_of_val:
+    forall v, to_val (of_val v) = Some v.
+  Proof. destruct v; reflexivity. Qed.
+
+  (** Evaluation context *)
+  Inductive ectx_item :=
+  | SeqCtx.
+
+  Notation ectx := (list ectx_item).
+
+  Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
+    match Ki with
+    | SeqCtx => Seq e
+    end.
+
+  Inductive prim_step: expr → state → list Empty_set → expr → state → list expr → Prop :=
+  | PS_no_fork_instr σ e' σ' :
+      step (Executable, σ) (e', σ') → prim_step (Instr Executable) σ [] (Instr e') σ' []
+  | PS_no_fork_seq σ : prim_step (Seq (Instr NextI)) σ [] (Seq (Instr Executable)) σ []
+  | PS_no_fork_halt σ : prim_step (Seq (Instr Halted)) σ [] (Instr Halted) σ []
+  | PS_no_fork_fail σ : prim_step (Seq (Instr Failed)) σ [] (Instr Failed) σ [].
+
+  Lemma val_stuck:
+    forall e σ o e' σ' efs,
+      prim_step e σ o e' σ' efs →
+      to_val e = None.
+  Proof. intros * HH. by inversion HH. Qed.
+
+  Lemma prim_step_exec_inv σ1 l1 e2 σ2 efs :
+    prim_step (Instr Executable) σ1 l1 e2 σ2 efs →
+    l1 = [] ∧ efs = [] ∧
+    exists (c: ConfFlag),
+      e2 = Instr c ∧
+      step (Executable, σ1) (c, σ2).
+  Proof. inversion 1; subst; split; eauto. Qed.
+
+  Lemma prim_step_and_step_exec σ1 e2 σ2 l1 e2' σ2' efs :
+    step (Executable, σ1) (e2, σ2) →
+    prim_step (Instr Executable) σ1 l1 e2' σ2' efs →
+    l1 = [] ∧ e2' = (Instr e2) ∧ σ2' = σ2 ∧ efs = [].
+  Proof.
+    intros* Hstep Hpstep. inversion Hpstep as [? ? ? Hstep' | | |]; subst.
+    generalize (step_deterministic _ _ _ _ _ _ Hstep Hstep'). intros [-> ->].
+    auto.
+  Qed.
+
+  Lemma overlay_lang_determ e1 σ1 κ κ' e2 e2' σ2 σ2' efs efs' :
+    prim_step e1 σ1 κ e2 σ2 efs →
+    prim_step e1 σ1 κ' e2' σ2' efs' →
+    κ = κ' ∧ e2 = e2' ∧ σ2 = σ2' ∧ efs = efs'.
+  Proof.
+    intros Hs1 Hs2. inv Hs1; inv Hs2. all: auto.
+    generalize (step_deterministic _ _ _ _ _ _ H0 H1).
+    intros [? ?]; subst. auto.
+  Qed.
+
+  Lemma fill_item_val Ki e :
+    is_Some (to_val (fill_item Ki e)) → is_Some (to_val e).
+  Proof. intros [v ?]. destruct Ki; simplify_option_eq; eauto. Qed.
+
+  Instance fill_item_inj Ki : Inj (=) (=) (fill_item Ki).
+  Proof. destruct Ki; intros ???; simplify_eq; auto with f_equal. Qed.
+
+  Lemma head_ctx_step_val Ki e σ1 κ e2 σ2 ef :
+    prim_step (fill_item Ki e) σ1 κ e2 σ2 ef → is_Some (to_val e).
+  Proof. destruct Ki; inversion_clear 1; simplify_option_eq; eauto. Qed.
+
+  Lemma fill_item_no_val_inj Ki1 Ki2 e1 e2 :
+    to_val e1 = None → to_val e2 = None →
+    fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2.
+  Proof.
+    destruct Ki1, Ki2; intros; try discriminate; simplify_eq;
+    repeat match goal with
+           | HH : to_val (of_val _) = None |- _ => by rewrite to_of_val in HH
+           end; auto.
+  Qed.
+
+  Lemma overlay_lang_mixin : EctxiLanguageMixin of_val to_val fill_item prim_step.
+  Proof.
+    constructor;
+    apply _ || eauto using to_of_val, of_to_val, val_stuck,
+           fill_item_val, fill_item_no_val_inj, head_ctx_step_val.
+  Qed.
+
+  Definition is_atomic (e : expr) : Prop :=
+    match e with
+    | Instr _ => True
+    | _ => False
+    end.
+
+  Lemma updatePC_atomic φ :
+    ∃ φ', updatePC φ = (Failed,φ') ∨ (updatePC φ = (NextI,φ')) ∨
+          (updatePC φ = (Halted,φ')).
+  Proof.
+    rewrite /updatePC; repeat case_match; eauto.
+  Qed.
+
+  Lemma instr_atomic i φ :
+    ∃ φ', (exec i φ = (Failed, φ')) ∨ (exec i φ = (NextI, φ')) ∨
+          (exec i φ = (Halted, φ')).
+  Proof.
+    unfold exec; repeat case_match; eauto; try (eapply updatePC_atomic; eauto).
+  Qed.
+
+End opsem.
+
+Canonical Structure overlay_ectxi_lang `{MachineParameters} := EctxiLanguage overlay_lang_mixin.
+Canonical Structure overlay_ectx_lang `{MachineParameters} := EctxLanguageOfEctxi overlay_ectxi_lang.
+Canonical Structure overlay_lang `{MachineParameters} := LanguageOfEctx overlay_ectx_lang.
+
+Hint Extern 20 (PureExec _ _ _) => progress simpl : typeclass_instances.
+
+Hint Extern 5 (IntoVal _ _) => eapply of_to_val; fast_done : typeclass_instances.
+Hint Extern 10 (IntoVal _ _) =>
+  rewrite /IntoVal; eapply of_to_val; rewrite /= !to_of_val /=; solve [ eauto ] : typeclass_instances.
+
+Hint Extern 5 (AsVal _) => eexists; eapply of_to_val; fast_done : typeclass_instances.
+Hint Extern 10 (AsVal _) =>
+eexists; rewrite /IntoVal; eapply of_to_val; rewrite /= !to_of_val /=; solve [ eauto ] : typeclass_instances.
+
+Local Hint Resolve language.val_irreducible.
+Local Hint Resolve to_of_val.
+Local Hint Unfold language.irreducible.
 
