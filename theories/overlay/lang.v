@@ -719,7 +719,11 @@ Section opsem.
     end.
 
   (* TODO: define *)
+  Definition clear_regs (reg: base.Reg) (l: list RegName) :=
+    foldr (fun r reg => <[r := inl 0%Z]> reg) reg l.
+
   Definition exec_call (φ: ExecConf) (rf: RegName) (rargs: list RegName): Conf :=
+    let regs' := <[PC := (updatePcPerm (RegLocate (reg φ) rf))]> (clear_regs (reg φ) (list_difference all_registers [PC; rf; r_stk])) in
     (Failed, φ).
 
   Definition decodeInstrW' (w: base.Word) :=
@@ -783,24 +787,21 @@ Section opsem.
         c = exec_call φ rf rargs ->
         step (Executable, φ) (c.1, c.2).
 
-  (* TODO: move into stdpp_extra and upstream into stdpp.finite *)
-  Definition f A n: sum {l : list A | (length l <=? n) = true} {l : list A | length l = S n} -> {l : list A | (length l <=? S n) = true}.
-    intros. destruct X.
-    - destruct s. exists x. rewrite Nat.leb_le.
-      erewrite Nat.leb_le in e. lia.
-    - destruct s. exists x. rewrite Nat.leb_le.
-      lia.
-  Defined.
+  (* TODO: move into stdpp_extra, already upstreamed to stdpp *)
+  Section surjective_finite.
+    Context {A} `{Finite A, EqDecision B} (f : A → B).
+    Context `{!Surj (=) f}.
 
-  Definition g A n: {l : list A | (length l <=? S n) = true} -> sum {l : list A | (length l <=? n) = true} {l : list A | length l = S n}.
-    intros. destruct X.
-    destruct (Nat.eq_dec (length x) (S n)).
-    + right. exists x; eauto.
-    + assert (length x <= S n) by (eapply Nat.leb_le; eauto).
-      assert (length x <= n) by (lia).
-      left. exists x. eapply Nat.leb_le; auto.
-  Defined.
+    Program Instance surjective_finite: Finite B :=
+      {| enum := remove_dups (f <$> enum A) |}.
+    Next Obligation. apply NoDup_remove_dups. Qed.
+    Next Obligation.
+      intros y. rewrite elem_of_remove_dups elem_of_list_fmap.
+      destruct (surj f y). eauto using elem_of_enum.
+    Qed.
+  End surjective_finite.
 
+  (* TODO: move into stdpp_extra and maybe upstream *)
   Global Instance lists_finite {A} `{Finite A} n:
     Finite { l : list A | length l <=? n = true }.
   Proof.
@@ -810,19 +811,21 @@ Section opsem.
       + intros. destruct x. destruct x.
         * apply elem_of_list_singleton. by apply (sig_eq_pi _).
         * simpl in e. inversion e.
-    - eapply @bijective_finite with (A := sum {l : list A | (length l <=? n) = true} {l : list A | length l = S n}) (f := f A n) (g := g A n).
+    - assert (Hf1: forall (l: list A), (length l <=? n) = true -> (length l <=? S n) = true) by (intros l Hl; erewrite Nat.leb_le in Hl; rewrite Nat.leb_le; lia).
+      assert (Hf2: forall (l: list A), length l = S n -> (length l <=? S n) = true) by (intros; rewrite Nat.leb_le; lia).
+      set (f := fun (x: sum {l : list A | (length l <=? n) = true} {l : list A | length l = S n}) => match x return {l : list A | (length l <=? S n) = true} with | inl (l ↾ p) => l ↾ (Hf1 l p) | inr (l ↾ p) => l ↾ (Hf2 l p) end).
+      eapply @surjective_finite with (f := f).
       + eapply sum_finite.
-      + intros x y Heq. destruct x, y; destruct s, s0; eapply proj1_sig_eq in Heq; simpl in Heq.
-        * f_equal. by apply (sig_eq_pi _).
-        * assert (length x <= n) by (eapply Nat.leb_le; eauto).
-          subst x0. lia.
-        * assert (length x0 <= n) by (eapply Nat.leb_le; eauto).
-          subst x0. lia.
-        * f_equal. by apply (sig_eq_pi _).
-      + intro. destruct x. eapply (sig_eq_pi). eapply _.
-        simpl. destruct (Nat.eq_dec (length x) (S n)); simpl; auto.
+      + intro y. destruct y as [l Hl].
+        destruct (Nat.eq_dec (length l) (S n)).
+        * exists (inr (l ↾ e)). simpl. by apply (sig_eq_pi _).
+        * generalize (proj1 (Nat.leb_le _ _) Hl); intros Hl'.
+          assert (Hl'': length l <= n) by lia.
+          exists (inl (l ↾ (proj2 (Nat.leb_le _ _) Hl''))).
+          simpl. by apply (sig_eq_pi _).
   Qed.
 
+  (* TODO: move into stdpp_extra and maybe upstream *)
   Lemma sig_exists_dec {A} {P Q: A -> Prop} `{Finite { x : A | Q x }}:
     (forall x, P x -> Q x) ->
     (∀ x : A, Decision (P x)) ->
@@ -954,7 +957,7 @@ Section opsem.
     | NextIV => Instr NextI
     end.
 
-  Fixpoint to_val (e: expr): option val :=
+  Definition to_val (e: expr): option val :=
     match e with
     | Instr c =>
       match c with
@@ -1097,3 +1100,75 @@ Local Hint Resolve language.val_irreducible.
 Local Hint Resolve to_of_val.
 Local Hint Unfold language.irreducible.
 
+Global Instance dec_pc c : Decision (isCorrectPC c).
+Proof. apply isCorrectPC_dec. Qed.
+
+(* There is probably a more general instance to be stated there...*)
+Instance Reflexive_ofe_equiv_Word : (Reflexive (ofe_equiv (leibnizO base.Word))).
+Proof. intro; reflexivity. Qed.
+
+(****)
+
+Lemma updatePC_not_executable `{MachineParameters}:
+  forall φ,
+    (updatePC φ).1 <> Executable.
+Proof.
+  intros; unfold updatePC.
+  repeat match goal with
+           |- context [match ?X with | _ => _ end] => destruct X
+         end; simpl; auto.
+Qed.
+
+Lemma exec_not_executable `{MachineParameters}:
+  forall i φ,
+    (exec i φ).1 <> Executable.
+Proof.
+  intros. destruct i; simpl; auto;
+            repeat match goal with
+                     |- context [match ?X with | _ => _ end] => destruct X
+                   end; simpl; auto; apply updatePC_not_executable.
+Qed.
+
+Global Instance is_atomic_correct `{MachineParameters} s (e : expr) : is_atomic e → Atomic s e.
+Proof.
+  intros Ha; apply strongly_atomic_atomic, ectx_language_atomic.
+  - destruct e.
+    + destruct c; rewrite /Atomic; intros ????? Hstep;
+        inversion Hstep.
+      match goal with HH : step _ _ |- _ => inversion HH end; subst; simpl; eauto.
+      * case_eq (exec (decodeInstrW' (mem σ !m! a)) σ); intros.
+        destruct c; eauto.
+        generalize (exec_not_executable (decodeInstrW' (mem σ !m! a)) σ).
+        rewrite H1. simpl; congruence.
+      * case_eq (exec (decodeInstrW' (m !m! a)) σ); intros.
+        destruct c; eauto.
+        generalize (exec_not_executable (decodeInstrW' (m !m! a)) σ).
+        rewrite H1. simpl; congruence.
+    + inversion Ha.
+  - intros K e' -> Hval%eq_None_not_Some.
+    induction K using rev_ind; first done.
+    simpl in Ha; rewrite fill_app in Ha; simpl in Ha.
+    destruct Hval. apply (fill_val K e'); simpl in *.
+    destruct x; naive_solver.
+Qed.
+
+Ltac solve_atomic :=
+  apply is_atomic_correct; simpl; repeat split;
+    rewrite ?to_of_val; eapply mk_is_Some; fast_done.
+
+Hint Extern 0 (Atomic _ _) => solve_atomic.
+Hint Extern 0 (Atomic _ _) => solve_atomic : typeclass_instances.
+
+Lemma head_reducible_from_step `{MachineParameters} σ1 e2 σ2 :
+  step (Executable, σ1) (e2, σ2) →
+  head_reducible (Instr Executable) σ1.
+Proof. intros * HH. rewrite /head_reducible /head_step //=.
+       eexists [], (Instr _), σ2, []. by constructor.
+Qed.
+
+Lemma normal_always_head_reducible `{MachineParameters} σ :
+  head_reducible (Instr Executable) σ.
+Proof.
+  generalize (normal_always_step σ); intros (?&?&?).
+  eapply head_reducible_from_step. eauto.
+Qed.
