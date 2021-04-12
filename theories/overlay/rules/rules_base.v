@@ -34,6 +34,51 @@ Instance memG_irisG `{MachineParameters} `{memG Σ, regG Σ, stackG Σ} : irisG 
 }.
 Global Opaque iris_invG.
 
+Lemma make_stack_map_length_none ss d a:
+  d >= length ss ->
+  make_stack_map ss !! (d, a) = None.
+Proof.
+  induction ss; intros.
+  - simpl. apply lookup_empty.
+  - simpl. apply (map_fold_ind (λ m1 m2, m1 !! (d, a) = None) (λ (a : Addr) (w : base.Word) (m : gmap (nat * Addr) base.Word), <[(length ss, a):=w]> m) (make_stack_map ss)).
+    + eapply IHss. simpl in H; lia.
+    + intros. simpl in H.
+      rewrite lookup_insert_ne; auto.
+      intro. inversion H2; lia.
+Qed.
+
+Lemma make_stack_map_cons_eq:
+  forall ss s d a, d <> length ss ->
+              make_stack_map (s::ss) !! (d, a) = make_stack_map ss !! (d, a).
+Proof.
+  intros. simpl.
+  apply (map_fold_ind (λ m1 m2, m1 !! (d, a) = (make_stack_map ss) !! (d, a))); auto.
+  intros. rewrite lookup_insert_ne; auto.
+  intro X; inversion X; congruence.
+Qed.
+
+Lemma make_stack_map_convert ss d a w:
+  make_stack_map (map snd ss) !! (d, a) = Some w ->
+  exists s, stack d ss = Some s /\ s !! a = Some w.
+Proof.
+  induction ss.
+  - simpl. rewrite lookup_empty. congruence.
+  - simpl. intros. destruct (nat_eq_dec d (@Datatypes.length Stackframe ss)).
+    + subst d. eexists; split; eauto.
+      clear IHss. rewrite map_length in H.
+      apply (map_fold_ind (λ m1 m2, forall i x, m1 !! (length ss, i) = Some x -> m2 !! i = Some x) (λ (a : Addr) (w : base.Word) (m : gmap (nat * Addr) base.Word), <[(length ss, a):=w]> m) (make_stack_map (map snd ss))); auto.
+      * intros. rewrite make_stack_map_length_none in H0. congruence.
+        rewrite map_length. lia.
+      * intros. destruct (decide (i = i0)).
+        { subst i0. rewrite lookup_insert. rewrite lookup_insert in H2. auto. }
+        { rewrite lookup_insert_ne; auto.
+          rewrite lookup_insert_ne in H2; auto.
+          intro X; inversion X; congruence. }
+    + eapply IHss. rewrite -H.
+      rewrite make_stack_map_cons_eq; auto.
+      rewrite map_length; auto.
+Qed.
+
 (* Points to predicates for registers *)
 Notation "r ↣ᵣ{ q } w" := (mapsto (L:=RegName) (V:=base.Word) r q w)
   (at level 20, q at level 50, format "r  ↣ᵣ{ q }  w") : bi_scope.
@@ -42,7 +87,7 @@ Notation "r ↣ᵣ w" := (mapsto (L:=RegName) (V:=base.Word) r 1 w)%I (at level 
 (* Points to predicates for stack memory *)
 (* Notation "a { n } ↣ₐ { q } w" := (mapsto (L:=(nat * Addr)) (V:=base.Word) (n, a) q w) *)
 (*   (at level 20, q at level 50, format "a { n } ↣ₐ { q }  w") : bi_scope. *)
-Notation "a ↣ₐ { n } w" := (mapsto (L:=nat * Addr) (V:=base.Word) (n, a) 1 w) (at level 20) : bi_scope.
+Notation "a ↣ₐ [ n ] w" := (mapsto (L:=nat * Addr) (V:=base.Word) (n, a) 1 w) (at level 20) : bi_scope.
 
 (* Points to predicates for heap memory *)
 (* Notation "a ↣ₐ { q } w" := (mapsto (L:=Addr) (V:=base.Word) a q w) *)
@@ -186,6 +231,49 @@ Section overlay_lang_rules.
     intros HPC Hs. inversion Hs; subst; auto; done.
   Qed.
 
+  Lemma step_exec_inv φ p g b e a w instr (c: ConfFlag) (σ: ExecConf) :
+    reg φ !! PC = Some (inr (Regular ((p, g), b, e, a))) →
+    isCorrectPC (inr (Regular ((p, g), b, e, a))) →
+    mem φ !! a = Some w →
+    decodeInstrW' w = instr →
+    ~ (∃ (rf : RegName) (rargs : list RegName), is_call rf rargs (mem φ) a e) ->
+    step (Executable, φ) (c, σ) →
+    exec instr φ = (c, σ).
+  Proof.
+    intros HPC Hpc Hm Hinstr Hnotcall. inversion 1.
+    { exfalso. subst. rewrite /RegLocate HPC in H6. auto. }
+    { exfalso. subst. rewrite /RegLocate HPC in H7. congruence. }
+    { subst. rewrite /RegLocate HPC in H7; inversion H7; subst.
+      rewrite /MemLocate Hm. eapply injective_projections; auto. }
+    { subst. rewrite /RegLocate HPC in H7. congruence. }
+    { subst. rewrite /RegLocate HPC in H7. inversion H7; subst.
+      elim Hnotcall; eauto. }
+    { subst. rewrite /RegLocate HPC in H7. congruence. }
+  Qed.
+
+  Lemma step_exec_inv' φ d p b e m a w instr (c: ConfFlag) (σ: ExecConf) :
+    reg φ !! PC = Some (inr (Stk d p b e a)) →
+    isCorrectPC (inr (Stk d p b e a)) →
+    stack d ((reg φ, stk φ) :: callstack φ) = Some m ->
+    m !! a = Some w →
+    decodeInstrW' w = instr →
+    ~ (∃ (rf : RegName) (rargs : list RegName), is_call rf rargs m a e) ->
+    step (Executable, φ) (c, σ) →
+    exec instr φ = (c, σ).
+  Proof.
+    intros HPC Hpc Hms Hm Hinstr Hnotcall. inversion 1.
+    { exfalso. subst. rewrite /RegLocate HPC in H6. auto. }
+    { exfalso. subst. rewrite /RegLocate HPC in H7. inversion H7; subst. congruence. }
+    { subst. rewrite /RegLocate HPC in H7. congruence. }
+    { subst. rewrite /RegLocate HPC in H7; inversion H7; subst.
+      inversion H7; subst. rewrite Hms in H9; inversion H9; subst.
+      rewrite /MemLocate Hm. eapply injective_projections; auto. }
+    { subst. rewrite /RegLocate HPC in H7. congruence. }
+    { subst. rewrite /RegLocate HPC in H7. inversion H7; subst.
+      rewrite Hms in H9. inversion H9; subst.
+      elim Hnotcall; eauto. }
+  Qed.
+
   Lemma wp_notCorrectPC:
     forall E w,
       ~ isCorrectPC w ->
@@ -207,5 +295,140 @@ Section overlay_lang_rules.
     iNext. iModIntro. iSplitR; auto. iFrame. cbn. by iApply "Hϕ".
     simpl. rewrite /RegLocate H3. eauto.
   Qed.
+
+  (* Subcases for respecitvely permissions and bounds *)
+
+  Lemma wp_notCorrectPC_perm E pc_p pc_g pc_b pc_e pc_a :
+      pc_p ≠ RX ∧ pc_p ≠ RWX ∧ pc_p ≠ RWLX →
+      {{{ PC ↣ᵣ inr (Regular ((pc_p,pc_g),pc_b,pc_e,pc_a))}}}
+      Instr Executable @ E
+      {{{ RET FailedV; True }}}.
+  Proof.
+    iIntros ([HnRX [HnRWX HnRWLX]] φ) "HPC Hwp".
+    iApply (wp_notCorrectPC with "[HPC]");[|iFrame|].
+    intro X; inversion X. destruct H9 as [Y | [Y | Y]]; congruence.
+    iNext. iIntros "HPC /=".
+    by iApply "Hwp".
+  Qed.
+
+  Lemma wp_notCorrectPC_perm' E d pc_p pc_b pc_e pc_a :
+      pc_p ≠ RX ∧ pc_p ≠ RWX ∧ pc_p ≠ RWLX →
+      {{{ PC ↣ᵣ inr (Stk d pc_p pc_b pc_e pc_a)}}}
+      Instr Executable @ E
+      {{{ RET FailedV; True }}}.
+  Proof.
+    iIntros ([HnRX [HnRWX HnRWLX]] φ) "HPC Hwp".
+    iApply (wp_notCorrectPC with "[HPC]");[|iFrame|].
+    intro X; inversion X. destruct H9 as [Y | [Y | Y]]; congruence.
+    iNext. iIntros "HPC /=".
+    by iApply "Hwp".
+  Qed.
+
+  (* ----------------------------------- ATOMIC RULES -------------------------------- *)
+
+  Lemma wp_halt E pc_p pc_g pc_b pc_e pc_a w pc_p' :
+    decodeInstrW' w = Halt →
+    PermFlows pc_p pc_p' →
+    isCorrectPC (inr (Regular ((pc_p,pc_g),pc_b,pc_e,pc_a))) →
+
+    {{{ PC ↣ᵣ inr (Regular ((pc_p,pc_g),pc_b,pc_e,pc_a)) ∗ pc_a ↣ₐ w }}}
+      Instr Executable @ E
+    {{{ RET HaltedV; PC ↣ᵣ inr (Regular (pc_p, pc_g, pc_b, pc_e, pc_a)) ∗ pc_a ↣ₐ w }}}.
+  Proof.
+    intros Hinstr Hfl Hvpc.
+    iIntros (φ) "[Hpc Hpca] Hφ".
+    iApply wp_lift_atomic_head_step_no_fork; auto.
+    iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [[[r m] stk] sf]; simpl.
+    iDestruct "Hσ1" as "[Hr [Hm Hstk]]".
+    iDestruct (@gen_heap_valid with "Hr Hpc") as %?.
+    iDestruct (@gen_heap_valid with "Hm Hpca") as %?.
+    iModIntro.
+    iSplitR. by iPureIntro; apply normal_always_head_reducible.
+    iIntros (e2 σ2 efs Hstep).
+    eapply prim_step_exec_inv in Hstep as (-> & -> & (c & -> & Hstep)).
+    eapply step_exec_inv in Hstep; eauto. cbn in Hstep. simplify_eq.
+    iNext. iModIntro. iSplitR; eauto. iFrame. iApply "Hφ". by iFrame.
+    intro X. destruct X as [rf [rargs Hiscall]].
+    destruct Hiscall as [a' [_ [_ [_ [_ [_ [_ [_ X]]]]]]]].
+    destruct (X 0 ltac:(lia)) as [a'' [A B]].
+    simpl in B. inversion B.
+    assert ((pc_a + 0%nat)%a = Some pc_a) by (clear; solve_addr).
+    rewrite A in H5; inversion H5; subst.
+    rewrite /MemLocate H4 in B. inversion B; subst.
+    rewrite /decodeInstrW' in Hinstr.
+    rewrite decode_encode_instrW_inv in Hinstr.
+    congruence.
+  Qed.
+
+  Lemma wp_halt' E d pc_p pc_b pc_e pc_a w pc_p' :
+    decodeInstrW' w = Halt →
+    PermFlows pc_p pc_p' →
+    isCorrectPC (inr (Stk d pc_p pc_b pc_e pc_a)) →
+
+    {{{ PC ↣ᵣ inr (Stk d pc_p pc_b pc_e pc_a) ∗ pc_a ↣ₐ [d] w }}}
+      Instr Executable @ E
+    {{{ RET HaltedV; PC ↣ᵣ inr (Stk d pc_p pc_b pc_e pc_a) ∗ pc_a ↣ₐ [d] w }}}.
+  Proof.
+    intros Hinstr Hfl Hvpc.
+    iIntros (φ) "[Hpc Hpca] Hφ".
+    iApply wp_lift_atomic_head_step_no_fork; auto.
+    iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [[[r m] stk] sf]; simpl.
+    iDestruct "Hσ1" as "[Hr [Hm Hstk]]".
+    iDestruct (@gen_heap_valid with "Hr Hpc") as %?.
+    iDestruct (@gen_heap_valid with "Hstk Hpca") as %?.
+    assert (XY: map_fold (λ a w (m : gmap (nat * Addr) base.Word), <[(length (map snd sf), a):=w]> m) (make_stack_map (map snd sf)) stk = make_stack_map (map snd ((r, stk)::sf))) by reflexivity.
+    rewrite XY in H4. eapply make_stack_map_convert in H4.
+    destruct H4 as [ms [HA HB]].
+    iModIntro.
+    iSplitR. by iPureIntro; apply normal_always_head_reducible.
+    iIntros (e2 σ2 efs Hstep).
+    eapply prim_step_exec_inv in Hstep as (-> & -> & (c & -> & Hstep)).
+    eapply step_exec_inv' in Hstep; eauto. cbn in Hstep. simplify_eq.
+    iNext. iModIntro. iSplitR; eauto. iFrame. iApply "Hφ". by iFrame.
+    intro X. destruct X as [rf [rargs Hiscall]].
+    destruct Hiscall as [a' [_ [_ [_ [_ [_ [_ [_ X]]]]]]]].
+    destruct (X 0 ltac:(lia)) as [a'' [A B]].
+    simpl in B. inversion B.
+    assert ((pc_a + 0%nat)%a = Some pc_a) by (clear; solve_addr).
+    rewrite A in H4; inversion H4; subst.
+    rewrite /MemLocate HB in H5.
+    rewrite -H5 /decodeInstrW' in Hinstr.
+    rewrite decode_encode_instrW_inv in Hinstr.
+    congruence.
+  Qed.
+
+  Lemma wp_fail E pc_p pc_g pc_b pc_e pc_a w pc_p' :
+    decodeInstrW' w = Fail →
+    PermFlows pc_p pc_p' →
+    isCorrectPC (inr (Regular ((pc_p,pc_g),pc_b,pc_e,pc_a))) →
+
+    {{{ PC ↣ᵣ inr (Regular ((pc_p,pc_g),pc_b,pc_e,pc_a)) ∗ pc_a ↣ₐ w }}}
+      Instr Executable @ E
+    {{{ RET FailedV; PC ↣ᵣ inr (Regular ((pc_p,pc_g),pc_b,pc_e,pc_a)) ∗ pc_a ↣ₐ w }}}.
+  Proof.
+    intros Hinstr Hfl Hvpc.
+    iIntros (φ) "[Hpc Hpca] Hφ".
+    iApply wp_lift_atomic_head_step_no_fork; auto.
+    iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [[[r m] stk] sf]; simpl.
+    iDestruct "Hσ1" as "[Hr [Hm Hstk]]".
+    iDestruct (@gen_heap_valid with "Hr Hpc") as %?.
+    iDestruct (@gen_heap_valid with "Hm Hpca") as %?.
+    iModIntro.
+    iSplitR. by iPureIntro; apply normal_always_head_reducible.
+    iIntros (e2 σ2 efs Hstep).
+    eapply prim_step_exec_inv in Hstep as (-> & -> & (c & -> & Hstep)).
+    eapply step_exec_inv in Hstep; eauto. cbn in Hstep. simplify_eq.
+    iNext. iModIntro. iSplitR; eauto. iFrame. iApply "Hφ". by iFrame.
+    intro X. destruct X as [rf [rargs Hiscall]].
+    destruct Hiscall as [a' [_ [_ [_ [_ [_ [_ [_ X]]]]]]]].
+    destruct (X 0 ltac:(lia)) as [a'' [A B]].
+    simpl in B. inversion B.
+    assert ((pc_a + 0%nat)%a = Some pc_a) by (clear; solve_addr).
+    rewrite A in H5; inversion H5; subst.
+    rewrite /MemLocate H4 in B. inversion B; subst.
+    rewrite /decodeInstrW' in Hinstr.
+    rewrite decode_encode_instrW_inv in Hinstr.
+    congruence.
+   Qed.
 
 End overlay_lang_rules.
