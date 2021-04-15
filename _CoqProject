@@ -11,6 +11,10 @@ theories/addr_reg.v
 theories/machine_base.v
 theories/machine_parameters.v
 theories/cap_lang.v
+theories/overlay/base.v
+theories/overlay/call.v
+theories/overlay/tailcall.v
+theories/overlay/lang.v
 theories/machine_run.v
 theories/region.v
 theories/multiple_updates.v

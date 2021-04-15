@@ -1,5 +1,5 @@
 From Coq Require Import Eqdep_dec. (* Needed to prove decidable equality on RegName *)
-From stdpp Require Import gmap fin_maps list.
+From stdpp Require Import gmap fin_maps list finite.
 
 (* We assume a fixed set of registers, and a finite set of memory addresses.
 
@@ -34,6 +34,26 @@ Program Definition n_to_regname (n : nat) : option RegName :=
 Next Obligation.
   intros. eapply Nat.leb_le; eauto.
 Defined.
+
+Definition all_registers: list RegName :=
+  [R 0 eq_refl; R 1 eq_refl; R 2 eq_refl; R 3 eq_refl; R 4 eq_refl; R 5 eq_refl;
+   R 6 eq_refl; R 7 eq_refl; R 8 eq_refl; R 9 eq_refl; R 10 eq_refl; R 11 eq_refl;
+   R 12 eq_refl; R 13 eq_refl; R 14 eq_refl; R 15 eq_refl; R 16 eq_refl; R 17 eq_refl;
+   R 18 eq_refl; R 19 eq_refl; R 20 eq_refl; R 21 eq_refl; R 22 eq_refl; R 23 eq_refl;
+   R 24 eq_refl; R 25 eq_refl; R 26 eq_refl; R 27 eq_refl; R 28 eq_refl; R 29 eq_refl;
+   R 30 eq_refl; R 31 eq_refl; PC].
+
+Global Instance RegName_finite: Finite RegName.
+Proof.
+  refine {| enum := all_registers;
+            NoDup_enum := _;
+            elem_of_enum := _ |}.
+  { repeat (econstructor; [set_solver|]).
+    econstructor. }
+  { destruct x; [set_solver|].
+    do 32 (destruct n as [|n]; [rewrite (@Eqdep_dec.eq_proofs_unicity bool ltac:(decide equality) _ _ fin (eq_refl _)); set_solver|]).
+    simpl in fin. discriminate. }
+Qed.
 
 Global Instance reg_countable : Countable RegName.
 Proof.

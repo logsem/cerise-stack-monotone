@@ -1,63 +1,8 @@
 From iris.algebra Require Import base.
 From iris.program_logic Require Import language ectx_language ectxi_language.
-From stdpp Require Import gmap fin_maps list.
+From stdpp Require Import gmap fin_maps list finite.
 From cap_machine Require Export addr_reg machine_base machine_parameters.
-
-Inductive Cap: Type :=
-| Regular: machine_base.Cap -> Cap (* Regular capabilities *)
-| Stk: nat -> Perm -> Addr -> Addr -> Addr -> Cap (* Stack derived capabilities *)
-| Ret: nat -> Addr -> Addr -> Addr -> Cap. (* Return capabilities *)
-
-Coercion Regular : machine_base.Cap >-> Cap.
-
-Definition Word := (Z + Cap)%type.
-
-Notation Reg := (gmap RegName Word).
-Notation Mem := (gmap Addr Word).
-
-Definition RegLocate (reg : Reg) (r : RegName) :=
-  match (reg !! r) with
-  | Some w => w
-  | None => inl 0%Z
-  end.
-
-Definition MemLocate (mem : Mem) (a : Addr) :=
-  match (mem !! a) with
-  | Some w => w
-  | None => inl 0%Z
-  end.
-
-Notation "mem !m! a" := (MemLocate mem a) (at level 20).
-Notation "reg !r! r" := (RegLocate reg r) (at level 20).
-
-Definition Stackframe := (Reg * Mem)%type.
-
-Definition ExecConf := (Reg * Mem * Mem * list Stackframe)%type.
-
-Definition reg (ϕ: ExecConf) :=
-  match ϕ with
-  | (r, _, _, _) => r
-  end.
-
-Definition mem (ϕ: ExecConf) :=
-  match ϕ with
-  | (_, m, _, _) => m
-  end.
-
-Definition stk (ϕ: ExecConf) :=
-  match ϕ with
-  | (_, _, stk, _) => stk
-  end.
-
-Definition callstack (ϕ: ExecConf) :=
-  match ϕ with
-  | (_, _, _, cs) => cs
-  end.
-
-Lemma ExecConfDestruct:
-  forall ϕ,
-    ϕ = (reg ϕ, mem ϕ, stk ϕ, callstack ϕ).
-Proof. repeat destruct ϕ as (ϕ & ?). reflexivity. Qed.
+From cap_machine.overlay Require Import base call.
 
 Inductive ConfFlag : Type :=
 | Executable
@@ -66,24 +11,6 @@ Inductive ConfFlag : Type :=
 | NextI.
 
 Definition Conf: Type := ConfFlag * ExecConf.
-
-Definition update_reg (ϕ: ExecConf) (r: RegName) (w: Word): ExecConf := (<[r:=w]>(reg ϕ), mem ϕ, stk ϕ, callstack ϕ).
-Definition update_mem (φ: ExecConf) (a: Addr) (w: Word): ExecConf := (reg φ, <[a:=w]>(mem φ), stk φ, callstack φ).
-Definition update_stk (φ: ExecConf) (a: Addr) (w: Word): ExecConf := (reg φ, mem φ, <[a:=w]> (stk φ), callstack φ).
-Fixpoint update_callstack (cs: list Stackframe) (d: nat) (a: Addr) (w: Word): option (list Stackframe) :=
-  match cs with
-  | sf::cs => if nat_eq_dec d (length cs) then Some ((fst sf, <[a := w]> (snd sf))::cs)
-             else match update_callstack cs d a w with
-                  | None => None
-                  | Some cs => Some (sf::cs)
-                  end
-  | [] => None
-  end.
-Definition update_stack (φ: ExecConf) (d: nat) (a: Addr) (w: Word): option ExecConf :=
-  match update_callstack (callstack φ) d a w with
-  | None => None
-  | Some cs => Some (reg φ, mem φ, stk φ, cs)
-  end.
 
 Definition updatePC (φ: ExecConf): Conf :=
   match RegLocate (reg φ) PC with
@@ -102,7 +29,7 @@ Definition updatePC (φ: ExecConf): Conf :=
   | _ => (Failed, φ)
   end.
 
-Definition updatePcPerm (w: Word): Word :=
+Definition updatePcPerm (w: base.Word): base.Word :=
   match w with
   | inr (Regular ((E, g), b, e, a)) => inr (Regular ((RX, g), b, e, a))
   | inr (Stk d E b e a) => inr (Stk d RX b e a)
@@ -121,13 +48,13 @@ Fixpoint stack (d: nat) (cs: list Stackframe) :=
   | [] => None
   end.
 
-Definition nonZero (w: Word): bool :=
+Definition nonZero (w: base.Word): bool :=
   match w with
   | inr _ => true
   | inl n => Zneq_bool n 0
   end.
 
-Definition canReadUpTo (w: Word): Addr :=
+Definition canReadUpTo (w: base.Word): Addr :=
   match w with
   | inl _ => za
   | inr (Regular ((p, g), b, e, a)) => match p with
@@ -143,7 +70,7 @@ Definition canReadUpTo (w: Word): Addr :=
   | inr (Ret d b e a) => e
   end.
 
-Definition canStore (p: Perm) (a: Addr) (w: Word): bool :=
+Definition canStore (p: Perm) (a: Addr) (w: base.Word): bool :=
   match w with
   | inl _ => true
   | inr (Regular ((_, g), _, _, _)) => match g with
@@ -154,7 +81,7 @@ Definition canStore (p: Perm) (a: Addr) (w: Word): bool :=
   | inr (Stk _ _ _ _ _) | inr (Ret _ _ _ _) => pwl p && leb_addr (canReadUpTo w) a
   end.
 
-Definition canStoreU (p: Perm) (a: Addr) (w: Word): bool :=
+Definition canStoreU (p: Perm) (a: Addr) (w: base.Word): bool :=
   match w with
   | inl _ => true
   | inr (Regular ((_, g), _, _, _)) => match g with
@@ -192,7 +119,7 @@ Definition verify_access (a: access_kind): option Addr :=
     end
   end.
 
-Definition z_of_argument (regs: Reg) (a: Z + RegName) : option Z :=
+Definition z_of_argument (regs: base.Reg) (a: Z + RegName) : option Z :=
   match a with
   | inl z => Some z
   | inr r =>
@@ -202,7 +129,7 @@ Definition z_of_argument (regs: Reg) (a: Z + RegName) : option Z :=
     end
   end.
 
-Inductive isCorrectPC: Word → Prop :=
+Inductive isCorrectPC: base.Word → Prop :=
 | isCorrectPC_intro:
     forall p g (b e a : Addr),
       (b <= a < e)%a →
@@ -213,6 +140,32 @@ Inductive isCorrectPC: Word → Prop :=
       (b <= a < e)%a →
       p = RX \/ p = RWX \/ p = RWLX →
       isCorrectPC (inr (Stk d p b e a)).
+
+Lemma isCorrectPC_dec:
+  forall w, { isCorrectPC w } + { not (isCorrectPC w) }.
+Proof.
+  destruct w.
+  - right. red; intros H. inversion H.
+  - destruct c.
+    + destruct c as ((((p & g) & b) & e) & a).
+      case_eq (match p with RX | RWX | RWLX => true | _ => false end); intros.
+      * destruct (Addr_le_dec b a).
+        { destruct (Addr_lt_dec a e).
+          { left. econstructor; simpl; eauto. by auto.
+            destruct p; naive_solver. }
+          { right. red; intro HH. inversion HH; subst. solve_addr. } }
+        { right. red; intros HH; inversion HH; subst. solve_addr. }
+      * right. red; intros HH; inversion HH; subst. naive_solver.
+    + case_eq (match p with RX | RWX | RWLX => true | _ => false end); intros.
+      * destruct (Addr_le_dec a a1).
+        { destruct (Addr_lt_dec a1 a0).
+          { left. econstructor; simpl; eauto. by auto.
+            destruct p; naive_solver. }
+          { right. red; intro HH. inversion HH; subst. solve_addr. } }
+        { right. red; intros HH; inversion HH; subst. solve_addr. }
+      * right. red; intros HH; inversion HH; subst. naive_solver.
+    + right. red; intros H. inversion H.
+Qed.
 
 Section opsem.
   Context `{MachineParameters}.
@@ -225,9 +178,8 @@ Section opsem.
       match (RegLocate (reg φ) r) with
       | inr (Ret d b e a) => match jmp_ret d (callstack φ) with
                             | None => (Failed, φ)
-                            | Some ((reg', m'), cs) => (NextI, (merge (fun a b => match a with Some _ => a | _ => b end) reg' (reg φ), mem φ, m', cs))
-                                                        (* TODO: this is not safe if registers are not cleared beforehands *)
-                      end
+                            | Some ((reg', m'), cs) => (NextI, (reg', mem φ, m', cs))
+                            end
       | _ => let φ' :=  (update_reg φ PC (updatePcPerm (RegLocate (reg φ) r))) in (NextI, φ')
       end
     | Jnz r1 r2 =>
@@ -235,7 +187,7 @@ Section opsem.
         match (RegLocate (reg φ) r1) with
         | inr (Ret d b e a) => match jmp_ret d (callstack φ) with
                               | None => (Failed, φ)
-                              | Some ((reg', m'), cs) => (NextI, (merge (fun a b => match a with Some _ => a | _ => b end) reg' (reg φ), mem φ, m', cs))
+                              | Some ((reg', m'), cs) => (NextI, (reg', mem φ, m', cs))
                               end
         | _ => let φ' := (update_reg φ PC (updatePcPerm (RegLocate (reg φ) r1))) in (NextI, φ')
         end
@@ -766,20 +718,457 @@ Section opsem.
       end
     end.
 
+  (* TODO: define *)
+  Definition clear_regs (reg: base.Reg) (l: list RegName) :=
+    foldr (fun r reg => <[r := inl 0%Z]> reg) reg l.
+
+  Definition exec_call (φ: ExecConf) (rf: RegName) (rargs: list RegName): Conf :=
+    let regs' := <[PC := (updatePcPerm (RegLocate (reg φ) rf))]> (clear_regs (reg φ) (list_difference all_registers [PC; rf; r_stk])) in
+    (Failed, φ).
+
+  Definition decodeInstrW' (w: base.Word) :=
+    match w with
+    | inl n => decodeInstrW (inl n)
+    | inr _ => Fail
+    end.
+
+  Definition is_call rf rargs m a e: Prop :=
+    exists a',
+      rf <> PC /\
+      rf <> r_stk /\
+      (R 0 eq_refl) ∉ rf::rargs /\
+      (R 1 eq_refl) ∉ rf::rargs /\
+      (R 2 eq_refl) ∉ rf::rargs /\
+      (a + (141 + length rargs))%a = Some a' /\
+      (a' < e)%a /\
+      (forall i, (i <= (141 + length rargs))%nat ->
+            exists a_i, (a + i)%a = Some a_i /\ (call_instrs rf rargs) !! i = Some (m !m! a_i)).
+
   Inductive step: Conf → Conf → Prop :=
   | step_exec_fail:
       forall φ,
         not (isCorrectPC ((reg φ) !r! PC)) →
         step (Executable, φ) (Failed, φ)
+  | step_exec_fail': (* This should never happen *)
+      forall φ d p b e a,
+        RegLocate (reg φ) PC = inr (Stk d p b e a) ->
+        stack d ((reg φ, stk φ)::(callstack φ)) = None ->
+        step (Executable, φ) (Failed, φ)
   | step_exec_instr:
       forall φ p g b e a i c,
         RegLocate (reg φ) PC = inr (Regular ((p, g), b, e, a)) ->
         isCorrectPC ((reg φ) !r! PC) →
-        decodeInstrW ((mem φ) !m! a) = i →
+        decodeInstrW' ((mem φ) !m! a) = i →
         exec i φ = c →
+        (~ exists rf rargs, is_call rf rargs (mem φ) a e) ->
+        step (Executable, φ) (c.1, c.2)
+  | step_exec_instr':
+      forall φ d p b e a i c m,
+        RegLocate (reg φ) PC = inr (Stk d p b e a) ->
+        isCorrectPC ((reg φ) !r! PC) →
+        stack d ((reg φ, stk φ)::(callstack φ)) = Some m ->
+        decodeInstrW' (m !m! a) = i →
+        exec i φ = c →
+        (~ exists rf rargs, is_call rf rargs m a e) ->
+        step (Executable, φ) (c.1, c.2)
+  | step_exec_call:
+      forall φ p g b e a c rf rargs,
+        RegLocate (reg φ) PC = inr (Regular ((p, g), b, e, a)) ->
+        isCorrectPC ((reg φ) !r! PC) →
+        is_call rf rargs (mem φ) a e ->
+        c = exec_call φ rf rargs ->
+        step (Executable, φ) (c.1, c.2)
+  | step_exec_call':
+      forall φ d p b e a c m rf rargs,
+        RegLocate (reg φ) PC = inr (Stk d p b e a) ->
+        isCorrectPC ((reg φ) !r! PC) →
+        stack d ((reg φ, stk φ)::(callstack φ)) = Some m ->
+        is_call rf rargs m a e ->
+        c = exec_call φ rf rargs ->
         step (Executable, φ) (c.1, c.2).
 
+  (* TODO: move into stdpp_extra, already upstreamed to stdpp *)
+  Section surjective_finite.
+    Context {A} `{Finite A, EqDecision B} (f : A → B).
+    Context `{!Surj (=) f}.
 
+    Program Instance surjective_finite: Finite B :=
+      {| enum := remove_dups (f <$> enum A) |}.
+    Next Obligation. apply NoDup_remove_dups. Qed.
+    Next Obligation.
+      intros y. rewrite elem_of_remove_dups elem_of_list_fmap.
+      destruct (surj f y). eauto using elem_of_enum.
+    Qed.
+  End surjective_finite.
 
+  (* TODO: move into stdpp_extra and maybe upstream *)
+  Global Instance lists_finite {A} `{Finite A} n:
+    Finite { l : list A | length l <=? n = true }.
+  Proof.
+    induction n.
+    - refine {| enum := [[]↾eq_refl]; NoDup_enum := _; elem_of_enum := _ |}.
+      + repeat econstructor. intro. inversion H1.
+      + intros. destruct x. destruct x.
+        * apply elem_of_list_singleton. by apply (sig_eq_pi _).
+        * simpl in e. inversion e.
+    - assert (Hf1: forall (l: list A), (length l <=? n) = true -> (length l <=? S n) = true) by (intros l Hl; erewrite Nat.leb_le in Hl; rewrite Nat.leb_le; lia).
+      assert (Hf2: forall (l: list A), length l = S n -> (length l <=? S n) = true) by (intros; rewrite Nat.leb_le; lia).
+      set (f := fun (x: sum {l : list A | (length l <=? n) = true} {l : list A | length l = S n}) => match x return {l : list A | (length l <=? S n) = true} with | inl (l ↾ p) => l ↾ (Hf1 l p) | inr (l ↾ p) => l ↾ (Hf2 l p) end).
+      eapply @surjective_finite with (f := f).
+      + eapply sum_finite.
+      + intro y. destruct y as [l Hl].
+        destruct (Nat.eq_dec (length l) (S n)).
+        * exists (inr (l ↾ e)). simpl. by apply (sig_eq_pi _).
+        * generalize (proj1 (Nat.leb_le _ _) Hl); intros Hl'.
+          assert (Hl'': length l <= n) by lia.
+          exists (inl (l ↾ (proj2 (Nat.leb_le _ _) Hl''))).
+          simpl. by apply (sig_eq_pi _).
+  Qed.
 
+  (* TODO: move into stdpp_extra and maybe upstream *)
+  Lemma sig_exists_dec {A} {P Q: A -> Prop} `{Finite { x : A | Q x }}:
+    (forall x, P x -> Q x) ->
+    (∀ x : A, Decision (P x)) ->
+    Decision (∃ x : A, P x).
+  Proof.
+    intros. generalize (exists_dec (fun x => P (proj1_sig x))).
+    intros. destruct H2.
+    - left. destruct e. eauto.
+    - right. intro. eapply n.
+      destruct H2. generalize (H1 _ H2). intros.
+      exists (exist _ x H3). simpl. auto.
+  Qed.
 
+  Lemma is_call_dec:
+    forall m a e,
+      Decision (exists rf rargs, is_call rf rargs m a e).
+  Proof.
+    intros. eapply exists_dec. intros rf.
+    eapply @sig_exists_dec with (Q := fun l => length l <=? Z.to_nat (e - a)%Z = true).
+    - eapply _.
+    - intros. destruct H0 as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
+      revert HD HE. clear. intros HD HE.
+      eapply Nat.leb_le. solve_addr.
+    - intros rargs. destruct (reg_eq_dec rf PC).
+      { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
+        eapply HPC; auto. }
+      destruct (reg_eq_dec rf r_stk).
+      { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
+        eapply Hstk; auto. }
+      destruct (elem_of_list_dec (R 0 eq_refl) (rf::rargs)).
+      { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
+        eapply HA; auto. }
+      destruct (elem_of_list_dec (R 1 eq_refl) (rf::rargs)).
+      { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
+        eapply HB; auto. }
+      destruct (elem_of_list_dec (R 2 eq_refl) (rf::rargs)).
+      { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
+        eapply HC; auto. }
+      destruct ((a + (141 + length rargs))%a) as [a'|] eqn:Ha'.
+      2: { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
+           congruence. }
+      destruct (Addr_lt_dec a' e).
+      2: { right. intro X. destruct X as [a'' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
+           rewrite HD in Ha'; inversion Ha'; subst.
+           eapply n4; auto. }
+      assert (Decision (∀ (i : fin (S (141 + length rargs))), ∃ a_i : Addr, (a + fin_to_nat i)%a = Some a_i ∧ call_instrs rf rargs !! (fin_to_nat i) = Some (m !m! a_i))).
+      { eapply forall_dec. intros. destruct (a + x)%a as [a_i|] eqn:Ha_i.
+        - case_eq ((call_instrs rf rargs) !! (fin_to_nat x)); intros.
+          + destruct (base.word_eq_dec w (m !m! a_i)).
+            * subst w. left; eauto.
+            * right. intros [a_i' [A B]].
+              inversion A; subst a_i'; clear A.
+              rewrite B in H0; inversion H0; subst. congruence.
+          + right. intros [a_i' [A B]].
+            rewrite B in H0; inversion H0.
+        - right; intros [a_i' [A B]].
+          inversion A. }
+      destruct H0.
+      { left. exists a'. repeat split; eauto.
+        intros. assert (i < S (141 + length rargs)) by lia.
+        generalize (e0 (nat_to_fin H1)). rewrite fin_to_nat_to_fin. auto. }
+      right. intro X. destruct X as [a'' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
+      eapply n4. intros. eapply (HF (fin_to_nat i)).
+      generalize (fin_to_nat_lt i). lia.
+  Qed.
+
+  Lemma normal_always_step:
+    forall φ, exists cf φ', step (Executable, φ) (cf, φ').
+  Proof.
+    intros. destruct (isCorrectPC_dec (RegLocate (reg φ) PC)).
+    - inversion i; subst.
+      + destruct (is_call_dec (mem φ) a e) as [Hiscall|Hiscall].
+        * destruct Hiscall as [rf [rargs Hiscall]].
+          do 2 eexists. eapply step_exec_call; eauto.
+        * do 2 eexists; eapply step_exec_instr; eauto.
+      + destruct (stack d ((reg φ, stk φ)::(callstack φ))) as [m|] eqn:Hstk.
+        * destruct (is_call_dec m a e) as [Hiscall|Hiscall].
+          { destruct Hiscall as [rf [rargs Hiscall]].
+            do 2 eexists. eapply step_exec_call'; eauto. }
+          { do 2 eexists; eapply step_exec_instr'; eauto. }
+        * do 2 eexists. eapply step_exec_fail'; eauto.
+    - exists Failed, φ. constructor 1; eauto.
+  Qed.
+
+  Lemma step_deterministic:
+    forall c1 c2 c2' σ1 σ2 σ2',
+      step (c1, σ1) (c2, σ2) →
+      step (c1, σ1) (c2', σ2') →
+      c2 = c2' ∧ σ2 = σ2'.
+  Proof.
+    Ltac inv H := inversion H; clear H; subst.
+    intros * H1 H2; split; inv H1; inv H2; auto; try congruence.
+    - rewrite H4 in H6; inv H6.
+      elim H10. eauto.
+    - rewrite H4 in H6; inv H6.
+      rewrite H9 in H8; inv H8.
+      elim H11. eauto.
+    - rewrite H4 in H6; inv H6.
+      elim H11. eauto.
+    - rewrite H4 in H6; inv H6.
+      rewrite H10 in H8; inv H8.
+      elim H13. eauto.
+    - rewrite H4 in H6; inv H6.
+      elim H10. eauto.
+    - rewrite H4 in H6; inv H6.
+      rewrite H9 in H8; inv H8.
+      elim H11. eauto.
+    - rewrite H4 in H6; inv H6.
+      elim H11. eauto.
+    - rewrite H4 in H6; inv H6.
+      rewrite H10 in H8; inv H8.
+      elim H13. eauto.
+  Qed.
+
+  Inductive val: Type :=
+  | HaltedV: val
+  | FailedV: val
+  | NextIV: val.
+
+  Inductive expr: Type :=
+  | Instr (c : ConfFlag)
+  | Seq (e : expr).
+  Definition state : Type := ExecConf.
+
+  Definition of_val (v: val): expr :=
+    match v with
+    | HaltedV => Instr Halted
+    | FailedV => Instr Failed
+    | NextIV => Instr NextI
+    end.
+
+  Definition to_val (e: expr): option val :=
+    match e with
+    | Instr c =>
+      match c with
+      | Executable => None
+      | Halted => Some HaltedV
+      | Failed => Some FailedV
+      | NextI => Some NextIV
+      end
+    | Seq _ => None
+    end.
+
+  Lemma of_to_val:
+    forall e v, to_val e = Some v →
+           of_val v = e.
+  Proof.
+    intros * HH. destruct e; try destruct c; simpl in HH; inv HH; auto.
+  Qed.
+
+  Lemma to_of_val:
+    forall v, to_val (of_val v) = Some v.
+  Proof. destruct v; reflexivity. Qed.
+
+  (** Evaluation context *)
+  Inductive ectx_item :=
+  | SeqCtx.
+
+  Notation ectx := (list ectx_item).
+
+  Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
+    match Ki with
+    | SeqCtx => Seq e
+    end.
+
+  Inductive prim_step: expr → state → list Empty_set → expr → state → list expr → Prop :=
+  | PS_no_fork_instr σ e' σ' :
+      step (Executable, σ) (e', σ') → prim_step (Instr Executable) σ [] (Instr e') σ' []
+  | PS_no_fork_seq σ : prim_step (Seq (Instr NextI)) σ [] (Seq (Instr Executable)) σ []
+  | PS_no_fork_halt σ : prim_step (Seq (Instr Halted)) σ [] (Instr Halted) σ []
+  | PS_no_fork_fail σ : prim_step (Seq (Instr Failed)) σ [] (Instr Failed) σ [].
+
+  Lemma val_stuck:
+    forall e σ o e' σ' efs,
+      prim_step e σ o e' σ' efs →
+      to_val e = None.
+  Proof. intros * HH. by inversion HH. Qed.
+
+  Lemma prim_step_exec_inv σ1 l1 e2 σ2 efs :
+    prim_step (Instr Executable) σ1 l1 e2 σ2 efs →
+    l1 = [] ∧ efs = [] ∧
+    exists (c: ConfFlag),
+      e2 = Instr c ∧
+      step (Executable, σ1) (c, σ2).
+  Proof. inversion 1; subst; split; eauto. Qed.
+
+  Lemma prim_step_and_step_exec σ1 e2 σ2 l1 e2' σ2' efs :
+    step (Executable, σ1) (e2, σ2) →
+    prim_step (Instr Executable) σ1 l1 e2' σ2' efs →
+    l1 = [] ∧ e2' = (Instr e2) ∧ σ2' = σ2 ∧ efs = [].
+  Proof.
+    intros* Hstep Hpstep. inversion Hpstep as [? ? ? Hstep' | | |]; subst.
+    generalize (step_deterministic _ _ _ _ _ _ Hstep Hstep'). intros [-> ->].
+    auto.
+  Qed.
+
+  Lemma overlay_lang_determ e1 σ1 κ κ' e2 e2' σ2 σ2' efs efs' :
+    prim_step e1 σ1 κ e2 σ2 efs →
+    prim_step e1 σ1 κ' e2' σ2' efs' →
+    κ = κ' ∧ e2 = e2' ∧ σ2 = σ2' ∧ efs = efs'.
+  Proof.
+    intros Hs1 Hs2. inv Hs1; inv Hs2. all: auto.
+    generalize (step_deterministic _ _ _ _ _ _ H0 H1).
+    intros [? ?]; subst. auto.
+  Qed.
+
+  Lemma fill_item_val Ki e :
+    is_Some (to_val (fill_item Ki e)) → is_Some (to_val e).
+  Proof. intros [v ?]. destruct Ki; simplify_option_eq; eauto. Qed.
+
+  Instance fill_item_inj Ki : Inj (=) (=) (fill_item Ki).
+  Proof. destruct Ki; intros ???; simplify_eq; auto with f_equal. Qed.
+
+  Lemma head_ctx_step_val Ki e σ1 κ e2 σ2 ef :
+    prim_step (fill_item Ki e) σ1 κ e2 σ2 ef → is_Some (to_val e).
+  Proof. destruct Ki; inversion_clear 1; simplify_option_eq; eauto. Qed.
+
+  Lemma fill_item_no_val_inj Ki1 Ki2 e1 e2 :
+    to_val e1 = None → to_val e2 = None →
+    fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2.
+  Proof.
+    destruct Ki1, Ki2; intros; try discriminate; simplify_eq;
+    repeat match goal with
+           | HH : to_val (of_val _) = None |- _ => by rewrite to_of_val in HH
+           end; auto.
+  Qed.
+
+  Lemma overlay_lang_mixin : EctxiLanguageMixin of_val to_val fill_item prim_step.
+  Proof.
+    constructor;
+    apply _ || eauto using to_of_val, of_to_val, val_stuck,
+           fill_item_val, fill_item_no_val_inj, head_ctx_step_val.
+  Qed.
+
+  Definition is_atomic (e : expr) : Prop :=
+    match e with
+    | Instr _ => True
+    | _ => False
+    end.
+
+  Lemma updatePC_atomic φ :
+    ∃ φ', updatePC φ = (Failed,φ') ∨ (updatePC φ = (NextI,φ')) ∨
+          (updatePC φ = (Halted,φ')).
+  Proof.
+    rewrite /updatePC; repeat case_match; eauto.
+  Qed.
+
+  Lemma instr_atomic i φ :
+    ∃ φ', (exec i φ = (Failed, φ')) ∨ (exec i φ = (NextI, φ')) ∨
+          (exec i φ = (Halted, φ')).
+  Proof.
+    unfold exec; repeat case_match; eauto; try (eapply updatePC_atomic; eauto).
+  Qed.
+
+End opsem.
+
+Canonical Structure overlay_ectxi_lang `{MachineParameters} := EctxiLanguage overlay_lang_mixin.
+Canonical Structure overlay_ectx_lang `{MachineParameters} := EctxLanguageOfEctxi overlay_ectxi_lang.
+Canonical Structure overlay_lang `{MachineParameters} := LanguageOfEctx overlay_ectx_lang.
+
+Hint Extern 20 (PureExec _ _ _) => progress simpl : typeclass_instances.
+
+Hint Extern 5 (IntoVal _ _) => eapply of_to_val; fast_done : typeclass_instances.
+Hint Extern 10 (IntoVal _ _) =>
+  rewrite /IntoVal; eapply of_to_val; rewrite /= !to_of_val /=; solve [ eauto ] : typeclass_instances.
+
+Hint Extern 5 (AsVal _) => eexists; eapply of_to_val; fast_done : typeclass_instances.
+Hint Extern 10 (AsVal _) =>
+eexists; rewrite /IntoVal; eapply of_to_val; rewrite /= !to_of_val /=; solve [ eauto ] : typeclass_instances.
+
+Local Hint Resolve language.val_irreducible.
+Local Hint Resolve to_of_val.
+Local Hint Unfold language.irreducible.
+
+Global Instance dec_pc c : Decision (isCorrectPC c).
+Proof. apply isCorrectPC_dec. Qed.
+
+(* There is probably a more general instance to be stated there...*)
+Instance Reflexive_ofe_equiv_Word : (Reflexive (ofe_equiv (leibnizO base.Word))).
+Proof. intro; reflexivity. Qed.
+
+(****)
+
+Lemma updatePC_not_executable `{MachineParameters}:
+  forall φ,
+    (updatePC φ).1 <> Executable.
+Proof.
+  intros; unfold updatePC.
+  repeat match goal with
+           |- context [match ?X with | _ => _ end] => destruct X
+         end; simpl; auto.
+Qed.
+
+Lemma exec_not_executable `{MachineParameters}:
+  forall i φ,
+    (exec i φ).1 <> Executable.
+Proof.
+  intros. destruct i; simpl; auto;
+            repeat match goal with
+                     |- context [match ?X with | _ => _ end] => destruct X
+                   end; simpl; auto; apply updatePC_not_executable.
+Qed.
+
+Global Instance is_atomic_correct `{MachineParameters} s (e : expr) : is_atomic e → Atomic s e.
+Proof.
+  intros Ha; apply strongly_atomic_atomic, ectx_language_atomic.
+  - destruct e.
+    + destruct c; rewrite /Atomic; intros ????? Hstep;
+        inversion Hstep.
+      match goal with HH : step _ _ |- _ => inversion HH end; subst; simpl; eauto.
+      * case_eq (exec (decodeInstrW' (mem σ !m! a)) σ); intros.
+        destruct c; eauto.
+        generalize (exec_not_executable (decodeInstrW' (mem σ !m! a)) σ).
+        rewrite H1. simpl; congruence.
+      * case_eq (exec (decodeInstrW' (m !m! a)) σ); intros.
+        destruct c; eauto.
+        generalize (exec_not_executable (decodeInstrW' (m !m! a)) σ).
+        rewrite H1. simpl; congruence.
+    + inversion Ha.
+  - intros K e' -> Hval%eq_None_not_Some.
+    induction K using rev_ind; first done.
+    simpl in Ha; rewrite fill_app in Ha; simpl in Ha.
+    destruct Hval. apply (fill_val K e'); simpl in *.
+    destruct x; naive_solver.
+Qed.
+
+Ltac solve_atomic :=
+  apply is_atomic_correct; simpl; repeat split;
+    rewrite ?to_of_val; eapply mk_is_Some; fast_done.
+
+Hint Extern 0 (Atomic _ _) => solve_atomic.
+Hint Extern 0 (Atomic _ _) => solve_atomic : typeclass_instances.
+
+Lemma head_reducible_from_step `{MachineParameters} σ1 e2 σ2 :
+  step (Executable, σ1) (e2, σ2) →
+  head_reducible (Instr Executable) σ1.
+Proof. intros * HH. rewrite /head_reducible /head_step //=.
+       eexists [], (Instr _), σ2, []. by constructor.
+Qed.
+
+Lemma normal_always_head_reducible `{MachineParameters} σ :
+  head_reducible (Instr Executable) σ.
+Proof.
+  generalize (normal_always_step σ); intros (?&?&?).
+  eapply head_reducible_from_step. eauto.
+Qed.
