@@ -574,12 +574,12 @@ Section heap.
       rewrite Hsome in Hv. done.
   Qed.
 
-  Lemma valid_uninitialized_condition W m a p g b e :
-    pwlU p = true → isU p = true →
-    (∀ a' : Addr, is_Some (m !! a') ↔ (W.1 !! a' = Some Monotemporary) ∧ (b <= a')%a) →
+  Lemma valid_uninitialized_condition_weak W m a p g b e b' :
+    pwlU p = true → isU p = true → (b' <= b)%a →
+    (∀ a' : Addr, is_Some (m !! a') ↔ (W.1 !! a' = Some Monotemporary) ∧ (b' <= a')%a) →
     interp W (inr (p,g,b,e,a)) -∗ ⌜∀ a', (b <= a' < e)%a → (∃ w, (uninitialize W m).1 !! a' = Some (Uninitialized w))⌝.
   Proof.
-    iIntros (HpwlU HU Hcond) "#Hv".
+    iIntros (HpwlU HU Hle' Hcond) "#Hv".
     iIntros (a' [Hle Hlt]).
     iDestruct (writeLocalAllowedU_implies_local with "Hv") as %Hmono;auto.
     destruct g;inversion Hmono.
@@ -614,6 +614,53 @@ Section heap.
         iDestruct "Hreg" as %Hreg.
         assert (is_Some (m !! a')) as [v Hv];[apply Hcond;split;auto;solve_addr|].
         rewrite (uninitialize_std_sta_lookup_in _ _ _ v);eauto.
+  Qed.
+
+  Lemma valid_readAllowed_condition_weak W m a p g b e b' :
+    readAllowed p = true → (b' <= b)%a →
+    (∀ a' : Addr, is_Some (m !! a') ↔ (W.1 !! a' = Some Monotemporary) ∧ (b' <= a')%a) →
+    interp W (inr (p,g,b,e,a)) -∗ ⌜∀ a', (b <= a' < e)%a → ((uninitialize W m).1 !! a' = Some Permanent ∨ (∃ w, (uninitialize W m).1 !! a' = Some (Uninitialized w)))⌝.
+  Proof.
+    iIntros (Hra Hle' Hcond) "#Hv".
+    iIntros (a' [Hle Hlt]).
+    iDestruct (readAllowed_implies_region_conditions with "Hv") as "Hcond";auto.
+    rewrite /region_conditions.
+    destruct (pwl p).
+    - iDestruct (big_sepL_elem_of _ _ a' with "Hcond") as (p' Hflows) "[Ha' #Hreg]".
+      { apply elem_of_region_addrs. solve_addr. }
+      rewrite /region_state_pwl_mono. iDestruct "Hreg" as %Hmono.
+      iRight.
+      assert (is_Some (m !! a')) as [v Hv];[apply Hcond;split;auto;solve_addr|].
+      rewrite (uninitialize_std_sta_lookup_in _ _ _ v);eauto.
+    - iDestruct (big_sepL_elem_of _ _ a' with "Hcond") as (p' Hflows) "[Ha' #Hreg]".
+      { apply elem_of_region_addrs. solve_addr. }
+      rewrite /region_state_nwl. iDestruct "Hreg" as %Hmono.
+      destruct g.
+      { iLeft;auto.
+        assert (m !! a' = None) as Hv;[|rewrite uninitialize_std_sta_None_lookup//;rewrite Hreg;eauto].
+        destruct (m !! a') eqn:Hsome;auto. assert (is_Some (m!!a')) as Hissome;eauto.
+        apply Hcond in Hissome as [Heq ?]. rewrite Hmono in Heq. congruence. }
+      { iLeft;auto.
+        assert (m !! a' = None) as Hv;[|rewrite uninitialize_std_sta_None_lookup//;rewrite Hreg;eauto].
+        destruct (m !! a') eqn:Hsome;auto. assert (is_Some (m!!a')) as Hissome;eauto.
+        apply Hcond in Hissome as [Heq ?]. rewrite Hmono in Heq. congruence. }
+      { destruct Hmono as [Hmono | Hmono].
+        + assert (is_Some (m !! a')) as [v Hv];[apply Hcond;split;auto;solve_addr|].
+          rewrite (uninitialize_std_sta_lookup_in _ _ _ v);eauto.
+        + assert (m !! a' = None) as Hv;[|rewrite uninitialize_std_sta_None_lookup//;rewrite Hmono;eauto].
+          destruct (m !! a') eqn:Hsome;auto. assert (is_Some (m!!a')) as Hissome;eauto.
+          apply Hcond in Hissome as [Heq ?]. rewrite Hmono in Heq. congruence.
+      }
+  Qed.
+
+  Lemma valid_uninitialized_condition W m a p g b e :
+    pwlU p = true → isU p = true →
+    (∀ a' : Addr, is_Some (m !! a') ↔ (W.1 !! a' = Some Monotemporary) ∧ (b <= a')%a) →
+    interp W (inr (p,g,b,e,a)) -∗ ⌜∀ a', (b <= a' < e)%a → (∃ w, (uninitialize W m).1 !! a' = Some (Uninitialized w))⌝.
+  Proof.
+    iIntros (HpwlU HU Hcond) "#Hv".
+    iApply valid_uninitialized_condition_weak;eauto.
+    solve_addr.
   Qed.
 
   Lemma region_map_uninitialized_monotone W W' M Mρ a :

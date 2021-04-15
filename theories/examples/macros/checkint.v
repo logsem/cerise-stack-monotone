@@ -225,9 +225,9 @@ Section stack_macros.
   Definition checkintsloop a p r r1 r2 r3 : iProp Σ :=
     ([∗ list] a_i;w_i ∈ a;(checkintsloop_instrs r r1 r2 r3), a_i ↦ₐ[p] w_i)%I.
 
-  Lemma checkintsloop_spec addrs r r1 r2 r3 pc_p pc_p' pc_g pc_b pc_e a_first a_last φ p p' g b e a ws :
+  Lemma checkintsloop_spec addrs r r1 r2 r3 pc_p pc_p' pc_g pc_b pc_e a_first a_last φ p g b e a wps :
     PermFlows pc_p pc_p' →
-    PermFlows p p' →
+    Forall (λ wp, PermFlows p wp.2) wps →
     isCorrectPC_range pc_p pc_g pc_b pc_e a_first a_last ->
     contiguous_between addrs a_first a_last ->
     readAllowed p = true ->
@@ -239,17 +239,17 @@ Section stack_macros.
     ∗ ▷ (∃ w1, r2 ↦ᵣ w1)
     ∗ ▷ (∃ w1, r3 ↦ᵣ w1)
     ∗ ▷ r ↦ᵣ inr (p,g,b,e,a)
-    ∗ ▷ ([[a,e]]↦ₐ[p'][[ws]])
+    ∗ ▷ ([∗ list] a;wp∈(region_addrs a e);wps, a ↦ₐ[wp.2] wp.1)
     (* if a points to an int, we want to be able to continue *)
     (* if not, we will fail, and must now show that Phi holds at failV *)
     ∗ ▷ (PC ↦ᵣ inr (pc_p,pc_g,pc_b,pc_e,a_last) ∗ checkintsloop addrs pc_p' r r1 r2 r3
-            ∗ r ↦ᵣ inr (p,g,b,e,e) ∗ (∃ w, r1 ↦ᵣ w) ∗ (∃ w, r2 ↦ᵣ w) ∗ (∃ w, r3 ↦ᵣ w) ∗ ([[a,e]]↦ₐ[p'][[ws]]) ∗ ⌜Forall (λ w, ∃ z, w = inl z) ws⌝
+            ∗ r ↦ᵣ inr (p,g,b,e,e) ∗ (∃ w, r1 ↦ᵣ w) ∗ (∃ w, r2 ↦ᵣ w) ∗ (∃ w, r3 ↦ᵣ w) ∗ ([∗ list] a;wp∈(region_addrs a e);wps, a ↦ₐ[wp.2] wp.1) ∗ ⌜Forall (λ wp, ∃ z, wp.1 = inl z) wps⌝
             -∗ WP Seq (Instr Executable) {{ λ v, φ v ∨ ⌜v = FailedV⌝ }})
     ⊢
       WP Seq (Instr Executable) {{ λ v, φ v ∨ ⌜v = FailedV⌝ }}.
   Proof.
     iIntros (Hfl Hfl' Hvpc Hcont Hra Hwb) "(>Hprog & >HPC & >Hr1 & >Hr2 & >Hr3 & >Hr & >Hae & Hcont)".
-    iLöb as "IH" forall (a ws Hwb).
+    iLöb as "IH" forall (a wps Hfl' Hwb).
     iDestruct "Hr1" as (w1) "Hr1".
     iDestruct "Hr2" as (w2) "Hr2".
     iDestruct "Hr3" as (w3) "Hr3".
@@ -257,11 +257,13 @@ Section stack_macros.
     iDestruct (big_sepL2_length with "Hae") as %Hlengthae.
     assert (Hwb':=Hwb).
     apply andb_true_iff in Hwb' as [Hle%Z.leb_le Hlt%Z.ltb_lt].
-    destruct ws as [|w ws].
+    destruct wps as [|w wps].
     { exfalso. rewrite region_addrs_length /= in Hlengthae.
       rewrite /region_size in Hlengthae. solve_addr. }
+    apply Forall_cons in Hfl' as [Hfl' Hforall].
     assert (is_Some (a + 1)%a) as [a' Ha'];[destruct (a + 1)%a eqn:hsome;eauto;solve_addr|].
-    iDestruct (region_mapsto_cons with "Hae") as "[Ha Hae]";[eauto|solve_addr|].
+    rewrite region_addrs_cons// Ha' /=.
+    iDestruct "Hae" as "[Ha Hae]".
     (* prepare the program *)
     iDestruct (big_sepL2_length with "Hprog") as %Hlength_prog.
     destruct addrs as [|a0 addrs];[inversion Hlength_prog|].
@@ -280,6 +282,7 @@ Section stack_macros.
     iPrologue "Hprog".
     iAssert (⌜(a =? a_first)%a = false⌝)%I as %Hfalse.
     { rewrite Z.eqb_neq. iIntros (->%z_of_eq). iDestruct (cap_duplicate_false with "[$Hi $Ha]") as "Bot";auto.
+      destruct w as [w p'].
       destruct Hperms as [-> |[-> | ->] ];destruct pc_p';inversion Hfl;destruct p;inversion Hra;destruct p';inversion Hfl';auto. }
     iApply (wp_load_success with "[$HPC $Hi $Hr1 $Hr Ha]");
       [apply decode_encode_instrW_inv|auto|iCorrectPC a_first a_last|auto|iContiguous_next_a Hcont|rewrite Hfalse..].
@@ -346,15 +349,13 @@ Section stack_macros.
         [apply decode_encode_instrW_inv|auto|iCorrectPC link a_last|done|].
       iEpilogue "(HPC & Hi & Hr2 & Hr1)". iCombine "Hi" "Hrest_done" as "Hrest_done".
       rewrite updatePcPerm_cap_non_E;[|destruct Hperms as [-> | [-> | ->] ];auto].
-      iApply ("IH" with "[] [Hrest_done Hprog_done Hreqint] HPC [Hr1] [Hr2] [Hr3] Hr Hae [-]");eauto.
+      iApply ("IH" with "[] [] [Hrest_done Hprog_done Hreqint] HPC [Hr1] [Hr2] [Hr3] Hr Hae [-]");eauto.
       { iPureIntro. apply andb_true_iff. rewrite Z.leb_le Z.ltb_lt. clear -Hcond Ha' Hle Hlt. apply Z.ltb_lt in Hcond. solve_addr. }
       { iFrame. iDestruct "Hrest_done" as "($&$&$&$&$&$&$&$)". done. }
       { iNext. iIntros "(HPC & Hprog_done & Hr & Hr1 & Hr2 & Hr3 & Hae & #Hforall)".
-        iApply "Hcont". iFrame. iSplit.
-        - iApply region_mapsto_cons;[apply Ha'| |iFrame].
-          clear -Hcond Ha' Hle Hlt. apply Z.ltb_lt in Hcond. solve_addr.
-        - iDestruct "Hforall" as %Hforall. iPureIntro.
-          apply Forall_cons. split;eauto. }
+        iApply "Hcont". iFrame.
+        iDestruct "Hforall" as %Hforall'. iPureIntro.
+        apply Forall_cons. split;eauto. }
     - (* otherwise, we are done and we must show that a' = e, and that ws = [w] *)
       iSimpl in "Hr1".
       (* jnz r2 r1 *)
@@ -367,10 +368,10 @@ Section stack_macros.
       { clear - Ha' Hcond Hle Hlt. apply Z.ltb_ge in Hcond. solve_addr. }
       iDestruct (big_sepL2_length with "Hae") as %Hlengthws.
       rewrite region_addrs_length in Hlengthws. rewrite region_size_0 in Hlengthws;[|clear;solve_addr].
-      destruct ws;[|inversion Hlengthws].
-      iApply "Hcont". iFrame. rewrite /region_mapsto (region_addrs_single a e);auto. iFrame. iDestruct "Hrest_done" as "($&$&$&$&$&$&$&$)".
+      destruct wps;[|inversion Hlengthws].
+      iApply "Hcont". iFrame. iDestruct "Hrest_done" as "($&$&$&$&$&$&$&$)".
       iSplitL "Hr1";[eauto|]. iSplitL "Hr2";[eauto|]. iSplitL "Hr3";[eauto|].
-      iSplit;auto. iPureIntro. apply Forall_singleton. eauto.
+      iPureIntro. apply Forall_singleton. eauto.
   Qed.
 
 
@@ -393,9 +394,9 @@ Section stack_macros.
   Definition checkints a p r r1 r2 r3 : iProp Σ :=
     ([∗ list] a_i;w_i ∈ a;(checkints_instrs r r1 r2 r3), a_i ↦ₐ[p] w_i)%I.
 
-  Lemma checkints_spec addrs r r1 r2 r3 pc_p pc_p' pc_g pc_b pc_e a_first a_last φ p p' g b e a ws w1 w2 w3 :
+  Lemma checkints_spec addrs r r1 r2 r3 pc_p pc_p' pc_g pc_b pc_e a_first a_last φ p g b e a wps w1 w2 w3 :
     PermFlows pc_p pc_p' →
-    PermFlows p p' →
+    Forall (λ wp, PermFlows p wp.2) wps →
     isCorrectPC_range pc_p pc_g pc_b pc_e a_first a_last ->
     contiguous_between addrs a_first a_last ->
     readAllowed p = true ->
@@ -406,12 +407,12 @@ Section stack_macros.
     ∗ ▷ r2 ↦ᵣ w2
     ∗ ▷ r3 ↦ᵣ w3
     ∗ ▷ r ↦ᵣ inr (p,g,b,e,a)
-    ∗ ▷ ([[b,e]]↦ₐ[p'][[ws]])
+    ∗ ▷ ([∗ list] a;wp∈(region_addrs b e);wps, a ↦ₐ[wp.2] wp.1)
     (* if a points to an int, we want to be able to continue *)
     (* if not, we will fail, and must now show that Phi holds at failV *)
     ∗ ▷ (PC ↦ᵣ inr (pc_p,pc_g,pc_b,pc_e,a_last) ∗ checkints addrs pc_p' r r1 r2 r3
             ∗ r ↦ᵣ inr (p,g,b,e,addr_reg.max b e) ∗ r1 ↦ᵣ inl 0%Z ∗ r2 ↦ᵣ inl 0%Z ∗ r3 ↦ᵣ inl 0%Z
-            ∗ ([[b,e]]↦ₐ[p'][[ws]]) ∗ ⌜Forall (λ w, ∃ z, w = inl z) ws⌝
+            ∗ ([∗ list] a;wp∈(region_addrs b e);wps, a ↦ₐ[wp.2] wp.1) ∗ ⌜Forall (λ w, ∃ z, w.1 = inl z) wps⌝
             -∗ WP Seq (Instr Executable) {{ λ v, φ v ∨ ⌜v = FailedV⌝ }})
     ⊢
       WP Seq (Instr Executable) {{ λ v, φ v ∨ ⌜v = FailedV⌝ }}.
@@ -546,7 +547,7 @@ Section stack_macros.
       assert (addr_reg.max b e = b) as ->;[|iFrame].
       clear -Hz. revert Hz; rewrite Z.ltb_ge =>Hz. solve_addr.
       iPureIntro. rewrite region_addrs_length /region_size in Hlength_ws. revert Hz; rewrite Z.ltb_ge =>Hz.
-      destruct ws;[by apply Forall_nil|]. exfalso. clear -Hlength_ws Hz. simpl in Hlength_ws. lia.
+      destruct wps;[by apply Forall_nil|]. exfalso. clear -Hlength_ws Hz. simpl in Hlength_ws. lia.
   Qed.
 
 End stack_macros.
