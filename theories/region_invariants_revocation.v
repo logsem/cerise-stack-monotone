@@ -854,12 +854,11 @@ Section heap.
   Lemma monotone_revoke_cond_region_def_mono_same M Mρ W W' :
     ⌜revoke_condition W⌝ -∗
     ⌜related_sts_priv_world W W'⌝ -∗
-     sts_full_world W -∗ region_map_def M Mρ (revoke W) -∗
-     sts_full_world W ∗ region_map_def M Mρ (revoke W').
+     sts_full_world W -∗ region_map_def M Mρ W -∗
+     sts_full_world W ∗ region_map_def M Mρ W'.
   Proof.
     iIntros (Hcond Hrelated) "Hfull Hr".
     iApply (monotone_revoke_cond_region_def_mono with "[] [] Hfull Hr");auto.
-    iPureIntro. apply revoke_monotone; auto.
   Qed.
 
   Lemma monotone_revoke_list_region_def_mono_same M Mρ W W' :
@@ -1449,22 +1448,26 @@ Section heap.
   (* ------------------ WE CAN UPDATE A REVOKED WORLD BACK TO TEMPORARY  -------------------- *)
   (* ---------------------------------------------------------------------------------------- *)
 
-  (* closing will take every revoked element of l and reinstate it as temporary *)
-  Fixpoint close_list_std_sta (l : list Addr) (fs : STS_STD) : STS_STD :=
+
+  Fixpoint conditional_close_list_std_sta (ρ : region_type) (l : list Addr) (fs : STS_STD) : STS_STD :=
     match l with
     | [] => fs
     | i :: l' => match fs !! i with
-               | Some j => match j with
-                          | Revoked => <[i := Monotemporary]> (close_list_std_sta l' fs)
-                          | _ => (close_list_std_sta l' fs)
-                          end
-               | None => (close_list_std_sta l' fs)
+               | Some j => if (decide (ρ = j)) then <[i := Monotemporary]> (conditional_close_list_std_sta ρ l' fs)
+                          else (conditional_close_list_std_sta ρ l' fs)
+
+                 (* match j with *)
+                 (*          | ρ => <[i := Monotemporary]> (conditional_close_list_std_sta ρ l' fs) *)
+                 (*          | _ => (conditional_close_list_std_sta ρ l' fs) *)
+                 (*          end *)
+               | None => (conditional_close_list_std_sta ρ l' fs)
                end
-    end. 
+    end.
+  Definition close_list_std_sta (l : list Addr) (fs : STS_STD) : STS_STD := conditional_close_list_std_sta Revoked l fs.
   Definition close_list l W : WORLD := (close_list_std_sta l (std W), loc W).
 
-  Lemma close_list_std_sta_is_Some Wstd_sta l i :
-    is_Some (Wstd_sta !! i) <-> is_Some (close_list_std_sta l Wstd_sta !! i).
+  Lemma conditional_close_list_std_sta_is_Some Wstd_sta ρ l i :
+    is_Some (Wstd_sta !! i) <-> is_Some (conditional_close_list_std_sta ρ l Wstd_sta !! i).
   Proof.
     split.
     - induction l.
@@ -1472,86 +1475,119 @@ Section heap.
       + intros [x Hx]. 
       simpl.
       destruct (Wstd_sta !! a);[|apply IHl;eauto].
-      destruct r;try (apply IHl;eauto).
+      destruct (decide (ρ = r));eauto.
       destruct (decide (a = i)).
         * subst. rewrite lookup_insert. eauto.
-        * rewrite lookup_insert_ne;eauto. 
+        * rewrite lookup_insert_ne;eauto.
     - induction l.
       + done.
       + intros [x Hx].
         simpl in Hx.
         destruct (Wstd_sta !! a) eqn:Hsome;eauto. 
-        destruct r;try by (apply IHl;eauto).
+        destruct (decide (ρ = r));try by (apply IHl;eauto).
         destruct (decide (a = i)).
         * subst. eauto. 
         * rewrite lookup_insert_ne in Hx;eauto. 
   Qed.
 
-  Lemma close_list_std_sta_None Wstd_sta l i :
-    Wstd_sta !! i = None <-> close_list_std_sta l Wstd_sta !! i = None.
+  Lemma close_list_std_sta_is_Some Wstd_sta l i :
+    is_Some (Wstd_sta !! i) <-> is_Some (close_list_std_sta l Wstd_sta !! i).
+  Proof.
+    apply conditional_close_list_std_sta_is_Some.
+  Qed.
+
+  Lemma conditional_close_list_std_sta_None Wstd_sta ρ l i :
+    Wstd_sta !! i = None <-> conditional_close_list_std_sta ρ l Wstd_sta !! i = None.
   Proof.
     split.
     - intros Hnone. apply eq_None_not_Some.
-      intros Hcontr. apply close_list_std_sta_is_Some in Hcontr.
+      intros Hcontr. apply conditional_close_list_std_sta_is_Some in Hcontr.
       apply eq_None_not_Some in Hcontr; auto.
     - intros Hnone. apply eq_None_not_Some.
-      intros Hcontr. revert Hcontr. rewrite close_list_std_sta_is_Some =>Hcontr.
+      intros Hcontr. revert Hcontr. rewrite conditional_close_list_std_sta_is_Some =>Hcontr.
       apply eq_None_not_Some in Hcontr; eauto.
   Qed.
+  Lemma close_list_std_sta_None Wstd_sta l i :
+    Wstd_sta !! i = None <-> close_list_std_sta l Wstd_sta !! i = None.
+  Proof.
+    apply conditional_close_list_std_sta_None.
+  Qed.
 
-  Lemma close_list_dom_eq Wstd_sta l :
-    dom (gset Addr) Wstd_sta = dom (gset Addr) (close_list_std_sta l Wstd_sta).
+  Lemma conditional_close_list_dom_eq Wstd_sta l ρ :
+    dom (gset Addr) Wstd_sta = dom (gset Addr) (conditional_close_list_std_sta ρ l Wstd_sta).
   Proof.
     apply gset_leibniz. split.
     - intros Hin.
       apply elem_of_gmap_dom. apply elem_of_gmap_dom in Hin.
-      rewrite -close_list_std_sta_is_Some. 
+      rewrite -conditional_close_list_std_sta_is_Some.
       eauto.
     - intros Hin.
       apply elem_of_gmap_dom. apply elem_of_gmap_dom in Hin.
-      rewrite close_list_std_sta_is_Some.  
+      rewrite conditional_close_list_std_sta_is_Some.
       eauto.
   Qed.
+  Lemma close_list_dom_eq Wstd_sta l :
+    dom (gset Addr) Wstd_sta = dom (gset Addr) (close_list_std_sta l Wstd_sta).
+  Proof.
+    apply conditional_close_list_dom_eq.
+  Qed.
 
-  Lemma close_list_std_sta_same Wstd_sta l i :
-    i ∉ l → Wstd_sta !! i = close_list_std_sta l Wstd_sta !! i.
+  Lemma conditional_close_list_std_sta_same Wstd_sta ρ l i :
+    i ∉ l → Wstd_sta !! i = conditional_close_list_std_sta ρ l Wstd_sta !! i.
   Proof.
     intros Hnin. induction l.
     - done.
     - simpl. apply not_elem_of_cons in Hnin as [Hne Hnin]. 
       destruct (Wstd_sta !! a); auto.
-      destruct r; auto.
+      destruct (decide (ρ = r)); auto.
       rewrite lookup_insert_ne; auto.
   Qed.
+  Lemma close_list_std_sta_same Wstd_sta l i :
+    i ∉ l → Wstd_sta !! i = close_list_std_sta l Wstd_sta !! i.
+  Proof.
+    apply conditional_close_list_std_sta_same.
+  Qed.
 
-  Lemma close_list_std_sta_same_alt Wstd_sta l i :
-    Wstd_sta !! i ≠ Some Revoked ->
-    Wstd_sta !! i = close_list_std_sta l Wstd_sta !! i.
+  Lemma conditional_close_list_std_sta_same_alt Wstd_sta ρ l i :
+    Wstd_sta !! i ≠ Some ρ ->
+    Wstd_sta !! i = conditional_close_list_std_sta ρ l Wstd_sta !! i.
   Proof.
     intros Hnin. induction l.
     - done.
     - simpl. (* apply not_elem_of_cons in Hnin as [Hne Hnin].  *)
       destruct (Wstd_sta !! a) eqn:some; auto.
-      destruct r; auto.
+      destruct (decide (ρ = r)); auto.
       destruct (decide (a = i)).
       + subst. contradiction. 
       + rewrite lookup_insert_ne; auto. 
   Qed.
+  Lemma close_list_std_sta_same_alt Wstd_sta l i :
+    Wstd_sta !! i ≠ Some Revoked ->
+    Wstd_sta !! i = close_list_std_sta l Wstd_sta !! i.
+  Proof.
+    apply conditional_close_list_std_sta_same_alt.
+  Qed.
 
-  Lemma close_list_std_sta_revoked Wstd_sta l i :
-    i ∈ l -> Wstd_sta !! i = Some Revoked →
-    close_list_std_sta l Wstd_sta !! i = Some Monotemporary.
+  Lemma conditional_close_list_std_sta_revoked Wstd_sta ρ l i :
+    i ∈ l -> Wstd_sta !! i = Some ρ →
+    conditional_close_list_std_sta ρ l Wstd_sta !! i = Some Monotemporary.
   Proof.
     intros Hin Hrev. induction l.
     - inversion Hin.
     - apply elem_of_cons in Hin as [Heq | Hin].
-      + subst. simpl. rewrite Hrev.
-        rewrite lookup_insert. auto. 
+      + subst. simpl. rewrite Hrev. rewrite decide_True//.
+        rewrite lookup_insert. auto.
       + simpl. destruct (Wstd_sta !! a); auto.
-        destruct r; auto.
+        destruct (decide (ρ = r)); auto.
         destruct (decide (i = a)); subst.
         * rewrite lookup_insert; auto.
         * rewrite lookup_insert_ne;auto.
+  Qed.
+  Lemma close_list_std_sta_revoked Wstd_sta l i :
+    i ∈ l -> Wstd_sta !! i = Some Revoked →
+    close_list_std_sta l Wstd_sta !! i = Some Monotemporary.
+  Proof.
+    apply conditional_close_list_std_sta_revoked.
   Qed.
 
   Lemma std_rel_pub_not_temp_cases x y :
@@ -1584,9 +1620,9 @@ Section heap.
     related_sts_pub_world W (close_list l W) →
     related_sts_pub_world W (close_list_std_sta (a :: l) (std W), loc W).
   Proof.
-    rewrite /close_list /=. intros IHl.
-    destruct (std W !! a) eqn:Hsome; auto.
-    destruct r;auto.
+    rewrite /close_list /close_list_std_sta /=. intros IHl.
+    destruct (std W !! a) eqn:Hsome; eauto.
+    destruct r;simpl;auto.
     apply related_sts_pub_trans_world with (close_list l W); auto.
     split;[|apply related_sts_pub_refl].
     split.
@@ -1661,7 +1697,7 @@ Section heap.
       apply revoke_monotone_lookup_same.
       intros Hcontr. apply Hiff in Hcontr. contradiction.
   Qed.
-  
+
   Lemma close_revoke_eq Wstd_sta (l : list Addr) :
     (forall (i : Addr), Wstd_sta !! i = Some Monotemporary <-> i ∈ l) ->
     (close_list_std_sta l (revoke_std_sta Wstd_sta)) = Wstd_sta.
@@ -1675,22 +1711,22 @@ Section heap.
     close_list_std_sta l1 (close_list_std_sta l2 Wstd_sta) = close_list_std_sta (l1 ++ l2) Wstd_sta. 
   Proof.
     induction l1;[done|].
-    simpl. rewrite IHl1.
-    destruct (Wstd_sta !! a) eqn:Hsome. 
+    rewrite /close_list_std_sta /=.
+    destruct (Wstd_sta !! a) eqn:Hsome.
     - destruct (decide (Revoked = r)).
       + subst.
         destruct (decide (a ∈ l2)). 
         ++ apply close_list_std_sta_revoked with (l:=l2) in Hsome as Hsome'; auto.
-           rewrite Hsome'. 
+           rewrite Hsome'. simpl.
            rewrite insert_id;auto.
            apply close_list_std_sta_revoked;auto.
            apply elem_of_app;by right. 
         ++ rewrite (close_list_std_sta_same _ l2) in Hsome;auto.
-           rewrite Hsome. auto. 
+           rewrite Hsome. simpl. f_equiv. auto.
       + assert (Wstd_sta !! a ≠ Some Revoked) as Hnrev.
         { intros Hcontr. congruence. }
         rewrite (close_list_std_sta_same_alt _ l2) in Hsome;auto.
-        by rewrite Hsome.
+        rewrite Hsome. rewrite decide_False;auto.
     - apply (close_list_std_sta_None _ l2) in Hsome. rewrite Hsome. done.
   Qed.
 
@@ -1722,7 +1758,7 @@ Section heap.
     - iFrame. destruct W as [ Wstd_sta Wloc]; done. 
     - apply NoDup_cons in Hdup as [Hdup Hnin]. 
       iDestruct "Hl" as "[ [Hx #[Hrel Hrev] ] Hl]". 
-      rewrite /close_list region_eq /region_def /std /=.
+      rewrite /close_list /close_list_std_sta region_eq /region_def /std /=.
       iMod ("IH" $! Hnin with "Hl Hfull Hr") as "(Hfull & Hr)"; auto.
       iClear "IH".
       destruct W as [ Wstd_sta Wloc].
@@ -1734,9 +1770,10 @@ Section heap.
       iDestruct "Hstate" as (ρ Mx) "[Hρ Hstate]".
       iDestruct (sts_full_state_std with "Hfull Hρ") as %Hx''.
       rewrite -(close_list_std_sta_same _ l _) in Hx''; auto.
-      rewrite  Hx''. iFrame.
-      iDestruct "Hrev" as %Hrev. inversion Hrev as [Heq]. subst ρ. 
-      iMod (sts_update_std _ _ _ Monotemporary with "Hfull Hρ") as "[Hfull Hρ] /=". iFrame. 
+      rewrite  Hx''.
+      iDestruct "Hrev" as %Hrev. inversion Hrev as [Heq]. subst ρ.
+      erewrite decide_True;auto.
+      iMod (sts_update_std _ _ _ Monotemporary with "Hfull Hρ") as "[Hfull Hρ] /=". iFrame.
       iModIntro. iExists M,(<[x:=Monotemporary]> Mρ). rewrite HMeq.
       iDestruct (region_map_delete_nonstatic with "Hr") as "Hr";[intros m; by rewrite Mx|].
       iDestruct (region_map_insert_nonmonostatic Monotemporary with "Hr") as "Hr";auto. 
@@ -1766,27 +1803,27 @@ Section heap.
             { destruct (pwl p'); iDestruct "Hmono" as "#Hmono"; iModIntro.
               - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). iPureIntro. apply related_sts_pub_a_world. auto.
               - iIntros (W' W'' Hrelated) "Hφ". iApply ("Hmono" with "[] Hφ"). iPureIntro. apply related_sts_pub_priv_world. auto.
-            } iFrame. repeat (iSplit;eauto). iExists _. iFrame. 
+            } iFrame. repeat (iSplit;eauto). iExists _. iFrame.
             iNext. iApply ("Hmono'" with "[] Hφ0"). iPureIntro.
             apply close_list_related_sts_pub_insert'; auto.
           + iDestruct "Hρ" as (γpred' p' φ0 Heq' Hpers) "(#Hpred & Hρ)".
             iDestruct "Hρ" as (v) "(HO & Ha' & #Hmono & Hφ0)".
-            iSplit;auto. iExists _,_,_. iFrame "∗ #". repeat iSplit;auto. 
+            iSplit;auto. iExists _,_,_. iFrame "∗ #". repeat iSplit;auto.
             iExists _; iFrame "∗ #". iNext. iApply ("Hmono" with "[] Hφ0"). iPureIntro.
             apply related_sts_pub_priv_world.
             apply close_list_related_sts_pub_insert'; auto.
       }
       do 2 (rewrite -HMeq). iFrame. iPureIntro.
       (* The domains remain equal *)
-      split. 
+      split.
       { rewrite -Hdom. rewrite dom_insert_L.
         assert (x ∈ dom (gset Addr) M) as Hin.
         { apply elem_of_gmap_dom. rewrite HMeq. rewrite lookup_insert. eauto. }
-        rewrite Hdom. set_solver. 
+        rewrite Hdom. set_solver.
       }
       rewrite dom_insert_L. assert (x ∈ dom (gset Addr) Mρ) as Hin;[apply elem_of_gmap_dom;eauto|].
-      rewrite -Hdom'. set_solver. 
-  Qed. 
+      rewrite -Hdom'. set_solver.
+  Qed.
 
   Lemma monotone_revoked_close_sub W l p φ `{forall Wv, Persistent (φ Wv)} :
     ([∗ list] a ∈ l, monotemp_resources (revoke W) φ a p ∗ rel a p φ
@@ -1800,8 +1837,8 @@ Section heap.
     iFrame.
   Qed.
 
-  (* However, we also want to be able to close regions that were valid in some world W, and which will be valid again 
-     in a public future world close l W' ! This is slightly more tricky: we must first update the region monotonically, 
+  (* However, we also want to be able to close regions that were valid in some world W, and which will be valid again
+     in a public future world close l W' ! This is slightly more tricky: we must first update the region monotonically,
      after which it will be possible to consolidate the full_sts and region *)
 
   Lemma close_list_consolidate W W' (l' l : list Addr) :
@@ -1820,10 +1857,10 @@ Section heap.
         apply submseteq_cons_r. left. auto. }
       iMod ("IH" $! Hsub' with "Hr Hsts Htemps") as "[Hsts Hr]".
       iClear "IH". 
-      rewrite /close_list /=.
+      rewrite /close_list /close_list_std_sta /=.
       iDestruct "Hx" as (p φ Hpers) "(Htemp & Hrel)".
       iDestruct "Htemp" as (v) "(Hne & Hx' & Hmono & Hφ)".
-      destruct (std W' !! x) eqn:Hsome;[|iFrame;done]. 
+      destruct (std W' !! x) eqn:Hsome;[|iFrame;done].
       destruct (decide (Revoked = r)).
       + subst.
         assert (x ∈ l) as Hinl.
@@ -1869,7 +1906,7 @@ Section heap.
         iFrame. iExists M,_. rewrite -HMeq. iFrame. rewrite -HMeq. iFrame. iModIntro. iSplit; auto.
         iPureIntro. rewrite dom_insert_L. rewrite -Hdom'.
         assert (x ∈ dom (gset Addr) Mρ);[apply elem_of_gmap_dom;eauto|]. set_solver.
-      + iFrame. destruct r; done. 
+      + iFrame. destruct r; done.
   Qed.
 
   Lemma monotone_close_list_region W W' (l : list Addr) :

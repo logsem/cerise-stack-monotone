@@ -3,6 +3,30 @@ From iris.proofmode Require Import tactics.
 From iris.base_logic Require Import invariants.
 From cap_machine Require Import stdpp_extra.
 
+Lemma big_sepM_to_create_gmap_default {Σ : gFunctors} {A B : Type} `{EqDecision A} `{Countable A}
+      (rmap rmap' : gmap A B) (φ : A -> B -> iProp Σ ) b :
+  dom (gset A) rmap = dom (gset A) rmap' →
+  ([∗ map] r_i↦_ ∈ rmap, φ r_i b) -∗
+  ([∗ map] r_i↦w_i ∈ create_gmap_default (elements (dom (gset A) rmap')) b, φ r_i w_i).
+Proof.
+  iIntros (Hdom) "Hrmap".
+  iInduction rmap as [|w b0 rmap] "IH" using map_ind forall (rmap' Hdom).
+  - rewrite -Hdom dom_empty_L elements_empty. simpl. done.
+  - iDestruct (big_sepM_insert with "Hrmap") as "[Hw Hrmap]";auto.
+    iDestruct ("IH" $! (delete w rmap') with "[]Hrmap") as "Hrmap'".
+    { iPureIntro. rewrite dom_delete_L. rewrite -Hdom. rewrite dom_insert_L.
+      assert (w ∉ dom (gset A) rmap) as Hnin;[apply not_elem_of_dom;auto|].
+      set_solver. }
+    rewrite dom_delete_L /=.
+    rewrite (create_gmap_default_Permutation _ (list_difference (elements (dom (gset A) rmap')) [w])).
+    + rewrite create_gmap_default_list_difference_singleton.
+      iDestruct (big_sepM_insert with "[$Hrmap' $Hw]") as "Hrmap";[rewrite lookup_delete;auto|].
+      rewrite insert_delete. rewrite insert_id. iFrame.
+      apply create_gmap_default_lookup. rewrite -Hdom dom_insert_L elements_union_singleton.
+      constructor. apply not_elem_of_dom. auto.
+    + eapply elements_difference_singleton. apply _.
+Qed.
+
 Lemma big_sepM_to_big_sepL {Σ : gFunctors} {A B : Type} `{EqDecision A} `{Countable A}
       (r : gmap A B) (lr : list A) (φ : A → B → iProp Σ) :
   NoDup lr →

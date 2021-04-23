@@ -12,6 +12,21 @@ Proof.
     + rewrite not_elem_of_list_to_set. by apply NoDup_cons_11.
 Qed.
 
+Lemma elements_difference_singleton :
+  ∀ (A C : Type) (H : ElemOf A C) (H0 : Empty C) (H1 : Singleton A C) (H2 : Union C) (H3 : Intersection C)
+    (H4 : Difference C) (H5 : Elements A C) (EqDecision0 : EqDecision A),
+    FinSet A C → ∀ (X : C) (x : A), elements (X ∖ {[x]}) ≡ₚlist_difference (elements X) [x].
+Proof.
+  intros. apply NoDup_Permutation.
+  - apply NoDup_elements.
+  - apply NoDup_list_difference. apply NoDup_elements.
+  - intros. split;intros Hin.
+    + apply elem_of_list_difference.
+      apply elem_of_elements in Hin. set_solver.
+    + apply elem_of_list_difference in Hin as [Hin Hne].
+      set_solver.
+Qed.
+
 Lemma NoDup_map_to_cons {A B} `{Countable A, EqDecision A} (rmap : gmap A B) (a :list (A * B) ):
   map_to_list rmap ≡ₚ a →
   NoDup (map_to_list rmap).*1 →
@@ -632,6 +647,40 @@ Proof.
   induction l as [| a l].
   - cbn. rewrite dom_empty_L //.
   - cbn [create_gmap_default list_to_set]. rewrite dom_insert_L // IHl //.
+Qed.
+
+Lemma create_gmap_default_Permutation {K V} `{EqDecision K, Countable K} (l l': list K) (d : V):
+  l ≡ₚl' →
+  create_gmap_default l d = create_gmap_default l' d.
+Proof.
+  intros Hl.
+  apply map_eq. intros i.
+  destruct (decide (i ∈ l)).
+  - assert (i ∈ l') as Hin;[rewrite -Hl;auto|].
+    eapply create_gmap_default_lookup in e.
+    eapply create_gmap_default_lookup in Hin.
+    rewrite Hin. rewrite e. auto.
+  - assert (i ∉ l') as Hin;[rewrite -Hl;auto|].
+    destruct (create_gmap_default l d !! i) eqn:Hsome.
+    apply create_gmap_default_lookup_is_Some in Hsome as [Hcontr _]. done.
+    destruct (create_gmap_default l' d !! i) eqn:Hsome'.
+    apply create_gmap_default_lookup_is_Some in Hsome' as [Hcontr _]. done.
+    auto.
+    Unshelve. all: done.
+Qed.
+
+Lemma create_gmap_default_list_difference_singleton {K V} `{EqDecision K, Countable K}
+      (l : list K) (d : V) (a : K):
+  create_gmap_default (list_difference l [a]) d = delete a (create_gmap_default l d).
+Proof.
+  induction l.
+  - simpl. rewrite delete_empty. auto.
+  - simpl. destruct (decide (a = a0)).
+    + subst. rewrite delete_insert_delete. rewrite -IHl.
+      rewrite decide_True;[|constructor]. auto.
+    + rewrite delete_insert_ne//. rewrite -IHl.
+      rewrite decide_False;[|intros Hcontr%elem_of_list_singleton;done].
+      auto.
 Qed.
 
 (* COPIED PASTED FROM rules_base.v TO AVOID SOME REQUIRE IMPORT WEIRDNESS BUGS *)

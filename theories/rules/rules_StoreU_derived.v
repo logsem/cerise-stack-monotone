@@ -107,6 +107,53 @@ Section cap_lang_rules.
      }
   Qed.
 
+  Lemma wp_storeU_failure_0_reg E pc_p pc_g pc_b pc_e pc_a pc_a' w dst src w'
+         p g b e a a' w'' pc_p' p' :
+    decodeInstrW w = StoreU dst (inl 0%Z) (inr src) →
+    PermFlows pc_p pc_p' →
+    PermFlows p p' →
+    isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
+    (pc_a + 1)%a = Some pc_a' →
+    isU p  = true -> canStoreU p a w'' = false ->
+    withinBounds ((p, g), b, e, a) = true ->
+    (a + 1)%a = Some a' ->
+
+
+     {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
+           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ src ↦ᵣ w''
+           ∗ ▷ dst ↦ᵣ inr ((p,g),b,e,a)
+           ∗ ▷ a ↦ₐ[p'] w' }}}
+       Instr Executable @ E
+       {{{ RET FailedV; True }}}.
+  Proof.
+      iIntros (Hinstr Hfl Hfl' Hvpc Hpca' HU HstoreU Hwb Ha' φ)
+             "(>HPC & >Hi & >Hsrc & >Hdst & >Hsrca) Hφ".
+    iDestruct (map_of_regs_3 with "HPC Hsrc Hdst") as "[Hmap (%&%&%)]".
+    pose proof (isU_nonO _ _ Hfl' HU) as Hp''.
+    pose proof (correctPC_nonO _ _ _ _ _ _ Hfl Hvpc) as Hpc_p'.
+    iDestruct (memMap_resource_2ne_apply with "Hi Hsrca") as "[Hmem %]"; auto.
+
+    iApply (wp_storeU _ pc_p with "[$Hmap $Hmem]"); eauto; simplify_map_eq; eauto.
+    { by rewrite !dom_insert; set_solver+. }
+    { rewrite addr_add_0. apply andb_true_iff in Hwb as [Hle%Z.leb_le Hlt%Z.ltb_lt].
+      rewrite !decide_True//;[|clear;solve_addr].
+      rewrite HU HstoreU /=. simplify_map_eq. auto. }
+    iNext. iIntros (regs' mem' retv) "(#Hspec & Hmem & Hmap)".
+    iDestruct "Hspec" as %Hspec.
+
+    destruct Hspec as [ | * Hfail ].
+    { (* Success (contradiction) *)
+      destruct H9 as (?&?&?&?&?&?).
+      simplify_map_eq. rewrite addr_add_0 in H8. simplify_eq.
+       rewrite decide_True in H12;[|clear;solve_addr].
+       rewrite insert_commute // insert_insert.
+       iDestruct (memMap_resource_2ne with "Hmem") as "[Hpc_a Ha]";auto.
+       destruct (addr_eq_dec a'0 a'0);[|contradiction].
+       incrementPC_inv. simplify_map_eq. congruence. }
+    { (* Failure (contradiction) *) iApply "Hφ". done. }
+  Qed.
+
   (* store and increment from and to the same register *)
   Lemma wp_storeU_success_0_reg_same E pc_p pc_g pc_b pc_e pc_a pc_a' w dst w'
          p g b e a a' pc_p' p' :

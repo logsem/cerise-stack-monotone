@@ -55,6 +55,43 @@ Section stack_macros.
     iApply "Hφ". iFrame.
   Qed.
 
+  (* The following specification is allowed to fail, in case the word does not meet
+     the monotone requirements *)
+  Lemma pushU_r_or_fail_spec a1 a2 w w' r p p' p_a g b e stk_b stk_e stk_a stk_a' φ :
+    isCorrectPC (inr ((p,g),b,e,a1)) →
+    PermFlows p p' ->
+    PermFlows URWLX p_a ->
+    withinBounds ((URWLX,Monotone),stk_b,stk_e,stk_a) = true →
+    (a1 + 1)%a = Some a2 →
+    (stk_a + 1)%a = Some stk_a' →
+
+      ▷ pushU_r a1 p' r_stk r
+    ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a1)
+    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a)
+    ∗ ▷ r ↦ᵣ w'
+    ∗ ▷ stk_a ↦ₐ[p_a] w
+    ∗ ▷ (φ FailedV)
+    ∗ ▷ (⌜isMonotone_word w' = true → (canReadUpTo w' <=? stk_a)%a = true⌝
+           ∗ PC ↦ᵣ inr ((p,g),b,e,a2) ∗ pushU_r a1 p' r_stk r ∗
+            r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a') ∗ r ↦ᵣ w' ∗ stk_a ↦ₐ[p_a] w'
+            -∗ WP Seq (Instr Executable) {{ φ }})
+    ⊢
+      WP Seq (Instr Executable) {{ φ }}.
+  Proof.
+    iIntros (Hvpc1 Hfl Hfl' Hwb Hsuc Hstk (* Hcanread *))
+            "(Ha1 & HPC & Hr_stk & Hr & Hstk_a' & Hfailed & Hφ)".
+    iApply (wp_bind (fill [SeqCtx])).
+    destruct (canStoreU URWLX stk_a w') eqn:canstore.
+    - iApply (wp_storeU_success_0_reg with "[$HPC $Ha1 $Hr $Hr_stk $Hstk_a']");
+        [apply decode_encode_instrW_inv|auto|auto|auto |apply Hsuc|auto|auto|eauto..].
+      iEpilogue "(HPC & Ha1 & Hr & Hr_stk & Hstk_a)".
+      iApply "Hφ". iFrame. iPureIntro. intros Hmono. destruct w' as [z|c];[inversion Hmono|].
+      destruct c,p0,p0,p0,l;inversion Hmono;auto.
+    - iApply (wp_storeU_failure_0_reg with "[$HPC $Ha1 $Hr $Hr_stk $Hstk_a']");
+        [apply decode_encode_instrW_inv|auto|auto|auto |apply Hsuc|auto|auto|eauto..].
+      iNext. iIntros "_". iApply wp_pure_step_later;eauto. iNext. iApply wp_value. iFrame.
+  Qed.
+
   Lemma pushU_r_spec_same a1 a2 w p p' p_a g b e stk_b stk_e stk_a stk_a' φ :
     isCorrectPC (inr ((p,g),b,e,a1)) →
     PermFlows p p' ->

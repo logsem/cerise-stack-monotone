@@ -164,11 +164,7 @@ Section stack_object.
     apply Z.ltb_lt in Hsize. apply Z.leb_le in Hbounds.
 
     (* we can extract the validity of the parameters passed on the stack *)
-    iDestruct (read_allowedU_inv _ bstk with "Hwstk_valid") as (p' Hflows) "Hcond1";[clear -Hbounds Hsize Ha_param;solve_addr|auto|].
-    iDestruct (writeLocalAllowedU_valid_cap_below_implies _ _ _ _ _ _ bstk with "Hwstk_valid") as %Hmono1;
-      [auto|apply le_addr_withinBounds|..];[clear -Hbounds Hsize Ha_param;solve_addr..|].
-    destruct p';inversion Hflows;clear Hflows.
-
+    (* we only need the validity of the stack object parameter, not need for the return pointer yet *)
     destruct (bstk + 1)%a eqn:Hsome;[|exfalso;clear -Ha_param Hsome;solve_addr].
     iDestruct (read_allowedU_inv _ a with "Hwstk_valid") as (p' Hflows) "Hcond2";[clear -Hbounds Hsize Hsome;solve_addr|auto|].
     iDestruct (writeLocalAllowedU_valid_cap_below_implies _ _ _ _ _ _ a with "Hwstk_valid") as %Hmono2;
@@ -222,6 +218,7 @@ Section stack_object.
       iApply read_allowed_inv. apply elem_of_region_addrs in Hinx. eauto. eauto.
       iFrame "Hwsecret_valid". }
     iDestruct "Hws" as (wps) "(Hbesec & Hcls' & #Hsecret_states & #Hperms)".
+    iDestruct (big_sepL2_length with "Hbesec") as %Hbesec_length.
     iDestruct "Hsecret_states" as %Hsecret_states. iDestruct "Hperms" as %Hperm_flows.
 
     (* Now we are ready to apply the checkints macro *)
@@ -237,35 +234,28 @@ Section stack_object.
     iDestruct ("Hcls'" with "Hbesec") as "Hr".
 
     (* for the next part of the code, we will need to manipulate our local stack frame *)
-    (* for that, we begin by revoking the full local stack frame from W *)
-    assert (∃ frame_end, a_param + 10 = Some frame_end)%a as [frame_end Hframe_delim].
-    { clear -Hbounds Ha_param Hsome Hsize. destruct (a_param + 10)%a eqn:HH;eauto. exfalso. solve_addr.}
+    (* for that, we begin by revoking the local stack frame from W which we will use to store the local state and activation record*)
+    assert (∃ frame_end, a_param + 12 = Some frame_end)%a as [frame_end Hframe_delim].
+    { clear -Hbounds Ha_param Hsome Hsize. destruct (a_param + 12)%a eqn:HH;eauto. exfalso. solve_addr. }
     (* first we must know that a fully uninitialized world satisfies the revoke condition *)
     apply uninitialize_revoke_condition in Hmcond as Hrevoked.
     (* next we may revoke it *)
-    iMod (uninitialize_to_revoked_cond_states (region_addrs bstk frame_end) _ _ RWLX (λ Wv, interp Wv.1 Wv.2) with "[$Hr $Hsts]") as "(Hr & Hsts & Hframe)";[apply region_addrs_NoDup|auto|..].
+    iMod (uninitialize_to_revoked_cond (region_addrs a_param frame_end) _ _ RWLX (λ Wv, interp Wv.1 Wv.2) with "[$Hr $Hsts]") as "(Hr & Hsts & Hframe)";[auto|apply region_addrs_NoDup|..].
     { apply Forall_forall. intros x Hin%elem_of_region_addrs. apply Hstk_cond. clear -Hbounds Ha_param Hsome Hsize Hframe_delim Hin. solve_addr. }
     { iApply big_sepL_forall. iIntros (k x Hlookup).
-      assert (x ∈ (region_addrs bstk frame_end)) as Hin;[apply elem_of_list_lookup;eauto|].
+      assert (x ∈ (region_addrs a_param frame_end)) as Hin;[apply elem_of_list_lookup;eauto|].
       apply elem_of_region_addrs in Hin.
       iDestruct (read_allowedU_inv _ x with "Hwstk_valid") as (p' Hflows) "Hcond".
       clear -Hin Hframe_delim Ha_param Hsome Hsize Hbounds. solve_addr.
       auto. destruct p';inversion Hflows. iFrame "Hcond". }
 
     (* finally we clean up our resources a bit *)
-    iAssert (∃ ws wret w', bstk ↦ₐ[RWLX] wret ∗ a ↦ₐ[RWLX] w' ∗ [[a_param,frame_end]]↦ₐ[RWLX][[ws]])%I with "[Hframe]" as (wsstk wret w') "(Hbstk & Ha & Hframe)".
+    iAssert (∃ ws,[[a_param,frame_end]]↦ₐ[RWLX][[ws]])%I with "[Hframe]" as (wsstk) "Hframe".
     { iDestruct (region_addrs_exists with "Hframe") as (ws) "Hframe".
-      iDestruct (big_sepL2_length with "Hframe") as %Hflen. rewrite region_addrs_length in Hflen.
-      assert (region_size bstk frame_end = 12) as Heq. clear -Hframe_delim Ha_param. rewrite /region_size. solve_addr.
-      rewrite Heq in Hflen. destruct ws;[inversion Hflen|]. rewrite region_addrs_cons;[|clear -Hframe_delim Ha_param;solve_addr].
-      rewrite Hsome /=. rewrite region_addrs_cons;[|clear -Hframe_delim Ha_param Hsome;solve_addr].
-      assert ((a + 1)%a = Some a_param) as ->;[clear -Hsome Ha_param;solve_addr|]. destruct ws;[inversion Hflen|]. simpl.
-      iDestruct "Hframe" as "(H1 & H2 & Hframe)".
-      iExists ws,w,w5. iDestruct "H1" as "[_ $]". iDestruct "H2" as "[_ $]".
-      iApply (big_sepL2_mono with "Hframe"). iIntros (k y1 y2 Hin1 Hin2) "[_ H]". iFrame. }
+      iExists ws. iApply (big_sepL2_mono with "Hframe"). iIntros (k y1 y2 Hin1 Hin2) "[_ H]". iFrame. }
     iDestruct (big_sepL2_length with "Hframe") as %Hframe_length.
     rewrite region_addrs_length in Hframe_length.
-    apply (incr_addr_region_size_iff _ _ 10)in Hframe_delim as Hframe_det.
+    apply (incr_addr_region_size_iff _ _ 12)in Hframe_delim as Hframe_det.
     destruct Hframe_det as [Hframe_le Hframe_size]. rewrite Hframe_size in Hframe_length.
 
     (* we can now continue with the execution of instructions *)
@@ -372,14 +362,217 @@ Section stack_object.
     { rewrite dom_insert_L !dom_delete_L !dom_insert_L Hdom. clear. simpl. set_solver. }
     iSplitL "Hr_t0";[eauto|].
     iNext. iIntros "(HPC & Hr_stk & Hr_t0 & Hregs & Hact & HscallU_prologue)".
+    iDestruct "Hregs" as (rmap' [Hdom' Hcond]) "Hregs".
 
     (* TODO: fix the calling convention to take the instructions between jmp and prologue into account
        (this can be done as a parametrised activation record, that subsegs the expected amount)? or as a parameter to prologue *)
-  Admitted. 
 
+    assert (length wparams = 3) as Hparams_length.
+    { rewrite Hframe_eqapp in Hframe_length. rewrite /= app_length Hact_size in Hframe_length. inversion Hframe_length. auto. }
+    iPrologue_multi "Hprog" Hcont Hvpc link6.
+    iDestruct (big_sepL2_length with "Hcode") as %Hlength_code1.
+    destruct_addr_list l_code4.
+    apply contiguous_between_cons_inv_first in Hcont_code6 as Heq. subst l_code4.
 
+    (* pushU r_stk r_param1 *)
+    destruct wparams;[inversion Hparams_length|].
+    destruct (b_r_adv + 1)%a eqn:Hparam1;[|exfalso;clear -Hb_r_adv Haf3 Haf2 Ha_param Hparam1 Hframe_delim;solve_addr].
+    iDestruct (region_mapsto_cons with "Hparams") as "[Hp1 Hparams]";[apply Hparam1|clear -Hb_r_adv Haf3 Haf2 Ha_param Hparam1 Hframe_delim;solve_addr|].
+    iDestruct "Hcode" as "[Hi Hcode]".
+    iApply (pushU_r_or_fail_spec with "[- $HPC $Hi $Hr_param1 $Hr_stk $Hp1]");
+      [iCorrectPC link5 link6|apply Hfl|auto| |iContiguous_next_a Hcont_code6|apply Hparam1|].
+    { clear -Hbounds Ha_param Hsize Hframe_delim Haf2 Haf3 Hparam1 Hb_r_adv Ha_r_adv.
+      apply le_addr_withinBounds; solve_addr. }
+    iSplitR;[iNext;by iRight|].
+    iNext. iIntros "(Hmonocond & HPC & Hprog_done3 & Hr_stk & Hr_param1 & Hp1)".
+    iDestruct "Hmonocond" as %Hmonocond.
 
+    (* pushU r_stk r_param2 *)
+    destruct wparams;[inversion Hparams_length|].
+    destruct (a14 + 1)%a eqn:Hparam2;[|exfalso;clear -Hb_r_adv Haf3 Haf2 Ha_param Hparam1 Hparam2 Hframe_delim;solve_addr].
+    iDestruct (region_mapsto_cons with "Hparams") as "[Hp2 Hparams]";[apply Hparam2|clear -Hb_r_adv Haf3 Haf2 Ha_param Hparam1 Hparam2 Hframe_delim;solve_addr|].
+    iDestruct "Hcode" as "[Hi Hcode]".
+    iApply (pushU_r_spec with "[- $HPC $Hi $Hr_param2 $Hr_stk $Hp2]");
+      [iCorrectPC link5 link6|apply Hfl|auto| |iContiguous_next_a Hcont_code6|apply Hparam2|..].
+    { clear -Hbounds Ha_param Hsize Hframe_delim Haf2 Haf3 Hparam1 Hb_r_adv Ha_r_adv.
+      apply le_addr_withinBounds; solve_addr. }
+    { simpl. intros _. clear -Hb_r_adv Hparam1. rewrite Z.leb_le. solve_addr. }
+    iNext. iIntros "(HPC & Hi & Hr_stk & Hr_param2 & Hp2)". iCombine "Hi" "Hprog_done3" as "Hprog_done3".
 
+    (* pushU r_stk r_t0 *)
+    destruct wparams;[inversion Hparams_length|].
+    destruct (a15 + 1)%a eqn:Hparam3;[|exfalso;clear -Hb_r_adv Haf3 Haf2 Ha_param Hparam1 Hparam2 Hparam3 Hframe_delim;solve_addr].
+    iDestruct (region_mapsto_cons with "Hparams") as "[Hp3 Hparams]";[apply Hparam3|clear -Hb_r_adv Haf3 Haf2 Ha_param Hparam1 Hparam2 Hparam3 Hframe_delim;solve_addr|].
+    iDestruct "Hcode" as "[Hi Hcode]".
+    iApply (pushU_r_spec with "[- $HPC $Hi $Hr_t0 $Hr_stk $Hp3]");
+      [iCorrectPC link5 link6|apply Hfl|auto| |iContiguous_next_a Hcont_code6|apply Hparam3|..].
+    { clear -Hbounds Ha_param Hsize Hframe_delim Haf2 Haf3 Hparam1 Hparam2 Hparam3 Hb_r_adv Ha_r_adv.
+      apply le_addr_withinBounds; solve_addr. }
+    { simpl. intros _. clear -Hb_r_adv Hparam1 Hparam2. rewrite Z.leb_le. solve_addr. }
+    iNext. iIntros "(HPC & Hi & Hr_stk & Hr_t0 & Hp3)". iCombine "Hi" "Hprog_done3" as "Hprog_done3".
+
+    (* move r_param1 0 *)
+    iPrologue "Hcode".
+    iApply (wp_move_success_z with "[$HPC $Hi $Hr_param1]");
+      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link5 link6|iContiguous_next_a Hcont_code6|].
+    iEpilogue "(HPC & Hi & Hr_param1)"; iCombine "Hi" "Hprog_done3" as "Hprog_done3".
+    (* move r_param2 0 *)
+    iPrologue "Hcode".
+    iApply (wp_move_success_z with "[$HPC $Hi $Hr_param2]");
+      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link5 link6|iContiguous_next_a Hcont_code6|].
+    iEpilogue "(HPC & Hi & Hr_param2)"; iCombine "Hi" "Hprog_done3" as "Hprog_done3".
+    (* move r_t0 0 *)
+    iPrologue "Hcode".
+    iApply (wp_move_success_z with "[$HPC $Hi $Hr_t0]");
+      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link5 link6|iContiguous_next_a Hcont_code6|].
+    iEpilogue "(HPC & Hi & Hr_t0)"; iCombine "Hi" "Hprog_done3" as "Hprog_done3".
+    (* jmp r_adv *)
+    iPrologue "Hcode".
+    iApply (wp_jmp_success with "[$HPC $Hi $Hr_adv]");
+      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link5 link6|].
+
+    (* prepare to use the ftlr by reconstructoring the register state *)
+    iDestruct (big_sepM_insert with "[$Hregs $Hr_param2]") as "Hregs".
+    { apply not_elem_of_dom. rewrite -Hdom'. clear. rewrite dom_insert_L !dom_delete_L !dom_insert_L. set_solver. }
+    iDestruct (big_sepM_insert with "[$Hregs $Hr_param1]") as "Hregs".
+    { rewrite lookup_insert_ne//. apply not_elem_of_dom. rewrite -Hdom'. clear. rewrite dom_insert_L !dom_delete_L !dom_insert_L. set_solver. }
+    iDestruct (big_sepM_insert with "[$Hregs $Hr_t0]") as "Hregs".
+    { rewrite !lookup_insert_ne//. apply not_elem_of_dom. rewrite -Hdom'. clear. rewrite dom_insert_L !dom_delete_L !dom_insert_L. set_solver. }
+
+    match goal with |- context [ ([∗ map] k↦y ∈ ?r, k ↦ᵣ y)%I ] =>
+                    set rmap2 := r
+    end.
+
+    iDestruct (fundamental_from_interp rmap2 with "Hadv_valid") as "Hexpr".
+    iEpilogue "(HPC & Hi & Hr_adv)"; iCombine "Hi" "Hprog_done3" as "Hprog_done3".
+
+    (* setup the map for the frozen local stack frame *)
+    (* Notice that we are not freezing the stack object! *)
+    assert (NoDup (a_param :: region_addrs af3 b_r_adv)) as Hnodup.
+    { apply NoDup_cons. split;try apply region_addrs_NoDup.
+      intros Hin1%elem_of_region_addrs.
+      clear -Hsome Haf2 Haf3 Hin1. exfalso. solve_addr. }
+
+    match goal with |- context [ [[af3,b_r_adv]]↦ₐ[RWLX][[?act]]%I ] =>
+                    set actw := act
+    end.
+    set lframe : gmap Addr Word := list_to_map (zip (a_param :: (region_addrs af3 b_r_adv)) (inl 2%Z :: actw)).
+
+    (* Freeze the local stack frame *)
+    iMod (region_revoked_cond_to_static _ lframe with "[Hf1 Hact $Hr $Hsts]") as "[Hsts Hr]".
+    { apply revoke_condition_std_multiple_updates;auto. }
+    { iApply big_sepL2_to_big_sepM. apply Hnodup.
+      iSimpl.
+      iDestruct (read_allowedU_inv _ a_param with "Hwstk_valid") as (p' Hflows) "Hcond3";
+        [clear -Hbounds Hsize Ha_param Haf2;solve_addr|auto|destruct p';inversion Hflows].
+      iSplitL "Hf1".
+      { iExists RWLX,(λ Wv, interp Wv.1 Wv.2). repeat iSplit;auto. iPureIntro. apply _. }
+      iDestruct (read_allowedU_inv_range _ _ _ _ _ _ af3 b_r_adv with "Hwstk_valid") as "Hconds";auto.
+      { clear -Hsome Haf2 Haf3 Hb_r_adv Hsize Hbounds Ha_param. solve_addr. }
+      iDestruct (big_sepL2_length with "Hact") as %Hact_length.
+      iDestruct (big_sepL2_to_big_sepL_l _ _ actw with "Hconds") as "Hconds'";auto.
+      iDestruct (big_sepL2_sep with "[Hconds' Hact]") as "Hact";[iSplitL;[iFrame "Hact"|iFrame "Hconds'"]|].
+      iApply (big_sepL2_mono with "Hact").
+      iIntros (k y1 y2 Hin1 Hin2) "[Hy Hy1] /=".
+      iDestruct "Hy1" as (p' Hflows') "Hcond". iExists _,_;destruct p';inversion Hflows'. iFrame.
+      iPureIntro. split; auto; apply _. }
+
+    (* a bit of world cleanup: This part is quite tedious, and could maybe be delegated to lemma! *)
+    destruct wparams;[|inversion Hparams_length]. iClear "Hparams".
+    assert (a16 = frame_end) as ->.
+    { clear -Hframe_delim Hb_r_adv Hparam1 Hparam2 Hparam3 Haf2 Haf3. solve_addr. }
+    assert (region_addrs a_param frame_end = a_param :: af2 :: region_addrs af3 b_r_adv ++ region_addrs b_r_adv frame_end) as Heqapp2.
+    { rewrite region_addrs_cons;[rewrite Haf2|clear -Hframe_delim Haf2 Ha_param;solve_addr]. f_equiv. simpl.
+      rewrite region_addrs_cons;[rewrite Haf3|clear -Hframe_delim Haf2 Ha_param;solve_addr]. f_equiv. simpl.
+      apply region_addrs_split. clear -Hb_r_adv Haf2 Haf3 Hparam1 Hparam2 Hparam3;solve_addr. }
+    rewrite Heqapp2.
+    erewrite std_update_multiple_permutation.
+    2: { apply elements_dom_list_to_map_zip;auto. apply _. simpl. rewrite region_addrs_length.
+         clear -Hb_r_adv. rewrite /region_size. solve_addr. }
+    assert (a_param :: af2 :: region_addrs af3 b_r_adv ++ region_addrs b_r_adv frame_end ≡ₚ
+                    ((af2 :: region_addrs b_r_adv frame_end) ++ (a_param :: region_addrs af3 b_r_adv))) as Hperm'.
+    { rewrite Permutation_app_comm. rewrite -(Permutation_middle _ _ a_param). simpl. auto. }
+    erewrite (std_update_multiple_permutation _ _ _ Revoked);[|apply Hperm'].
+    rewrite (std_update_multiple_app _ _ _ Revoked). rewrite std_update_multiple_overlap.
+    rewrite std_update_multiple_disjoint.
+    2: { assert (af2 :: region_addrs b_r_adv frame_end = [af2] ++ region_addrs b_r_adv frame_end) as ->;auto.
+         assert (a_param :: region_addrs af3 b_r_adv = [a_param] ++ region_addrs af3 b_r_adv) as ->;auto.
+         rewrite -(region_addrs_single a_param af2)//.  apply region_addrs_disjoint_skip_middle. auto. clear -Hb_r_adv. solve_addr. }
+
+    (* we are ready to close the parts of the world that must stay valid: the two stack objects *)
+    iAssert (⌜if pwl l then p = Monotone else True⌝)%I as %Hmono.
+    { destruct (pwl l) eqn:Hpwl. iDestruct (writeLocalAllowed_implies_local with "Hwsecret_valid") as %HH;auto.
+      iPureIntro. destruct p;inversion HH;auto. auto. }
+    iMod (close_stack_object with "Hsecret_cond Hsts Hr") as "(Hsts & Hr & #Hvalid)";
+      [apply Hmono|auto|apply Hbesec_length|apply Hints|apply Hsecret_states|..].
+    { clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim . apply elem_of_disjoint. intros x Hin.
+      apply elem_of_disjoint in Hdisj. apply Hdisj in Hin as Hnin.
+      apply not_elem_of_cons. split.
+      { intros ->. apply Hnin. apply elem_of_region_addrs. solve_addr. }
+      apply not_elem_of_app. split.
+      { intros Hcontr%elem_of_region_addrs. apply Hnin. apply elem_of_region_addrs. solve_addr. }
+      apply not_elem_of_cons. split.
+      { intros ->. apply Hnin. apply elem_of_region_addrs. solve_addr. }
+      intros Hcontr%elem_of_region_addrs. apply Hnin. apply elem_of_region_addrs. solve_addr. }
+
+    match goal with |- context [ region ?W ] =>
+                    set W1 := W
+    end.
+
+    (* we close the first parameter *)
+    iDestruct (read_allowedU_inv _ b_r_adv with "Hwstk_valid") as "#Hb_r_adv_rel";[|auto|].
+    { clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim. solve_addr. }
+    iDestruct "Hb_r_adv_rel" as (p' Hflows) "Hb_r_adv_rel". destruct p';inversion Hflows;clear Hflows.
+    iMod (update_region_revoked_monotemp_pwl with "[] Hsts Hr Hp1 [] Hb_r_adv_rel") as "[Hr Hsts]";[|auto|auto|..].
+    { rewrite /W1 /= initialize_list_nin. rewrite lookup_insert_ne. rewrite std_sta_update_multiple_lookup_in_i//.
+      apply elem_of_region_addrs. all: clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim Hdisj. 1,2: solve_addr.
+      apply elem_of_disjoint in Hdisj. intros Hcontr. apply Hdisj in Hcontr.
+      apply Hcontr. apply elem_of_region_addrs. solve_addr. }
+    { iAlways. iIntros (W0 W' Hrelated) "Hv /=". destruct p.
+      iApply (interp_monotone_nm with "[] [] Hv");auto. iPureIntro.
+      clear -Hrelated. apply related_sts_pub_plus_priv_world. eapply related_sts_a_pub_plus_world. eauto.
+      iApply (interp_monotone_nm with "[] [] Hv");auto. iPureIntro.
+      clear -Hrelated. apply related_sts_pub_plus_priv_world. eapply related_sts_a_pub_plus_world. eauto.
+      iApply (interp_monotone_a with "[] Hv"). iPureIntro.
+      clear -Hmonocond Hmono2 Hmono Hrelated Hra. simpl in *.
+      assert (isU l = false) as ->;[destruct l;auto;inversion Hra|].
+      eapply related_sts_a_weak_world;[|eauto]. revert Hmonocond; rewrite Z.leb_le =>Hmonocond.
+      destruct l;inversion Hra;apply Hmonocond;auto. }
+    { iSimpl. iFrame "Hvalid". }
+
+    (* our new stack object at addess af2: we go from Revoked to Monotemporary *)
+    iDestruct (read_allowedU_inv _ af2 with "Hwstk_valid") as "#Hf2_rel";[|auto|].
+    { clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim. solve_addr. }
+    iDestruct "Hf2_rel" as (p' Hflows) "Hf2_rel". destruct p';inversion Hflows;clear Hflows.
+    iMod (update_region_revoked_monotemp_pwl with "[] Hsts Hr Hf2 [] Hf2_rel") as "[Hr Hsts]";[|auto|auto|..].
+    { rewrite lookup_insert_ne. 2: clear -Hb_r_adv Haf3;solve_addr. rewrite /W1 /= initialize_list_nin. rewrite lookup_insert//.
+      apply elem_of_disjoint in Hdisj. intros Hcontr. apply Hdisj in Hcontr.
+      apply Hcontr. apply elem_of_region_addrs. clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim. solve_addr. }
+    { iAlways. iIntros (W0 W' _) "_ /=". rewrite !fixpoint_interp1_eq. eauto. }
+    { iSimpl. rewrite !fixpoint_interp1_eq. eauto. }
+
+    (* we close the second parameter *)
+    iDestruct (read_allowedU_inv _ a14 with "Hwstk_valid") as "#Ha14_rel";[|auto|].
+    { clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim Hparam1. solve_addr. }
+    iDestruct "Ha14_rel" as (p' Hflows) "Ha14_rel". destruct p';inversion Hflows;clear Hflows.
+    iMod (update_region_revoked_monotemp_pwl with "[] Hsts Hr Hp2 [] Ha14_rel") as "[Hr Hsts]";[|auto|auto|..].
+    { rewrite lookup_insert_ne;[|clear -Hb_r_adv Hparam1 Haf3;solve_addr].
+      rewrite lookup_insert_ne;[|clear -Hb_r_adv Hparam1;solve_addr].
+      rewrite /W1 /= initialize_list_nin. rewrite lookup_insert_ne. rewrite std_sta_update_multiple_lookup_in_i//.
+      apply elem_of_region_addrs. all: clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim Hdisj Hparam1. 1,2: solve_addr.
+      apply elem_of_disjoint in Hdisj. intros Hcontr. apply Hdisj in Hcontr.
+      apply Hcontr. apply elem_of_region_addrs. solve_addr. }
+    { iModIntro. iIntros (W0 W' Hrelated) "Hv /=".
+      iApply (interp_monotone_a with "[] Hv"). iPureIntro.
+      clear -Hparam1 Hb_r_adv Hrelated.
+      eapply related_sts_a_weak_world;[|eauto]. solve_addr. }
+    { iSimpl. rewrite !fixpoint_interp1_eq. iSimpl. rewrite region_addrs_single;auto. iSimpl.
+      iSplit;auto. iExists RWLX. iFrame "Hf2_rel". iSplit;auto. rewrite /region_state_pwl_mono. rewrite lookup_insert. auto. }
+
+    (* We are almost ready to apply the expression relation of the adversary *)
+    (* We have two remaining steps: first we must show that the continuation is in the value relation *)
+    (* Next we must close the final parameter and apply the relation on the almost empty register state, where in particular
+       we must show the validity of the current stack register *)
 
 
 

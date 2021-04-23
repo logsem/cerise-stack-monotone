@@ -447,6 +447,36 @@ Section std_updates.
      - rewrite std_update_multiple_swap /=. by rewrite IHl2.
    Qed.
 
+   Lemma revoke_condition_std_multiple_updates W l ρ :
+     revoke_condition W → ρ ≠ Monotemporary → revoke_condition (std_update_multiple W l ρ).
+   Proof.
+     induction l.
+     - auto.
+     - intros Hrev Hne. simpl. intros a'.
+       destruct (decide (a = a')).
+       + simpl. destruct W as [Wstd Wloc].
+         rewrite (std_update_multiple_std_sta_eq _ Wloc). subst. rewrite lookup_insert.
+         congruence.
+       + simpl. destruct W as [Wstd Wloc].
+         rewrite (std_update_multiple_std_sta_eq _ Wloc). rewrite lookup_insert_ne//.
+         apply IHl in Hrev;auto.
+   Qed.
+
+
+   Lemma std_update_multiple_overlap W l ρ1 ρ2 :
+     std_update_multiple (std_update_multiple W l ρ1) l ρ2 = std_update_multiple W l ρ2.
+   Proof.
+     induction l;auto.
+     simpl. destruct W as [Wstd Wloc]. rewrite /std_update /=. rewrite !std_update_multiple_loc /=. f_equiv.
+     apply map_eq'. intros k v.
+     destruct (decide (a = k)).
+     + subst. rewrite !lookup_insert. auto.
+     + rewrite !lookup_insert_ne//. destruct (decide (k ∈ l)).
+       * rewrite !std_sta_update_multiple_lookup_in_i//.
+       * rewrite !std_sta_update_multiple_lookup_same_i// /=.
+         rewrite lookup_insert_ne//. rewrite !std_sta_update_multiple_lookup_same_i// /=.
+   Qed.
+
    (* Helper lemmas about permutation *)
 
    (* TODO: never used ? *)

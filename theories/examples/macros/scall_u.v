@@ -126,7 +126,8 @@ Section scall.
    ∗ ▷ (PC ↦ᵣ inr (p,g,b,e,a_cont)
             ∗ r_stk ↦ᵣ inr ((URWLX,Monotone),b_r_adv,e_r,b_r_adv)
             ∗ r_t0 ↦ᵣ inr ((E,Monotone),b_r,b_r_adv,a_r) (* Note that this capbility does not grant permissions up to the end of the stack anymore *)
-            ∗ ([∗ map] r_i↦_ ∈ rmap, r_i ↦ᵣ inl 0%Z)
+            ∗ (∃ rmap', ⌜dom (gset RegName) rmap = dom (gset RegName) rmap' ∧ ∀ r w, rmap' !! r = Some w → w = inl 0%Z⌝
+                                                    ∗ [∗ map] r_i↦w_i ∈ rmap', r_i ↦ᵣ w_i)
             ∗ [[ a_r, b_r_adv ]]↦ₐ[RWLX][[ [inl w_1;
                                              inl w_2_U;
                                              inl w_3;
@@ -397,16 +398,24 @@ Section scall.
     iNext. iIntros "(HPC & Hregs & Hrclear)".
     iApply "Hφ". rewrite decode_encode_permPair_inv. iFrame "HPC Hr_stk Hr_t0".
     iSplitL "Hregs".
-    { iDestruct (big_sepM_dom with "Hregs") as "Hregs". iApply big_sepM_dom.
-      rewrite big_opS_proper'. iApply "Hregs". reflexivity.
-      rewrite !dom_insert_L  Hrmap.
-      rewrite !difference_difference_L !singleton_union_difference_L !all_registers_union_l.
-      f_equal. clear -Hne Hdisj. set_solver. }
+    { iExists (create_gmap_default (elements (dom (gset RegName) rmap)) (inl 0%Z)).
+      iSplit;[iPureIntro|].
+      - rewrite Hrmap create_gmap_default_dom. split;[clear;set_solver|].
+        intros r w' Hin. apply create_gmap_default_lookup_is_Some in Hin as [? ->]. auto.
+      - iApply big_sepM_to_create_gmap_default; last iFrame "Hregs".
+        rewrite /= !dom_insert_L. clear -Hin_rmap.
+        assert (r_t2 ∈ dom (gset RegName) rmap) as Hin2.
+        { apply elem_of_gmap_dom. apply Hin_rmap. repeat constructor. }
+        assert (r_t1 ∈ dom (gset RegName) rmap) as Hin1.
+        { apply elem_of_gmap_dom. apply Hin_rmap. repeat constructor. }
+        set_solver.
+    }
     iSplitL "Hact_frame".
     { iDestruct "Hact_frame" as "(?&?&?&?&?&?&?)". by iFrame. }
     { rewrite Happeq'. repeat (iDestruct "Hprog_done" as "(?&Hprog_done)").
       repeat (iDestruct "Hpushes" as "(?&Hpushes)").
       iFrame. rewrite -list_difference_app. iFrame. }
+    Unshelve. apply _.
   Qed.
 
   Lemma scallU_epilogue_spec stack_own_b stack_own_e s_last stack_new rt1w rstkw
