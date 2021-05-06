@@ -140,13 +140,14 @@ Section heap.
 
   (* The following lemma takes a revoked region and makes it Temporary. *)
 
-  Lemma update_region_revoked_monotemp_pwl E W l p v φ `{∀ Wv, Persistent (φ Wv)} :
+  (* In the following variant, we only require monotonicity of the updated world *)
+  Lemma update_region_revoked_monotemp_updated_pwl E W l p v φ `{∀ Wv, Persistent (φ Wv)} :
     (std W) !! l = Some Revoked →
     p ≠ O → pwl p = true →
     future_pub_a_mono l φ v -∗
     sts_full_world W -∗
     region W -∗
-    l ↦ₐ[p] v -∗ φ (W,v) -∗ rel l p φ ={E}=∗ region (<s[l := Monotemporary ]s>W)
+    l ↦ₐ[p] v -∗ φ (<s[l := Monotemporary ]s>W,v) -∗ rel l p φ ={E}=∗ region (<s[l := Monotemporary ]s>W)
                              ∗ sts_full_world (<s[l := Monotemporary ]s>W).
   Proof.
     iIntros (Hrev HO Hpwl) "#Hmono Hsts Hreg Hl #Hφ #Hrel".
@@ -167,7 +168,6 @@ Section heap.
     assert (related_sts_a_world W (<s[l := Monotemporary ]s> W) l) as Hrelated'.
     { apply related_sts_pub_a_world; auto. }
     iDestruct (region_map_monotone _ _ _ _ Hrelated with "Hr") as "Hr".
-    iDestruct ("Hmono" $! _ _ Hrelated' with "Hφ") as "Hφ'".
     assert (is_Some (M !! l)) as [x Hsome].
     { apply elem_of_gmap_dom. rewrite -Hdom. apply elem_of_gmap_dom. eauto. }
     iDestruct (region_map_delete_nonstatic with "Hr") as "Hr"; [intros m;congruence|].
@@ -185,13 +185,31 @@ Section heap.
     - repeat rewrite dom_insert_L;rewrite Hdom';set_solver.
   Qed.
 
-   Lemma update_region_revoked_monotemp_nwl E W l p v φ `{∀ Wv, Persistent (φ Wv)} :
+  Lemma update_region_revoked_monotemp_pwl E W l p v φ `{∀ Wv, Persistent (φ Wv)} :
+    (std W) !! l = Some Revoked →
+    p ≠ O → pwl p = true →
+    future_pub_a_mono l φ v -∗
+    sts_full_world W -∗
+    region W -∗
+    l ↦ₐ[p] v -∗ φ (W,v) -∗ rel l p φ ={E}=∗ region (<s[l := Monotemporary ]s>W)
+                             ∗ sts_full_world (<s[l := Monotemporary ]s>W).
+  Proof.
+    iIntros (Hrev HO Hpwl) "#Hmono Hsts Hreg Hl #Hφ #Hrel".
+    assert (related_sts_pub_world W (<s[l := Monotemporary ]s> W)) as Hrelated.
+    { apply related_sts_pub_world_revoked_monotemp; auto. }
+    assert (related_sts_a_world W (<s[l := Monotemporary ]s> W) l) as Hrelated'.
+    { apply related_sts_pub_a_world; auto. }
+    iDestruct ("Hmono" $! _ _ Hrelated' with "Hφ") as "Hφ'".
+    iApply (update_region_revoked_monotemp_updated_pwl with "Hmono Hsts Hreg Hl Hφ' Hrel");auto.
+  Qed.
+
+  Lemma update_region_revoked_monotemp_updated_nwl E W l p v φ `{∀ Wv, Persistent (φ Wv)} :
     (std W) !! l = Some Revoked →
     p ≠ O →
     future_priv_mono φ v -∗
     sts_full_world W -∗
     region W -∗
-    l ↦ₐ[p] v -∗ φ (W,v) -∗ rel l p φ ={E}=∗ region (<s[l := Monotemporary ]s>W)
+    l ↦ₐ[p] v -∗ φ (<s[l := Monotemporary ]s>W,v) -∗ rel l p φ ={E}=∗ region (<s[l := Monotemporary ]s>W)
                              ∗ sts_full_world (<s[l := Monotemporary ]s>W).
   Proof.
     iIntros (Hrev HO) "#Hmono Hsts Hreg Hl #Hφ #Hrel".
@@ -214,7 +232,6 @@ Section heap.
     iDestruct (region_map_monotone _ _ _ _ Hrelated with "Hr") as "Hr".
     iDestruct (region_map_delete_nonstatic with "Hr") as "Hr"; [intros m;congruence|].
     iDestruct (region_map_insert_nonmonostatic Monotemporary with "Hr") as "Hr";auto.
-    iDestruct ("Hmono" $! _ _ Hrelated' with "Hφ") as "Hφ'".
     assert (is_Some (M !! l)) as [x Hsome].
     { apply elem_of_gmap_dom. rewrite -Hdom. apply elem_of_gmap_dom. eauto. }
     iDestruct (big_sepM_delete _ _ l _ Hsome with "[Hl Hstate $Hr]") as "Hr".
@@ -233,6 +250,24 @@ Section heap.
     apply insert_id in Hsome. apply insert_id in Hl. rewrite -Hsome -Hl. split.
     - repeat rewrite dom_insert_L;rewrite Hdom;set_solver.
     - repeat rewrite dom_insert_L;rewrite Hdom';set_solver.
+  Qed.
+
+   Lemma update_region_revoked_monotemp_nwl E W l p v φ `{∀ Wv, Persistent (φ Wv)} :
+    (std W) !! l = Some Revoked →
+    p ≠ O →
+    future_priv_mono φ v -∗
+    sts_full_world W -∗
+    region W -∗
+    l ↦ₐ[p] v -∗ φ (W,v) -∗ rel l p φ ={E}=∗ region (<s[l := Monotemporary ]s>W)
+                             ∗ sts_full_world (<s[l := Monotemporary ]s>W).
+   Proof.
+    iIntros (Hrev HO) "#Hmono Hsts Hreg Hl #Hφ #Hrel".
+    assert (related_sts_pub_world W (<s[l := Monotemporary ]s> W)) as Hrelated.
+    { apply related_sts_pub_world_revoked_monotemp; auto. }
+    assert (related_sts_priv_world W (<s[l := Monotemporary ]s> W)) as Hrelated'.
+    { apply related_sts_pub_priv_world. auto. }
+    iDestruct ("Hmono" $! _ _ Hrelated' with "Hφ") as "Hφ'".
+    iApply (update_region_revoked_monotemp_updated_nwl with "Hmono Hsts Hreg Hl Hφ' Hrel");auto.
   Qed.
 
   (* -------------------------------------------------------------------------- *)
