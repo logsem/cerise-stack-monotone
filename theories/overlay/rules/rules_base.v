@@ -429,6 +429,43 @@ Section overlay_lang_rules.
     rewrite /decodeInstrW' in Hinstr.
     rewrite decode_encode_instrW_inv in Hinstr.
     congruence.
-   Qed.
+  Qed.
+
+  Lemma wp_fail' E d pc_p pc_b pc_e pc_a w pc_p' :
+    decodeInstrW' w = Fail →
+    PermFlows pc_p pc_p' →
+    isCorrectPC (inr (Stk d pc_p pc_b pc_e pc_a)) →
+
+    {{{ PC ↣ᵣ inr (Stk d pc_p pc_b pc_e pc_a) ∗ pc_a ↣ₐ [d] w }}}
+      Instr Executable @ E
+    {{{ RET FailedV; PC ↣ᵣ inr (Stk d pc_p pc_b pc_e pc_a) ∗ pc_a ↣ₐ [d] w }}}.
+  Proof.
+    intros Hinstr Hfl Hvpc.
+    iIntros (φ) "[Hpc Hpca] Hφ".
+    iApply wp_lift_atomic_head_step_no_fork; auto.
+    iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [[[r m] stk] sf]; simpl.
+    iDestruct "Hσ1" as "[Hr [Hm Hstk]]".
+    iDestruct (@gen_heap_valid with "Hr Hpc") as %?.
+    iDestruct (@gen_heap_valid with "Hstk Hpca") as %?.
+    assert (XY: map_fold (λ a w (m : gmap (nat * Addr) base.Word), <[(length (map snd sf), a):=w]> m) (make_stack_map (map snd sf)) stk = make_stack_map (map snd ((r, stk)::sf))) by reflexivity.
+    rewrite XY in H4. eapply make_stack_map_convert in H4.
+    destruct H4 as [ms [HA HB]].
+    iModIntro.
+    iSplitR. by iPureIntro; apply normal_always_head_reducible.
+    iIntros (e2 σ2 efs Hstep).
+    eapply prim_step_exec_inv in Hstep as (-> & -> & (c & -> & Hstep)).
+    eapply step_exec_inv' in Hstep; eauto. cbn in Hstep. simplify_eq.
+    iNext. iModIntro. iSplitR; eauto. iFrame. iApply "Hφ". by iFrame.
+    intro X. destruct X as [rf [rargs Hiscall]].
+    destruct Hiscall as [a' [_ [_ [_ [_ [_ [_ [_ X]]]]]]]].
+    destruct (X 0 ltac:(lia)) as [a'' [A B]].
+    simpl in B. inversion B.
+    assert ((pc_a + 0%nat)%a = Some pc_a) by (clear; solve_addr).
+    rewrite A in H4; inversion H4; subst.
+    rewrite /MemLocate HB in H5.
+    rewrite -H5 /decodeInstrW' in Hinstr.
+    rewrite decode_encode_instrW_inv in Hinstr.
+    congruence.
+  Qed.
 
 End overlay_lang_rules.
