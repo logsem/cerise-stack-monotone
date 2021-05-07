@@ -216,7 +216,7 @@ Section heap.
     region W ∗ sts_full_world W ={E}=∗ ∃ m, ⌜((∃ (v : Word), {[addr_reg.top:=v]} = m) ↔ W.1 !! addr_reg.top = Some Monotemporary)
                                              ∧ (∅ = m <-> W.1 !! addr_reg.top ≠ Some Monotemporary)⌝
                                              ∗ region W ∗ sts_full_world (uninitialize W m)
-                                             ∗ □ ▷ ([∗ map] a↦w ∈ m, ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ monotemp_pers_resources W φ a p w ∗ rel a p φ).
+                                             ∗ □ ▷ ([∗ map] a↦w ∈ m, □ ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ monotemp_pers_resources W φ a p w ∗ rel a p φ).
   Proof.
     iIntros "[Hr Hsts]".
     destruct (decide (W.1 !! addr_reg.top = Some Monotemporary)).
@@ -255,8 +255,8 @@ Section heap.
         assert (Persistent ((if pwl p then future_pub_a_mono addr_reg.top φ v else future_priv_mono φ v) ∗ ▷ φ (W, v))) as Hpersistent.
         { destruct (pwl p);apply _. }
         iDestruct "Hres" as "#Hres". iModIntro.
-        rewrite big_sepM_singleton. iExists p, φ. iSplit;auto. iSplit;[|iExists _;iFrame "#"].
-        iNext. rewrite /monotemp_pers_resources. iFrame "#". auto.
+        rewrite big_sepM_singleton. iModIntro. iExists p, φ. iModIntro. iSplit;auto. iSplit;[|iExists _;iFrame "#"].
+        rewrite /monotemp_pers_resources. iFrame "#". auto.
     + iModIntro. iExists ∅. rewrite uninitialize_empty. iFrame. rewrite big_sepM_empty. iSplit;[|auto].
       iPureIntro. split. split;intros;try contradiction. destruct H0. inversion H0.
       split;intros;auto.
@@ -268,7 +268,7 @@ Section heap.
     region W ∗ sts_full_world W ={E}=∗
     ∃ m, ⌜∀ (a' : Addr), is_Some(m !! a') ↔ ((W.1 !! a' = Some Monotemporary) ∧ (a' ∈ l)%a)⌝
          ∗ region W ∗ sts_full_world (uninitialize W m)
-         ∗ □ ▷ ([∗ map] a↦w ∈ m, ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ monotemp_pers_resources W φ a p w ∗ rel a p φ).
+         ∗ □ ▷ ([∗ map] a↦w ∈ m, □ ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ monotemp_pers_resources W φ a p w ∗ rel a p φ).
   Proof.
     iIntros (Heq) "(Hr & Hsts)".
     iInduction (l) as [|a' l] "IH" forall (a Heq).
@@ -340,7 +340,7 @@ Section heap.
           assert (Persistent ((if pwl p then future_pub_a_mono a φ v else future_priv_mono φ v) ∗ ▷ φ (W, v))) as Hpersistent.
           { destruct (pwl p);apply _. }
           iDestruct "Hres'" as "#Hres'". iModIntro. iNext. iApply big_sepM_insert;[auto|].
-          iFrame "Hres". iExists p, φ. iSplit;auto. iSplit;[|iExists _;iFrame "#"].
+          iFrame "Hres". iExists p, φ. iModIntro. iSplit;auto. iSplit;[|iExists _;iFrame "#"].
           rewrite /monotemp_pers_resources. iFrame "#". auto.
       + iMod ("IH" $! a0 with "[] Hr Hsts") as (m Hmcond) "[Hr [Hsts #Hres] ]".
         { rewrite region_addrs_cons in Heq;[|solve_addr]. rewrite Hnext in Heq. inversion Heq;auto. }
@@ -412,7 +412,7 @@ Section heap.
     region W ∗ sts_full_world W ={E}=∗
     ∃ m, ⌜∀ (a' : Addr), is_Some(m !! a') ↔ (((std W) !! a' = Some Monotemporary) ∧ (a <= a')%a)⌝
       ∗ region (uninitialize W m) ∗ sts_full_world (uninitialize W m)
-      ∗ □ ▷ ([∗ map] a↦w ∈ m, ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ monotemp_pers_resources W φ a p w ∗ rel a p φ).
+      ∗ □ ▷ ([∗ map] a↦w ∈ m, □ ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝ ∗ monotemp_pers_resources W φ a p w ∗ rel a p φ).
   Proof.
     iIntros "(Hr & Hsts)".
     iMod (uninitialize_region_states_keep _ _ (region_addrs a addr_reg.top ++ [addr_reg.top])
@@ -470,7 +470,7 @@ Section heap.
 
   Lemma uninitialize_to_monotemporary_states E W W' (m : gmap Addr Word) :
     (∀ a w, m !! a = Some w → W.1 !! a = Some Monotemporary ∨ W.1 !! a = Some (Uninitialized w)) →
-    ([∗ map] a↦w ∈ m, ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝
+    ([∗ map] a↦w ∈ m, □ ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝
                     ∗ monotemp_pers_resources W' φ a p w
                     ∗ rel a p φ)
     ∗ region W'
@@ -482,7 +482,7 @@ Section heap.
     iInduction m as [|a w] "IH" using map_ind.
     - rewrite dom_empty_L elements_empty /=. iFrame. done.
     - iDestruct (big_sepM_insert with "Htemps") as "[Ha Htemps]";auto.
-      iDestruct "Ha" as (p φ Hpers) "[Hmono Hrel]".
+      iDestruct "Ha" as (p φ Hpers) "[#Hmono Hrel]".
       iMod ("IH" with "[] Htemps Hr Hsts") as "(Hr & Hsts)".
       { iPureIntro. intros a' w' Hin. destruct (decide (a = a'));subst;[congruence|]. apply Hstate. rewrite lookup_insert_ne//. }
       rewrite dom_insert_L. assert (a ∉ dom (gset Addr) m) as Hnin;[by apply not_elem_of_dom|].
@@ -493,7 +493,7 @@ Section heap.
       { rewrite /std_update. rewrite insert_id. iFrame. done. rewrite std_sta_update_multiple_lookup_same_i;auto.
         intros [? ?]%elem_of_elements%elem_of_gmap_dom. congruence. }
       rewrite region_eq /region_def rel_eq /rel_def REL_eq /REL_def RELS_eq /RELS_def.
-      iDestruct "Hr" as (M Mρ) "(HM & % & % & Hmap)". iDestruct "Hrel" as (γpred) "[Hrel #Hsaved]".
+      iDestruct "Hr" as (M Mρ) "(HM & % & % & Hmap)". iDestruct "Hrel" as (γpred) "[#Hrel #Hsaved]".
       iDestruct (reg_in with "[$Hrel $HM]") as %HMeq. rewrite HMeq.
       iDestruct (big_sepM_insert with "Hmap") as "(Ha & Hmap)". by simplify_map_eq.
       iDestruct "Ha" as (ρ Hmρ) "[Hstate Hρ]".
@@ -539,7 +539,7 @@ Section heap.
 
   Lemma uninitialize_to_monotemporary E W W' (m : gmap Addr Word) :
     (∀ a w, m !! a = Some w → W.1 !! a = Some Monotemporary ∨ W.1 !! a = Some (Uninitialized w)) →
-    ([∗ map] a↦w ∈ m, ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝
+    ([∗ map] a↦w ∈ m, □ ∃ p φ, ⌜forall Wv, Persistent (φ Wv)⌝
                     ∗ monotemp_pers_resources (std_update_multiple W (elements (dom (gset Addr) m)) Monotemporary) φ a p w
                     ∗ rel a p φ)
     ∗ region W

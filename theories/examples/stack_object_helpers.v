@@ -355,10 +355,10 @@ Section stack_object.
 
     interp W (inr (URWLX, Monotone, bstk, estk, astk)) -∗
 
-    □ ([∗ map] a16↦w7 ∈ m, ∃ (p0 : Perm) (φ0 : WORLD * Word → iPropI Σ),
+    □ ([∗ map] a16↦w7 ∈ m, □ ∃ (p0 : Perm) (φ0 : WORLD * Word → iPropI Σ),
         ⌜∀ Wv : WORLD * Word, Persistent (φ0 Wv)⌝
         ∗ monotemp_pers_resources W φ0 a16 p0 w7 ∗ rel a16 p0 φ0) -∗
-    □ ([∗ map] a16↦w7 ∈ m', ∃ (p0 : Perm) (φ0 : WORLD * Word → iPropI Σ),
+    □ ([∗ map] a16↦w7 ∈ m', □ ∃ (p0 : Perm) (φ0 : WORLD * Word → iPropI Σ),
         ⌜∀ Wv : WORLD * Word, Persistent (φ0 Wv)⌝
         ∗ monotemp_pers_resources W' φ0 a16 p0 w7 ∗ rel a16 p0 φ0) -∗
     ∃ w, ⌜(override_uninitialize lframe (uninitialize W' m')).1 !! bstk = Some (Uninitialized w)⌝
@@ -400,7 +400,7 @@ Section stack_object.
         clear -Ha_param Haf3 Haf2 Hb_r_adv. solve_addr. }
     destruct Hbstk' as [ [Hbstk' Hbstk''] | Hbstk'].
     - iDestruct (big_sepM_delete with "Hmcond") as "[Hbstk Hmcond_del]";[apply Hw|].
-      iDestruct "Hbstk" as (p' φ' Hpers) "[Hres Hrel']".
+      iDestruct "Hbstk" as (p' φ' Hpers) "[Hres #Hrel']".
       iDestruct (rel_agree _ RWLX p' with "[$Hrel' $Hrel]") as "[% Heq]".
       iExists w. iSplit.
       + rewrite override_uninitialize_std_sta_lookup_none.
@@ -417,7 +417,7 @@ Section stack_object.
       { apply Hmcond'. split;auto. clear;solve_addr. }
       iExists w'.
       iDestruct (big_sepM_delete with "Hmcond'") as "[Hbstk Hmcond_del]";[apply Hw'|].
-      iDestruct "Hbstk" as (p' φ' Hpers) "[Hres Hrel']".
+      iDestruct "Hbstk" as (p' φ' Hpers) "[Hres #Hrel']".
       iDestruct (rel_agree _ RWLX p' with "[$Hrel' $Hrel]") as "[% Heq]". iSplit.
       + rewrite override_uninitialize_std_sta_lookup_none.
         iPureIntro. apply uninitialize_std_sta_lookup_in;auto.
@@ -684,6 +684,107 @@ Section stack_object.
       + rewrite initialize_list_nuninit in Hin;[congruence|].
         rewrite Hsome. auto.
       + rewrite initialize_list_nin in Hin;auto. congruence.
+  Qed.
+
+  Lemma stack_state_W2_params W2 a15 a14 af2 b_r_adv bsec esec W m a_param af3 lframe frame_end x (bstk estk : Addr) :
+    W2 = <s[a15:=Monotemporary]s>
+         (<s[a14:=Monotemporary]s>
+          (<s[af2:=Monotemporary]s>
+           (<s[b_r_adv:=Monotemporary]s>
+            (initialize_list (region_addrs bsec esec) (std_update_multiple (std_update_multiple (uninitialize W m) (a_param :: region_addrs af3 b_r_adv) (Monostatic lframe)) (af2 :: region_addrs b_r_adv frame_end) Revoked))))) ->
+    x ∈ region_addrs b_r_adv frame_end →
+    (12%nat + 2%nat < estk - bstk)%Z →
+    (bstk + 2%nat)%a = Some a_param →
+    (a_param + 1)%a = Some af2 →
+    (af2 + 1)%a = Some af3 →
+    (af3 + 7)%a = Some b_r_adv →
+    (b_r_adv + 1)%a = Some a14 →
+    (a14 + 1)%a = Some a15 →
+    (a15 + 1)%a = Some frame_end →
+    region_addrs bsec esec ## region_addrs a_param estk →
+
+    std W2 !! x = Some Monotemporary.
+  Proof.
+    intros HW2 Hin Hsize Hbstk Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2 Hsec_cond.
+    subst W2. simpl.
+    repeat (match goal with
+              |- context [<[ ?a := _ ]> _] =>
+              destruct (decide (x = a));[subst;rewrite lookup_insert;auto|rewrite lookup_insert_ne//]
+            end).
+    apply elem_of_region_addrs in Hin.
+    assert (x ∉ region_addrs bsec esec) as Hnin.
+    { apply elem_of_disjoint in Hsec_cond. intros Hcontr%Hsec_cond.
+      apply Hcontr,elem_of_region_addrs. solve_addr. }
+    rewrite initialize_list_nin//.
+    assert (x ≠ af2) as Hne.
+    { solve_addr. }
+    rewrite lookup_insert_ne//.
+    assert (region_addrs b_r_adv frame_end = [b_r_adv;a14;a15]) as ->.
+    { rewrite region_addrs_cons;[|solve_addr]. rewrite Hb_r_adv /=.
+      rewrite region_addrs_cons;[|solve_addr]. rewrite Hparam1 /=.
+      rewrite region_addrs_cons;[|solve_addr]. rewrite Hparam2 /=.
+      rewrite region_addrs_empty;[|solve_addr]. auto. }
+    assert (a_param ≠ x).
+    { solve_addr. }
+    solve_addr.
+  Qed.
+
+  Lemma stack_state_W2 W2 a15 a14 af2 b_r_adv bsec esec W m a_param af3 lframe frame_end x (bstk estk : Addr) :
+    W2 = <s[a15:=Monotemporary]s>
+         (<s[a14:=Monotemporary]s>
+          (<s[af2:=Monotemporary]s>
+           (<s[b_r_adv:=Monotemporary]s>
+            (initialize_list (region_addrs bsec esec) (std_update_multiple (std_update_multiple (uninitialize W m) (a_param :: region_addrs af3 b_r_adv) (Monostatic lframe)) (af2 :: region_addrs b_r_adv frame_end) Revoked))))) ->
+    x ∈ region_addrs frame_end estk →
+    (12%nat + 2%nat < estk - bstk)%Z →
+    (bstk + 2%nat)%a = Some a_param →
+    (a_param + 1)%a = Some af2 →
+    (af2 + 1)%a = Some af3 →
+    (af3 + 7)%a = Some b_r_adv →
+    (b_r_adv + 1)%a = Some a14 →
+    (a14 + 1)%a = Some a15 →
+    (a15 + 1)%a = Some frame_end →
+    region_addrs bsec esec ## region_addrs a_param estk →
+    (∀ a' : Addr, is_Some (m !! a') ↔ std W !! a' = Some Monotemporary ∧ (0 <= a')%a) →
+    Forall (λ a0 : Addr, W.1 !! a0 = Some Monotemporary ∨ (∃ w : Word, W.1 !! a0 = Some (Uninitialized w))) (region_addrs a_param estk) →
+
+    std W2 !! x = Some Monotemporary ∨ (∃ w : leibnizO Word, std W2 !! x = Some (Uninitialized w)).
+  Proof.
+    intros HW2 Hin Hsize Hbstk Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2 Hsec_cond Hmcond Hstk_cond.
+    subst W2. simpl.
+    repeat (match goal with
+              |- context [<[ ?a := _ ]> _] =>
+              destruct (decide (x = a));[subst;rewrite lookup_insert;auto|rewrite lookup_insert_ne//]
+            end).
+    apply elem_of_region_addrs in Hin.
+    assert (x ∉ region_addrs bsec esec) as Hnin.
+    { apply elem_of_disjoint in Hsec_cond. intros Hcontr%Hsec_cond.
+      apply Hcontr,elem_of_region_addrs. solve_addr. }
+    rewrite initialize_list_nin//.
+    assert (x ≠ af2) as Hne.
+    { solve_addr. }
+    rewrite lookup_insert_ne//.
+    assert (region_addrs b_r_adv frame_end = [b_r_adv;a14;a15]) as ->.
+    { rewrite region_addrs_cons;[|solve_addr]. rewrite Hb_r_adv /=.
+      rewrite region_addrs_cons;[|solve_addr]. rewrite Hparam1 /=.
+      rewrite region_addrs_cons;[|solve_addr]. rewrite Hparam2 /=.
+      rewrite region_addrs_empty;[|solve_addr]. auto. }
+    assert (a_param ≠ x).
+    { solve_addr. }
+    simpl. rewrite !lookup_insert_ne//.
+    rewrite std_sta_update_multiple_lookup_same_i.
+    2: { rewrite elem_of_region_addrs. solve_addr. }
+    revert Hstk_cond; rewrite Forall_forall =>Hstk_cond.
+    destruct Hstk_cond with x as [Hmono | [w Hw] ].
+    { apply elem_of_region_addrs. solve_addr. }
+    - right. assert (is_Some (m !! x)) as [v Hv].
+      { apply Hmcond. split;auto. clear; solve_addr. }
+      exists v. apply uninitialize_std_sta_lookup_in;auto.
+    - right. assert (m !! x = None) as Hnone.
+      { apply eq_None_not_Some. intros [Hcontr _]%Hmcond.
+        rewrite Hcontr in Hw. congruence. }
+      rewrite uninitialize_std_sta_None_lookup//.
+      eauto.
   Qed.
 
   (* Future worlds relation proofs needed in the example *)
@@ -1029,88 +1130,175 @@ Section stack_object.
           specialize (Hrel1 (Monotemporary) y' eq_refl Hy').
           destruct (decide (le_a b_r_adv i)).
           + apply std_rel_pub_plus_rtc_Monotemporary in Hrel1;auto.
-            assert (is_Some (m' !! i)) as [v' Hv'].
-            { apply Hmcond'. split;auto. clear; solve_addr. }
-
-
-
-            in Hrel1.
-          + rewrite Hperm in Hx. revert Hperm; rewrite (uninitialize_std_sta_lookup_perm _ m) =>Hperm.
-            rewrite Hy in Hperm. simplify_eq. left.
-          + rewrite !lookup_insert_ne// !std_sta_update_multiple_lookup_same_i//.
-            revert Hperm; rewrite (uninitialize_std_sta_lookup_perm _ m) =>Hperm.
-            rewrite Hperm. auto.
-        - assert (is_Some (m !! i)) as [v Hv].
-          { apply Hmcond. split;auto. clear. solve_addr. }
-          rewrite (initialize_list_in _ _ _ v)// in Hy. rewrite Hx in Hmono. simplify_eq. left.
-          rewrite !lookup_insert_ne// !std_sta_update_multiple_lookup_same_i//.
-          rewrite (uninitialize_std_sta_lookup_in _ _ _ v)//.
+            destruct Hrel1 as [Heq | [w Heq] ];subst.
+            * assert (is_Some (m' !! i)) as [v' Hv'].
+              { apply Hmcond'. split;auto. clear -Hb_r_adv Ha_param l Haf2 Haf3; solve_addr. }
+              rewrite initialize_list_nin in Hy;auto.
+              2: { rewrite elem_of_list_filter elem_of_elements -elem_of_gmap_dom. intros [Hcontr _].
+                   clear -Hb_r_adv Ha_param l Haf2 Haf3 Hcontr; solve_addr. }
+              rewrite override_uninitialize_std_sta_lookup_none in Hy;auto.
+              2: { apply not_elem_of_list_to_map. rewrite fst_zip. apply not_elem_of_cons;auto.
+                   rewrite /= Hactlen region_addrs_length /region_size. clear -Hb_r_adv;solve_addr. }
+              rewrite (uninitialize_std_sta_lookup_in _ _ _ v')// in Hy. rewrite Hx in Hmono. simplify_eq.
+              eright;[|left]. rewrite decide_True. right. constructor.
+              clear -Hb_r_adv Ha_param l Haf2 Haf3; solve_addr.
+            * assert (m' !! i = None) as Hnone.
+              { apply eq_None_not_Some. intros [Hcontr _]%Hmcond'. rewrite Hy' in Hcontr. done. }
+              rewrite initialize_list_nin in Hy;auto.
+              2: { rewrite elem_of_list_filter elem_of_elements -elem_of_gmap_dom. intros [Hcontr _].
+                   clear -Hb_r_adv Ha_param l Haf2 Haf3 Hcontr; solve_addr. }
+              rewrite override_uninitialize_std_sta_lookup_none in Hy;auto.
+              2: { apply not_elem_of_list_to_map. rewrite fst_zip. apply not_elem_of_cons;auto.
+                   rewrite /= Hactlen region_addrs_length /region_size. clear -Hb_r_adv;solve_addr. }
+              rewrite uninitialize_std_sta_None_lookup in Hy;auto. rewrite Hy' in Hy.
+              rewrite Hx in Hmono. simplify_eq.
+              eright;[|left]. rewrite decide_True. right. constructor.
+              clear -Hb_r_adv Ha_param l Haf2 Haf3; solve_addr.
+          + apply std_rel_pub_rtc_Monotemporary in Hrel1;auto. subst.
+            destruct (decide (le_a bstk i)).
+            { rewrite (initialize_list_nin) in Hy.
+              2: { rewrite elem_of_list_filter. intros [Hcontr _]. clear -Hcontr l. solve_addr. }
+              rewrite override_uninitialize_std_sta_lookup_none in Hy;auto.
+              2: { apply not_elem_of_list_to_map. rewrite fst_zip. apply not_elem_of_cons;auto.
+                   rewrite /= Hactlen region_addrs_length /region_size. clear -Hb_r_adv;solve_addr. }
+              assert (is_Some (m' !! i)) as [v' Hv'].
+              { apply Hmcond'. split;auto. }
+              rewrite (uninitialize_std_sta_lookup_in _ _ _ v')// in Hy. rewrite Hx in Hmono. simplify_eq.
+              eright;[|left]. right. constructor. }
+            rewrite (initialize_list_nuninit) in Hy.
+            2: { rewrite override_uninitialize_std_sta_lookup_none;auto.
+                 2: { apply not_elem_of_list_to_map. rewrite fst_zip. apply not_elem_of_cons;auto.
+                      rewrite /= Hactlen region_addrs_length /region_size. clear -Hb_r_adv;solve_addr. }
+                 rewrite uninitialize_std_sta_None_lookup. rewrite Hy'. auto.
+                 apply eq_None_not_Some. intros [_ Hcontr]%Hmcond'.
+                 clear -n4 Hcontr. solve_addr. }
+            rewrite override_uninitialize_std_sta_lookup_none in Hy.
+            2: { apply not_elem_of_list_to_map. rewrite fst_zip. apply not_elem_of_cons;auto.
+                 rewrite /= Hactlen region_addrs_length /region_size. clear -Hb_r_adv;solve_addr. }
+            rewrite uninitialize_std_sta_None_lookup in Hy.
+            rewrite Hy' in Hy. rewrite Hx in Hmono. simplify_eq. left.
+            apply eq_None_not_Some. intros [_ Hcontr]%Hmcond'.
+            clear -n4 Hcontr. solve_addr.
       }
-      rewrite initialize_list_nin// in Hy.
 
+      rewrite initialize_list_nin// in Hrel1. simpl in Hrel1.
+      rewrite lookup_insert_ne// in Hrel1.
 
+      assert (i ∉ region_addrs b_r_adv frame_end).
+      { rewrite elem_of_region_addrs. clear -n n0 n2 Hparam1 Hparam2 Hparam3. solve_addr. }
+      rewrite std_sta_update_multiple_lookup_same_i// in Hrel1.
 
+      destruct (decide (i = a_param));[subst;rewrite lookup_insert in Hrel1|rewrite lookup_insert_ne// in Hrel1].
+      { rewrite initialize_list_nin in Hy.
+        2: { rewrite elem_of_list_filter. intros [Hcontr _]. clear -Hcontr Ha_param. solve_addr. }
+        rewrite (override_uninitialize_std_sta_lookup_some _ _ _ (inl 2%Z)) in Hy.
+        2: { simpl. rewrite lookup_insert. auto. }
+        destruct Hstk_cond with a_param as [Hx' | [w Hx'] ];[|rewrite Hx in Hx';inversion Hx'..].
+        apply elem_of_region_addrs. clear -Ha_param Hsize; solve_addr. subst. simplify_eq.
+        eright;[|left]. rewrite decide_True. right;constructor. clear -Ha_param Haf2 Haf3 Hb_r_adv. solve_addr.
+        simplify_eq. right with Monotemporary.
+        rewrite decide_True. left;constructor. clear -Ha_param Haf2 Haf3 Hb_r_adv. solve_addr.
+        eright;[|left]. rewrite decide_True. right;constructor. clear -Ha_param Haf2 Haf3 Hb_r_adv. solve_addr. }
 
+      destruct (decide (i ∈ (region_addrs af3 b_r_adv))).
+      { subst Wfinal maddrs. rewrite initialize_list_nin in Hy.
+        2: { rewrite elem_of_list_filter. intros [Hcontr _]. clear -e Hcontr Ha_param Hb_r_adv Haf2 Haf3.
+             revert e; rewrite elem_of_region_addrs =>e. solve_addr. }
+        rewrite std_sta_update_multiple_lookup_in_i// in Hrel1.
+        eapply Hrel1 in Hy' as Hrtc;[|eauto].
+        apply rtc_implies with (Q:=(λ x y : region_type, std_rel_pub x y)) in Hrtc.
+        2: { intros r q. rewrite decide_False. auto. apply elem_of_region_addrs in e. clear -e. solve_addr. }
+        eapply std_rel_pub_rtc_Monostatic in Hrtc;[|eauto]. subst y'.
+        assert (is_Some (lframe !! i)) as [w Hw].
+        { rewrite Hlframe. apply list_to_map_lookup_is_Some. rewrite fst_zip. apply elem_of_cons. right. auto.
+          rewrite /= Hactlen region_addrs_length /region_size. clear -Hb_r_adv. solve_addr. }
+        rewrite (override_uninitialize_std_sta_lookup_some _ _ _ w)// in Hy.
+        destruct Hstk_cond with i as [Hx' | [w' Hx'] ];[|rewrite Hx in Hx';inversion Hx'..].
+        revert e. rewrite !elem_of_region_addrs. clear -Ha_param Haf2 Haf3 Hb_r_adv Hsize. solve_addr.
+        simplify_eq. eright;[|left]. rewrite decide_True. right;constructor. apply elem_of_region_addrs in e.
+        clear -e Ha_param Haf2 Haf3 Hb_r_adv. solve_addr.
+        simplify_eq. right with Monotemporary. rewrite decide_True. left;constructor.
+        apply elem_of_region_addrs in e. clear -e Ha_param Haf2 Haf3 Hb_r_adv. solve_addr.
+        eright;[|left]. rewrite decide_True. right;constructor. apply elem_of_region_addrs in e.
+        clear -e Ha_param Haf2 Haf3 Hb_r_adv. solve_addr. }
 
+      rewrite std_sta_update_multiple_lookup_same_i// in Hrel1.
+      destruct (m !! i) eqn:Hsome.
+      { assert (is_Some (m !! i)) as [Hmono _]%Hmcond;[eauto|].
+        rewrite (uninitialize_std_sta_lookup_in _ _ _ w)// in Hrel1.
+        eapply Hrel1 in Hy' as Hrtc;[|eauto].
+        destruct (decide (bstk <= i)%a).
+        - apply rtc_implies with (Q:=λ x y : region_type, std_rel_pub x y ∨ std_rel_pub_plus x y)in Hrtc.
+          2: { intros r q. destruct (decide (b_r_adv <= i)%a);auto. }
+          eapply std_rel_pub_plus_rtc_Uninitialized in Hrtc;[|eauto].
+          subst. rewrite initialize_list_nin in Hy.
+          2: { rewrite elem_of_list_filter. intros [Hcontr _]. clear -l Hcontr Ha_param Haf2 Haf3 Hb_r_adv. solve_addr. }
+          rewrite override_uninitialize_std_sta_lookup_none in Hy.
+          2: { apply not_elem_of_list_to_map. rewrite fst_zip. apply not_elem_of_cons;auto.
+               rewrite /= Hactlen region_addrs_length /region_size. clear -Hb_r_adv. solve_addr. }
+          destruct Hrtc as [Heq | [v Heq] ].
+          { subst. assert (is_Some (m' !! i)) as [v' Hissome].
+            { apply Hmcond'. split;auto. }
+            rewrite (uninitialize_std_sta_lookup_in _ _ _ v')// in Hy. rewrite Hx in Hmono. simplify_eq.
+            eright;[|left]. rewrite decide_True. right;constructor. auto. }
+          subst. assert (m' !! i = None) as Hnone.
+          { apply eq_None_not_Some. intros [Hcontr _]%Hmcond'. rewrite Hy' in Hcontr. done. }
+          rewrite uninitialize_std_sta_None_lookup// in Hy. rewrite Hy' in Hy. rewrite Hx in Hmono. simplify_eq.
+          eright;[|left]. rewrite decide_True. right;constructor. auto.
+        - apply rtc_implies with (Q:=λ x y : region_type, std_rel_pub x y)in Hrtc.
+          2: { intros r q. rewrite decide_False//. clear -n6 Ha_param Hb_r_adv Haf2 Haf3. solve_addr. }
+          eapply std_rel_pub_rtc_Uninitialized in Hrtc;[|eauto]. destruct Hrtc as [-> | ->].
+          + subst. assert (m' !! i = None) as Hnone.
+            { apply eq_None_not_Some. intros [_ Hcontr]%Hmcond'. done. }
+            rewrite initialize_list_nuninit in Hy.
+            2: { rewrite override_uninitialize_std_sta_lookup_none. rewrite uninitialize_std_sta_None_lookup//.
+                 rewrite Hy';auto. apply not_elem_of_list_to_map. rewrite fst_zip. rewrite not_elem_of_cons//.
+                 rewrite /= Hactlen region_addrs_length /region_size. clear -Hb_r_adv;solve_addr. }
+            rewrite override_uninitialize_std_sta_lookup_none in Hy.
+            2: { apply not_elem_of_list_to_map. rewrite fst_zip. rewrite not_elem_of_cons//.
+                 rewrite /= Hactlen region_addrs_length /region_size. clear -Hb_r_adv;solve_addr. }
+            rewrite uninitialize_std_sta_None_lookup// in Hy. rewrite Hy in Hy'. rewrite Hx in Hmono.
+            simplify_eq. left.
+          + subst. assert (m' !! i = None) as Hnone.
+            { apply eq_None_not_Some. intros [_ Hcontr]%Hmcond'. done. }
+            rewrite (initialize_list_in _ _ _ w) in Hy.
+            2: { apply elem_of_list_filter. rewrite elem_of_elements -elem_of_gmap_dom.
+                 split;eauto. clear -n6;solve_addr. }
+            rewrite Hx in Hmono. simplify_eq. left.
+            rewrite override_uninitialize_std_sta_lookup_none.
+            2: { apply not_elem_of_list_to_map. rewrite fst_zip. rewrite not_elem_of_cons//.
+                 rewrite /= Hactlen region_addrs_length /region_size. clear -Hb_r_adv;solve_addr. }
+            rewrite uninitialize_std_sta_None_lookup//. }
 
-      destruct (decide (i = b_r_adv));[subst|].
-      { rewrite lookup_insert in Hrel1. rewrite initialize_list_nin in Hy.
-        2: { intros [Hcontr _]%elem_of_list_filter.
-             clear -Hparam1 Hparam2 Hparam3 Ha_param Hb_r_adv Haf2 Haf3 Hcontr. solve_addr. }
-        specialize (Hrel1 Monotemporary _ eq_refl Hy').
-        apply rtc_implies with (Q:=λ x y : region_type, Rpub x y) in Hrel1.
-        2: { intros r q Hrq. rewrite decide_False in Hrq;auto.
-             clear -Hparam1 Hparam2 Hparam3 Ha_param Hb_r_adv Haf2 Haf3. solve_addr. }
-        apply std_rel_pub_rtc_Monotemporary in Hrel1;auto.
-        rewrite override_uninitialize_std_sta_lookup_none in Hy.
-        2: { simpl. rewrite lookup_insert_ne; [|clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2; solve_addr].
-             apply not_elem_of_list_to_map. rewrite fst_zip. rewrite elem_of_region_addrs.
-             2: rewrite Hactlen region_addrs_length /region_size.
-             all: clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2; solve_addr. }
-        subst.
-        assert (is_Some (m' !! af2)) as [v' Hv].
-        { apply Hmcond'. split;auto. clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2; solve_addr. }
-        rewrite (uninitialize_std_sta_lookup_in _ _ _ v')// in Hy.
-        destruct Hstk_cond with af2 as [Hx' | [w Hx'] ];[|rewrite Hx in Hx';inversion Hx'..].
-        apply elem_of_region_addrs. clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2 Hsize; solve_addr.
-        all: simplify_eq. 2: right with Monotemporary. 3,1: eright;[|left].
-        all: rewrite decide_True;[|clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2; solve_addr].
-        1,2 : right;constructor. left;constructor. }
+      rewrite uninitialize_std_sta_None_lookup// in Hrel1.
+      eapply Hrel1 in Hx as Hrtc;eauto.
+      subst. rewrite initialize_list_nin in Hy.
+      2: { rewrite elem_of_list_filter elem_of_elements -elem_of_gmap_dom Hsome /=. intros [_ Hcontr]; inversion Hcontr. done. }
+      rewrite override_uninitialize_std_sta_lookup_none in Hy.
+      2: { apply not_elem_of_list_to_map. rewrite fst_zip. rewrite not_elem_of_cons//.
+           rewrite /= Hactlen region_addrs_length /region_size. clear -Hb_r_adv;solve_addr. }
 
-       destruct (decide (i = a15));[subst|].
-      { rewrite lookup_insert in Hrel1. rewrite initialize_list_nin in Hy.
-        2: { intros [Hcontr _]%elem_of_list_filter.
-             clear -Hparam1 Hparam2 Hparam3 Ha_param Hb_r_adv Haf2 Haf3 Hcontr. solve_addr. }
-        specialize (Hrel1 Monotemporary _ eq_refl Hy').
-        apply rtc_implies with (Q:=λ x y : region_type, Rpub x y ∨ Rpubp x y) in Hrel1.
-        2: { intros r q Hrq. rewrite decide_True in Hrq;auto.
-             clear -Hparam1 Hparam2 Hparam3 Ha_param Hb_r_adv Haf2 Haf3. solve_addr. }
-        apply std_rel_pub_plus_rtc_Monotemporary in Hrel1;auto.
-        rewrite override_uninitialize_std_sta_lookup_none in Hy.
-        2: { simpl. rewrite lookup_insert_ne; [|clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2; solve_addr].
-             apply not_elem_of_list_to_map. rewrite fst_zip. rewrite elem_of_region_addrs.
-             2: rewrite Hactlen region_addrs_length /region_size.
-             all: clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2; solve_addr. }
-        destruct Hrel1 as [ Heq | [v Heq] ].
-        - subst.
-          assert (is_Some (m' !! a15)) as [v' Hv].
-          { apply Hmcond'. split;auto. clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2; solve_addr. }
-          rewrite (uninitialize_std_sta_lookup_in _ _ _ v')// in Hy.
-          destruct Hstk_cond with a15 as [Hx' | [w Hx'] ];[|rewrite Hx in Hx';inversion Hx'..].
-          apply elem_of_region_addrs. clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2 Hsize; solve_addr.
-          all: simplify_eq. 2: right with Monotemporary. 3,1: eright;[|left].
-          all: rewrite decide_True;[|clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2; solve_addr].
-          1,2 : right;constructor. left;constructor.
-        - assert (m' !! a15 = None) as Hnone.
-          { apply eq_None_not_Some. intros [Hcontr _]%Hmcond'. subst. rewrite Hy' in Hcontr. done. }
-          rewrite (uninitialize_std_sta_None_lookup)// in Hy. subst. rewrite Hy' in Hy. simplify_eq.
-          destruct Hstk_cond with a15 as [Hx' | [w Hx'] ];[|rewrite Hx in Hx';inversion Hx'..].
-          apply elem_of_region_addrs. clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2 Hsize; solve_addr.
-          all: simplify_eq. 2: right with Monotemporary. 3,1: eright;[|left].
-          all: rewrite decide_True;[|clear -Ha_param Haf2 Haf3 Hb_r_adv Hparam1 Hparam2; solve_addr].
-          1,2 : right;constructor. left;constructor. }
+      destruct (m' !! i) eqn:Hsome'.
+      { assert (is_Some (m' !! i)) as [Htemp Hle]%Hmcond';[eauto|].
+        assert ((∃ w', W.1 !! i = Some (Uninitialized w')) ∨ (∃ m, W.1 !! i = Some (Monostatic m)) ∨ W.1 !! i = Some Revoked) as Heq.
+        { destruct x;rewrite Hx;eauto;exfalso.
+          - assert (is_Some (m !! i)) as [? Hcontr];[|congruence].
+            apply Hmcond. split;auto. clear;solve_addr.
+          - apply rtc_implies with (Q:=λ x y : region_type, std_rel_pub x y ∨ std_rel_pub_plus x y)in Hrtc.
+            2: { intros r q. destruct (decide (b_r_adv <= i)%a);auto. }
+            apply std_rel_pub_plus_rtc_Permanent in Hrtc;auto. subst. rewrite Hy' in Htemp. congruence. }
+        rewrite (uninitialize_std_sta_lookup_in _ _ _ w)// in Hy.
+        destruct Heq as [ [w' Hx'] | [ [s Hx'] | Hx'] ].
+        all: rewrite Hx in Hx'. all: simplify_eq;clear -Hle.
+        all: right with Monotemporary;[rewrite decide_True//;try (left;constructor);right;constructor|].
+        all: eright;[|left]. all: rewrite decide_True//;right;constructor. }
 
-
+      rewrite uninitialize_std_sta_None_lookup// in Hy. rewrite Hy' in Hy. simplify_eq.
+      eapply rtc_implies;[|apply Hrtc].
+      intros r q. simpl. intros Hrq.
+      destruct (decide (bstk <= i)%a). destruct (decide (b_r_adv <= i)%a);auto.
+      rewrite decide_False// in Hrq. clear -n6 Ha_param Haf2 Haf3 Hb_r_adv. solve_addr.
+  Qed.
 
   (* TODO: move this to region_invariants.v *)
   Lemma region_close_uninit W l φ p w `{forall Wv, Persistent (φ Wv)}:
@@ -1139,7 +1327,7 @@ Section stack_object.
   Lemma initialize_list_consolidate W' (l' l : list Addr) :
     ⊢ ⌜l' ⊆+ l⌝ →
     (region (initialize_list l W') ∗ sts_full_world W'
-            ∗ ([∗ list] a ∈ l', ∃ p φ w, ⌜W'.1 !! a = Some (Uninitialized w) ∨ W'.1 !! a = Some Monotemporary⌝
+            ∗ ([∗ list] a ∈ l', □ ∃ p φ w, ⌜W'.1 !! a = Some (Uninitialized w) ∨ W'.1 !! a = Some Monotemporary⌝
                             ∗ ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
                             ∗ monotemp_pers_resources (initialize_list l W') φ a p w ∗ rel a p φ))
       ==∗ (sts_full_world (initialize_list l' W') ∗ region (initialize_list l W')).
@@ -1188,7 +1376,7 @@ Section stack_object.
 
   Lemma initialize_list_region W (l : list Addr) :
     (region W ∗ sts_full_world W
-    ∗ ([∗ list] a ∈ l, ∃ p φ w, ⌜W.1 !! a = Some (Uninitialized w) ∨ W.1 !! a = Some Monotemporary⌝
+    ∗ ([∗ list] a ∈ l, □ ∃ p φ w, ⌜W.1 !! a = Some (Uninitialized w) ∨ W.1 !! a = Some Monotemporary⌝
                                ∗ ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
                                ∗ monotemp_pers_resources (initialize_list l W) φ a p w ∗ rel a p φ))
       ==∗ (sts_full_world (initialize_list l W) ∗ region (initialize_list l W)).
