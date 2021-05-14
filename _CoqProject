@@ -47,6 +47,7 @@ theories/ftlr/ftlr_base.v
 theories/ftlr/Jmp.v
 theories/ftlr/Store.v
 theories/ftlr/StoreU.v
+theories/ftlr/Load.v
 theories/fundamental.v
 theories/examples/addr_reg_sample.v
 theories/examples/disjoint_regions_tactics.v
@@ -66,3 +67,5 @@ theories/examples/macros/checkra.v
 theories/examples/macros/scall_u.v
 theories/examples/macros/macros.v
 theories/examples/downwards_lse.v
+theories/examples/stack_object_helpers.v
+theories/examples/stack_object.v

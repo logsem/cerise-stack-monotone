@@ -7,7 +7,7 @@ From cap_machine Require Export iris_extra addr_reg_sample region_macros contigu
 Section lse.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
@@ -25,13 +25,13 @@ Section lse.
     rclear_instrs (list_difference all_registers [PC;r_t0]) ++
     [jmp r_t0].
 
-  Definition lse a p f_a :=
-    ([∗ list] a_i;w_i ∈ a;(lse_instrs f_a), a_i ↦ₐ[p] w_i)%I.
+  Definition lse a f_a :=
+    ([∗ list] a_i;w_i ∈ a;(lse_instrs f_a), a_i ↦ₐ w_i)%I.
 
-  Definition lse_inv d : iProp Σ := d ↦ₐ[RWX] inl 2%Z.
+  Definition lse_inv d : iProp Σ := d ↦ₐ inl 2%Z.
 
 
-  Lemma lse_spec W pc_p pc_p' pc_g pc_b pc_e (* PC *)
+  Lemma lse_spec W pc_p pc_g pc_b pc_e (* PC *)
         lse_addrs (* program addresses *)
         d d' (* dynamically allocated memory given by preamble, connected to invariant i *)
         a_first a_last (* special adresses *)
@@ -42,7 +42,6 @@ Section lse.
 
     (* PC assumptions *)
     isCorrectPC_range pc_p pc_g pc_b pc_e a_first a_last ->
-    PermFlows pc_p pc_p' ->
 
     (* Program adresses assumptions *)
     contiguous_between lse_addrs a_first a_last ->
@@ -71,9 +70,9 @@ Section lse.
       (* token which states all non atomic invariants are closed *)
       ∗ na_own logrel_nais ⊤
       (* trusted code *)
-      ∗ na_inv logrel_nais ι1 (lse lse_addrs pc_p' f_a)
+      ∗ na_inv logrel_nais ι1 (lse lse_addrs f_a)
       (* linking table *)
-      ∗ na_inv logrel_nais ι2 (pc_b ↦ₐ[pc_p'] inr (RO,Global,b_link,e_link,a_link) ∗ a_entry ↦ₐ[RO] fail_cap)
+      ∗ na_inv logrel_nais ι2 (pc_b ↦ₐ inr (RO,Global,b_link,e_link,a_link) ∗ a_entry ↦ₐ fail_cap)
       (* we start out with arbitrary sts *)
       ∗ sts_full_world W
       ∗ region W
@@ -86,7 +85,7 @@ Section lse.
                          ∗ sts_full_world W'
                          ∗ region W' }}}.
   Proof.
-    iIntros (Hvpc Hfl Hcont Hlt_wb Hlt_link Hdoff Hdom Hndisj φ).
+    iIntros (Hvpc Hcont Hlt_wb Hlt_link Hdoff Hdom Hndisj φ).
     iIntros "(Hr_stk & HPC & Hr_env & Hregs & #Hdinv & #Hwstk_valid & Hown & #Hlse_prog & #Htable & Hsts & Hr) Hφ".
     iMod (na_inv_acc with "Hlse_prog Hown") as "(>Hprog & Hown & Hcls)";auto.
     (* get some general purpose registers *)
@@ -119,20 +118,20 @@ Section lse.
     iDestruct (writeLocalAllowedU_valid_cap_below_implies _ _ _ _ _ _ b_stk with "Hwstk_valid") as %Ha_param_W;[auto|..].
     { clear -Hle Hsize Ha. rewrite andb_true_iff Z.leb_le Z.ltb_lt. solve_addr. }
     { clear -Hle;solve_addr. }
-    iDestruct (read_allowedU_inv _ b_stk with "Hwstk_valid") as (p' Hfl') "Hrel";[clear -Hsize;solve_addr|auto|]. destruct p'; inversion Hfl'.
-    iDestruct (region_open_monotemp_pwl with "[$Hr $Hsts $Hrel]") as (wret) "(Hr & Hsts & Hstate & Hb_stk & % & #Hmono & #Hwret_valid)";auto.
+    iDestruct (read_allowedU_inv _ b_stk with "Hwstk_valid") as  "Hrel";[clear -Hsize;solve_addr|auto|]. 
+    iDestruct (region_open_monotemp with "[$Hr $Hsts $Hrel]") as (wret) "(Hr & Hsts & Hstate & Hb_stk & #Hmono & #Hwret_valid)";auto.
     iSimpl in "Hwret_valid".
     (* loadU r_t0 r_stk -1 *)
     iPrologue_multi "Hprog" Hcont Hvpc link0.
     iDestruct (big_sepL2_length with "Hcode") as %Hlength1. destruct_addr_list l_code0.
     iPrologue "Hcode". apply contiguous_between_cons_inv_first in Hcont_code0 as Heq. subst link.
     iApply (rules_LoadU_derived.wp_loadU_success with "[$HPC $Hi $Hr_t0 $Hr_stk $Hb_stk]");
-      [apply decode_encode_instrW_inv|apply Hfl|auto|iCorrectPC l_code0 link0|auto..].
+      [apply decode_encode_instrW_inv|iCorrectPC l_code0 link0|auto..].
     { clear -Hle Hsize Ha. rewrite andb_true_iff Z.leb_le Z.ltb_lt. solve_addr. }
     { iContiguous_next_a Hcont_code0. }
     iEpilogue "(HPC & Hr_t0 & Hprog_done & Hr_stk & Hb_stk)".
     (* we can close the world again *)
-    iDestruct (region_close_monotemp_pwl with "[$Hstate $Hb_stk $Hr $Hrel $Hmono $Hwret_valid]") as "Hr";auto.
+    iDestruct (region_close_monotemp with "[$Hstate $Hb_stk $Hr $Hrel $Hmono $Hwret_valid]") as "Hr";auto.
 
     (* pushu r_stk r_env *)
     (* we have reached a part of the code which will require us to make a pub^b_stk change to the world *)
@@ -143,35 +142,34 @@ Section lse.
     (* next we can open the world at a *)
     assert (b_stk <= a < e_stk)%a as Hstk_bounds.
     { split;[clear -Ha;solve_addr|]. clear -Hsize Ha. solve_addr. }
-    pose proof (Hstk_cond a Hstk_bounds) as [w Hw]. clear Hfl'.
-    iDestruct (read_allowedU_inv _ a with "Hwstk_valid") as (p' Hfl') "Hrel'";[clear -Hsize Ha;solve_addr|auto|]. destruct p'; inversion Hfl'.
-    iDestruct (region_open_uninitialized with "[$Hrel' $Hr $Hsts]") as "(Hr & Hsts & Hstate & Ha & %)";[eauto|..].
+    pose proof (Hstk_cond a Hstk_bounds) as [w Hw].
+    iDestruct (read_allowedU_inv _ a with "Hwstk_valid") as "Hrel'";[clear -Hsize Ha;solve_addr|auto|].
+    iDestruct (region_open_uninitialized with "[$Hrel' $Hr $Hsts]") as "(Hr & Hsts & Hstate & Ha)";[eauto|..].
     (* and we are ready to push a new value b_stk *)
     assert (is_Some (a + 1))%a as [b_stk1 Hb_next].
     { clear -Hstk_bounds. destruct (a + 1)%a eqn:Hsome;eauto. exfalso. solve_addr. }
     iDestruct "Hcode" as "[HpushU Hcode]".
     iApply (pushU_r_spec with "[- $HPC $HpushU $Hr_stk $Hr_env $Ha]");
-      [iCorrectPC l_code0 link0|auto|auto| |iContiguous_next_a Hcont_code0|apply Hb_next|..].
+      [iCorrectPC l_code0 link0| |iContiguous_next_a Hcont_code0|apply Hb_next|..].
     { apply andb_true_iff. split;[apply Z.leb_le|apply Z.ltb_lt];clear -Hstk_bounds;solve_addr. }
     { intros Hcontr;inversion Hcontr. }
     iNext. iIntros "(HPC & HpushU & Hr_stk & Hr_env & Hb_stk)".
     (* we can now close the world again *)
     pose proof (uninitialized_condition _ _ _ Hmcond) as Hmcond_alt.
     iMod (uninitialize_open_region_change _ _ a with "[$Hb_stk $Hrel' $Hsts $Hr $Hstate]") as "[Hr Hsts]";
-      [clear;solve_addr|auto|auto|].
-    { intros. apply Hmcond_alt. clear -H2 Ha. solve_addr. }
+      [clear;solve_addr|auto|].
+    { intros. apply Hmcond_alt. clear -H0 Ha. solve_addr. }
 
     (* and we can now finish executing the instructions without more changes to W *)
     iPrologue "Hcode".
     iDestruct "Hdinv" as (ι) "Hdinv". iInv ι as ">Hd" "Hcls'". rewrite /lse_inv.
     iAssert (⌜(d =? a1)%a = false⌝)%I as %Heq_false.
-    { rewrite Z.eqb_neq. iIntros (->%z_of_eq). iDestruct (address_dupl_false with "Hi Hd") as "Hbot";[auto..|done].
-      eapply pc_range_nonO in Hcont_code0;[|eauto]. destruct pc_p',pc_p;auto;inversion Hfl;auto. }
+    { rewrite Z.eqb_neq. iIntros (->%z_of_eq). iDestruct (addr_dupl_false with "Hi Hd") as "Hbot";[auto..|done]. }
     iApply (wp_load_success_same with "[$HPC $Hi $Hr_env Hd]");
-      [auto|apply decode_encode_instrW_inv|apply Hfl|iCorrectPC l_code0 link0|..].
-    { clear -Hdoff. split;auto. apply andb_true_iff. split;[apply Z.leb_le|apply Z.ltb_lt];solve_addr. }
+      [auto|apply decode_encode_instrW_inv|iCorrectPC l_code0 link0|..];auto.
+    { clear -Hdoff. apply andb_true_iff. split;[apply Z.leb_le|apply Z.ltb_lt];solve_addr. }
     { eapply contiguous_between_last. apply Hcont_code0. auto. }
-    { rewrite Heq_false. iFrame. auto. }
+    { rewrite Heq_false. iFrame. }
     rewrite Heq_false.
     iNext. iIntros "(HPC & Hr_env & Hi & Hd)". iCombine "Hi" "Hprog_done" as "Hprog_done".
     iMod ("Hcls'" with "[$Hd]") as "_".
@@ -182,7 +180,7 @@ Section lse.
     iPrologue_multi "Hprog" Hcont Hvpc link2.
     iMod (na_inv_acc with "Htable Hown") as "(>[Hpc_b Ha_entry] & Hown & Hcls'')";[auto|solve_ndisj|].
     iApply (assert_r_z_success with "[- $HPC $Hcode $Hr_env $Hpc_b $Ha_entry]");
-      [apply Hvpc_code1|apply Hfl|apply Hcont_code1|auto..|].
+      [apply Hvpc_code1|apply Hcont_code1|auto..|].
     iSplitL "Hr_t1";[eauto|]. iSplitL "Hr_t2";[eauto|]. iSplitL "Hr_t3";[eauto|].
     iNext. iIntros "(Hr_t1 & Hr_t2 & Hr_t3 & Hr_env & HPC & Hassert & Hpc_b & Ha_entry)".
     iMod ("Hcls''" with "[$Hown $Hpc_b $Ha_entry]") as "Hown".
@@ -209,7 +207,7 @@ Section lse.
     prep_addr_list_full l_rest2 Hcont.
     iPrologue "Hprog".
     iApply (wp_jmp_success with "[$HPC $Hi $Hr_t0]");
-      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link3 a_last|].
+      [apply decode_encode_instrW_inv|iCorrectPC link3 a_last|].
 
     (* first we will update the varilidy of wret to the new world *)
     set (W' := (<s[a:=Uninitialized (inr (RWX, Global, d, d', d))]s>(uninitialize W m))).

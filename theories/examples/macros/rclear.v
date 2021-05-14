@@ -6,7 +6,6 @@ From cap_machine Require Export iris_extra addr_reg_sample region_macros contigu
 
 Section stack_macros.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ}
           `{MP: MachineParameters}.
 
   (* -------------------------------------- RCLEAR ----------------------------------- *)
@@ -17,25 +16,24 @@ Section stack_macros.
      Lemma rclear_instrs_cons rr r: rclear_instrs (rr :: r) = move_z rr 0 :: rclear_instrs r.
      Proof. reflexivity. Qed.
 
-     Definition rclear (a : list Addr) (p : Perm) (r : list RegName) : iProp Σ :=
-         ([∗ list] k↦a_i;w_i ∈ a;(rclear_instrs r), a_i ↦ₐ[p] w_i)%I.
+     Definition rclear (a : list Addr) (r : list RegName) : iProp Σ :=
+         ([∗ list] k↦a_i;w_i ∈ a;(rclear_instrs r), a_i ↦ₐ w_i)%I.
 
-     Lemma rclear_spec (a : list Addr) (r: list RegName) (rmap : gmap RegName Word) p p' g b e a1 an φ :
+     Lemma rclear_spec (a : list Addr) (r: list RegName) (rmap : gmap RegName Word) p g b e a1 an φ :
        contiguous_between a a1 an →
        ¬ PC ∈ r → hd_error a = Some a1 →
        isCorrectPC_range p g b e a1 an →
-       PermFlows p p' →
        list_to_set r = dom (gset RegName) rmap →
 
          ▷ ([∗ map] r_i↦w_i ∈ rmap, r_i ↦ᵣ w_i)
        ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a1)
-       ∗ ▷ rclear a p' r
+       ∗ ▷ rclear a r
        ∗ ▷ (PC ↦ᵣ inr ((p,g),b,e,an) ∗ ([∗ map] r_i↦_ ∈ rmap, r_i ↦ᵣ inl 0%Z)
-               ∗ rclear a p' r -∗
+               ∗ rclear a r -∗
                WP Seq (Instr Executable) {{ φ }})
        ⊢ WP Seq (Instr Executable) {{ φ }}.
      Proof.
-       iIntros (Ha Hne Hhd Hvpc Hfl Hrdom) "(>Hreg & >HPC & >Hrclear & Hφ)".
+       iIntros (Ha Hne Hhd Hvpc Hrdom) "(>Hreg & >HPC & >Hrclear & Hφ)".
        iDestruct (big_sepL2_length with "Hrclear") as %Har.
        iRevert (Hne Har Hhd Hvpc Ha Hrdom).
        iInduction (a) as [| a1'] "IH" forall (r rmap a1 an).
@@ -51,7 +49,7 @@ Section stack_macros.
        iDestruct (big_sepM_delete _ _ r with "Hreg") as "[Hr Hreg]". eauto.
        pose proof (contiguous_between_cons_inv _ _ _ _ Ha) as [-> [a2 [? Hcont'] ] ].
        iApply (wp_move_success_z with "[$HPC $Hr $Ha1]");
-         [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC a1 an|eauto|..].
+         [apply decode_encode_instrW_inv|iCorrectPC a1 an|eauto|..].
        iNext. iIntros "(HPC & Ha1 & Hr)". iApply wp_pure_step_later; auto. iNext.
        destruct a.
        { iApply "Hφ". iFrame. inversion Hcont'; subst. iFrame.
@@ -159,23 +157,22 @@ Section stack_macros.
      Qed.
 
      (* rclear spec in terms of a new map; this one should be a bit more practical in proofs - should also help rewrite parts of the awkward example *)
-     Lemma rclear_spec_gmap (a : list Addr) (r: list RegName) (rmap : gmap RegName Word) p p' g b e a1 an φ :
+     Lemma rclear_spec_gmap (a : list Addr) (r: list RegName) (rmap : gmap RegName Word) p g b e a1 an φ :
      contiguous_between a a1 an →
      ¬ PC ∈ r → hd_error a = Some a1 →
      isCorrectPC_range p g b e a1 an →
-     PermFlows p p' →
      list_to_set r = dom (gset RegName) rmap →
-   
+
        ▷ ([∗ map] r_i↦w_i ∈ rmap, r_i ↦ᵣ w_i)
      ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a1)
-     ∗ ▷ rclear a p' r
+     ∗ ▷ rclear a r
      ∗ ▷ (PC ↦ᵣ inr ((p,g),b,e,an) ∗
              (∃ rmap', ([∗ map] r_i↦y ∈ rmap', r_i ↦ᵣ y %Z) ∗ ⌜dom (gset RegName) rmap' = (list_to_set r) ∧ (∀ x : RegName, x ∈ (dom (gset RegName) rmap') → rmap' !! x = Some (inl 0%Z))⌝)
-             ∗ rclear a p' r -∗
+             ∗ rclear a r -∗
              WP Seq (Instr Executable) {{ φ }})
      ⊢ WP Seq (Instr Executable) {{ φ }}.
    Proof.
-     iIntros (Ha Hne Hhd Hvpc Hfl Hrdom) "(>Hreg & >HPC & >Hrclear & Hφ)".
+     iIntros (Ha Hne Hhd Hvpc Hrdom) "(>Hreg & >HPC & >Hrclear & Hφ)".
      iApply (rclear_spec with "[- $Hreg $HPC $Hrclear]"); eauto.
      iNext. iIntros "(HPC & Hreg & Hrclear)".
      iDestruct (rmap_zero_extract with "Hreg") as "Hreg'"; auto.

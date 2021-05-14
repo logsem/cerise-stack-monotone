@@ -8,7 +8,7 @@ From cap_machine.rules Require Import rules_Jmp.
 Section fundamental.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
@@ -21,12 +21,12 @@ Section fundamental.
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
-  Lemma jmp_case (W : WORLD) (r : leibnizO Reg) (p p' : Perm)
-        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (r0 : RegName):
-    ftlr_instr W r p p' g b e a w (Jmp r0) ρ.
+  Lemma jmp_case (W : WORLD) (r : leibnizO Reg) (p : Perm)
+        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (r0 : RegName) (P:D):
+    ftlr_instr W r p g b e a w (Jmp r0) ρ P.
   Proof.
-    intros Hp Hsome i Hbae Hfp Hpwl Hregion Hnotrevoked Hnotmonostatic Hnotuninitialized HO Hi.
-    iIntros "#IH #Hinv #Hreg #Hinva Hmono #Hw Hsts Hown".
+    intros Hp Hsome i Hbae Hpers Hpwl Hregion Hnotrevoked Hnotmonostatic Hnotuninitialized Hi.
+    iIntros "#IH #Hinv #Hreg #Hinva #Hrcond #Hwcond Hmono Hw Hsts Hown".
     iIntros "Hr Hstate Ha HPC Hmap".
     rewrite delete_insert_delete.
     destruct (reg_eq_dec PC r0).
@@ -39,7 +39,7 @@ Section fundamental.
       iDestruct ((big_sepM_delete _ _ PC) with "[HPC Hmap]") as "Hmap /=";
         [apply lookup_insert|rewrite delete_insert_delete;iFrame|]. simpl.
       (* close region *)
-      iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
+      iDestruct (region_close with "[$Hstate $Hr Hw $Ha $Hmono]") as "Hr"; eauto.
       { destruct ρ;auto;[|specialize (Hnotmonostatic g0)|specialize (Hnotuninitialized w0)];contradiction. }
       (* apply IH *)
       iApply ("IH" $! _ _ _ g _ _ a with "[] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); eauto.
@@ -101,9 +101,13 @@ Section fundamental.
             simpl. rewrite /read_write_cond.
             (* iDestruct "Hwsrc" as (q) "[% H1]". *)
             iNext.
-            iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
+            iDestruct (region_close with "[$Hstate $Hr Hw $Ha $Hmono]") as "Hr"; eauto.
             { destruct ρ;auto;[|specialize (Hnotmonostatic g0)|specialize (Hnotuninitialized w0)];contradiction. }
             iApply ("IH" with "[] [] [$Hmap] [$Hr] [$Hsts] [$Hown]"); eauto.
+            rewrite /region_conditions. iSimpl.
+            iModIntro. iApply (big_sepL_mono with "Hwsrc").
+            intros. iIntros "H". iDestruct "H" as (P' Hpers') "(((?&?)&?)&?)".
+            iFrame. iExists P';iFrame. auto.
           + inv Heq. rewrite (fixpoint_interp1_eq _ (inr _)).
             simpl. rewrite /enter_cond.
             rewrite /interp_expr /=.
@@ -115,7 +119,7 @@ Section fundamental.
               - apply related_sts_a_refl_world. }
             iSpecialize ("H" $! _ _ with "Hfuture").
             iNext.
-            iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
+            iDestruct (region_close with "[$Hstate $Hr Hw $Ha $Hmono]") as "Hr"; eauto.
             { destruct ρ;auto;[|specialize (Hnotmonostatic g0)|specialize (Hnotuninitialized w0)];contradiction. }
             iDestruct ("H" with "[$Hmap $Hr $Hsts $Hown]") as "[_ HA]"; auto.
         - iApply (wp_bind (fill [SeqCtx])).
@@ -125,7 +129,7 @@ Section fundamental.
           iApply wp_value.
           iNext. iIntros. discriminate.
         - iNext.
-          iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
+          iDestruct (region_close with "[$Hstate $Hr Hw $Ha $Hmono]") as "Hr"; eauto.
           { destruct ρ;auto;[|specialize (Hnotmonostatic g0)|specialize (Hnotuninitialized w0)];contradiction. }
           iDestruct ((big_sepM_delete _ _ PC) with "[HPC Hmap]") as "Hmap /=".
           apply lookup_insert. rewrite delete_insert_delete. iFrame.
@@ -140,7 +144,7 @@ Section fundamental.
           iClear "Hinv".
           iApply ("IH" with "[] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); iFrame "#"; eauto.
         - iNext.
-          iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
+          iDestruct (region_close with "[$Hstate $Hr Hw $Ha $Hmono]") as "Hr"; eauto.
           { destruct ρ;auto;[|specialize (Hnotmonostatic g0)|specialize (Hnotuninitialized w0)];contradiction. }
           iDestruct ((big_sepM_delete _ _ PC) with "[HPC Hmap]") as "Hmap /=".
           apply lookup_insert. rewrite delete_insert_delete. iFrame.

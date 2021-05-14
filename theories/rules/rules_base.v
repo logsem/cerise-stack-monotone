@@ -33,211 +33,6 @@ Notation "a ↦ₐ { q } w" := (mapsto (L:=Addr) (V:=Word) a q w)
   (at level 20, q at level 50, format "a  ↦ₐ { q }  w") : bi_scope.
 Notation "a ↦ₐ w" := (mapsto (L:=Addr) (V:=Word) a 1 w) (at level 20) : bi_scope.
 
-(* capabilities. We use the monotone monoid to construct a pointer which may only
-   update according to its permission *)
-Section Capabilities.
-
-  Definition LeastPermUpd (w : Word) : Perm :=
-    match w with
-    | inl _ => URW
-    | inr ((_,Global),_,_,_) => URW
-    | _ => URWL
-    end.
-
-  (* It could have been better to define the second in terms of the first here *)
-  Lemma isLocal_RWL w:
-    isLocalWord w = true → LeastPermUpd w = URWL.
-  Proof.
-    intros HiLW. destruct w.
-    - cbv in HiLW. by exfalso.
-    - destruct_cap c. cbv in HiLW.
-      destruct c3; by cbv.
-  Qed.
-
-  Lemma not_isLocal_WL w:
-    isLocalWord w = false → LeastPermUpd w = URW.
-  Proof.
-    intros HiLW. destruct w.
-    - auto.
-    - destruct_cap c. cbv in HiLW.
-      destruct c3; by cbv.
-  Qed.
-
-  Lemma LeastPermUpd_atleast w:
-    PermFlows URW (LeastPermUpd w).
-  Proof.
-    destruct w as [|c]; cbn. constructor.
-    destruct_cap c. case_match; constructor.
-  Qed.
-
-  Inductive CapR : relation (Word * Perm) :=
-  | P_res w p1 p2 : PermFlows p1 p2 → CapR (w,p2) (w,p1)
-  | W_upd w1 w2 p : PermFlows (LeastPermUpd w2) p → CapR (w1,p) (w2,p).
-
-  Definition PerP := λ p1 p2, PermFlows p2 p1.
-  Lemma PerP_refl : ∀ p, PerP p p.
-  Proof. apply PermFlows_refl. Qed.
-  Lemma PerP_trans : ∀ P1 P2 P3, PerP P1 P2 → PerP P2 P3 → PerP P1 P3.
-  Proof.
-    intros p1 p2 p3. rewrite /PerP /PermFlows /PermFlowsTo;
-    intros Hp1 Hp2.
-    destruct p1,p2,p3; simpl; auto.
-  Qed.
-
-  Definition CapR_rtc := rtc CapR.
-
-  Instance WordPerm_Equiv : Equiv (leibnizO (Word * Perm)).
-  Proof. apply _. Defined.
-
-  Instance WordPerm_Dist : Dist (leibnizO (Word * Perm)).
-  Proof. apply _. Defined.
-
-  Global Instance CapR_rtc_ProperPreOrder : monocmra.ProperPreOrder CapR_rtc.
-  Proof. split; apply _. Defined.
-
-  Instance PermFlows_Equiv : Equiv (leibnizO Perm).
-  Proof. apply _. Defined.
-
-  Instance PermFlows_Dist : Dist (leibnizO Perm).
-  Proof. apply _. Defined.
-
-  Global Instance PerP_ProperPreOrder : monocmra.ProperPreOrder PerP.
-  Proof.
-    split; [|apply _].
-    split; intro;[rewrite /Reflexive;apply PerP_refl|rewrite /Transitive;apply PerP_trans].
-  Defined.
-
-  Global Instance PermFlows_ProperPreOrder : monocmra.ProperPreOrder PermFlows.
-  Proof.
-    split; [|apply _].
-    split; intro;[rewrite /Reflexive;apply PerP_refl|rewrite /Transitive;apply PermFlows_trans].
-  Defined.
-
-  Context `{MonRefG (leibnizO _) CapR_rtc Σ, !memG Σ}.
-  Notation A := (leibnizO (Word * Perm)).
-
-  Definition MonRefMapsto_def l γ (v : A) :=
-    (Exact (A:=A) CapR_rtc γ v ∗ atleast (A:=A) CapR_rtc γ v
-           ∗ (l ↦ₐ v.1 ∨ ⌜v.2 = O⌝))%I.
-  (* if the permission is O, we do not have ownership of the location *)
-  Definition MonRefMapsto_aux l γ v : seal (MonRefMapsto_def l γ v).
-  Proof. by eexists. Qed.
-  Definition MonRefMapsto l γ v : iProp Σ := (MonRefMapsto_aux l γ v).(unseal).
-  Definition MonRefMapsto_eq l γ v :
-    MonRefMapsto l γ v = MonRefMapsto_def l γ v :=
-    (MonRefMapsto_aux l γ v).(seal_eq).
-
-  Notation "a ↦ₐ [ p ] w" := (∃ cap_γ, MonRefMapsto a cap_γ (w,p))%I
-              (at level 20, p at level 50, format "a  ↦ₐ [ p ]  w") : bi_scope.
-
-  Lemma MonRefAlloc l v p :
-    l ↦ₐ v ==∗ l ↦ₐ[p] v.
-  Proof.
-    iIntros "Hl".
-    iMod (MonRef_alloc (A:=A)) as (γ) "[HE Hal]"; eauto.
-    iModIntro. iExists _.
-    rewrite MonRefMapsto_eq /MonRefMapsto_def. iFrame.
-  Qed.
-
-  Lemma MonRefAlloc_sepL2 (p:Perm) (l1: list Addr) (l2: list Word) :
-    ([∗ list] k;v ∈ l1;l2, k ↦ₐ v) ==∗ ([∗ list] k;v ∈ l1;l2, k ↦ₐ[p] v).
-  Proof.
-    iIntros "H".
-    iDestruct (big_sepL2_mono with "H") as "H".
-    { intros. apply MonRefAlloc. }
-    iDestruct (big_sepL2_bupd with "H") as "H". eauto.
-  Qed.
-
-  Lemma MonRefAlloc_sepM (p:Perm) (m: gmap Addr Word) :
-    ([∗ map] k↦v ∈ m, k ↦ₐ v) ==∗ ([∗ map] k↦v ∈ m, k ↦ₐ[p] v).
-  Proof.
-    iIntros "H".
-    iDestruct (big_sepM_mono with "H") as "H".
-    { intros. apply MonRefAlloc. }
-    iDestruct (big_sepM_bupd with "H") as "H". eauto.
-  Qed.
-
-  Lemma MonRefDealloc l γ v p :
-    MonRefMapsto l γ (v,p) -∗
-                 (l ↦ₐ v ∨ ⌜p = O⌝) ∗
-       ∃ P, P ∗ (P -∗ ∀ w, ⌜CapR_rtc (v,p) w⌝ -∗
-                       (l ↦ₐ w.1 ∨ ⌜w.2 = O⌝) ==∗ MonRefMapsto l γ w).
-  Proof.
-    rewrite MonRefMapsto_eq /MonRefMapsto_def.
-    iIntros "(HE & Ha & Hl)".
-    iFrame.
-    iDestruct (MonRef_related (A:=A) with "HE Ha") as %Hab.
-    iExists (Exact (A:=A) CapR_rtc γ (v,p) ∗
-                   atleast (A:=A) CapR_rtc γ (v,p))%I; iFrame.
-    iIntros "[HE Ha]". iIntros ([w p'] Hcap) "Hl /=".
-    rewrite MonRefMapsto_eq /MonRefMapsto_def; iFrame.
-    iMod (MonRef_update (A:=A) CapR_rtc γ (v,p) with "HE") as "[$ $]"; eauto.
-  Qed.
-
-  Lemma snap_shot l γ v : MonRefMapsto l γ v ==∗ atleast (A:=A) CapR_rtc γ v.
-  Proof.
-    rewrite MonRefMapsto_eq /MonRefMapsto_def atleast_eq /atleast_def.
-    iIntros "(HE & Hal & Hl)"; eauto.
-  Qed.
-
-  Lemma recall l γ v w :
-    atleast (A:=A) CapR_rtc γ w -∗ MonRefMapsto l γ v -∗ ⌜CapR_rtc w v⌝.
-  Proof.
-    rewrite MonRefMapsto_eq /MonRefMapsto_def.
-    iIntros "Hal (HE & Hal' & Hl)".
-    iDestruct (MonRef_related with "HE Hal") as "?"; eauto.
-  Qed.
-
-  Instance Exact_Timeless : Timeless (Exact (A:=A) CapR_rtc γ v).
-  Proof. apply _. Qed.
-
-  Instance atleast_Timeless : Timeless (atleast (A:=A) CapR_rtc γ v).
-  Proof.
-    intros. rewrite (atleast_eq (A:=A) CapR_rtc γ v). apply _. Qed.
-
-  Global Instance MonRefMapsto_Timeless : Timeless (MonRefMapsto l γ v).
-  Proof.
-    intros.
-    rewrite MonRefMapsto_eq /MonRefMapsto_def.
-    apply _.
-  Qed.
-
-End Capabilities.
-
-Section World.
-  Local Definition STS : Type := (STS_states * STS_rels).
-
-  Inductive RelW : (STS * bool) → (STS * bool) -> Prop :=
-  | RelW_pr (W1 W2 : STS) : related_sts_priv W1.1 W2.1 W1.2 W2.2
-                            -> RelW (W1,true) (W2,true)
-  | RelW_pu (W1 W2 : STS) : related_sts_pub W1.1 W2.1 W1.2 W2.2
-                            -> RelW (W1,false) (W2,false)
-  | RelW_pu_to_pr (W1 W2 : STS) : related_sts_priv W1.1 W2.1 W1.2 W2.2
-                              → RelW (W1,false) (W2,true).
-
-  Instance PrivRelW_Equiv : Equiv (leibnizO (STS * bool)).
-  Proof. apply _. Defined.
-
-  Instance PrivRelW_Dist : Dist (leibnizO (STS * bool)).
-  Proof. apply _. Defined.
-
-  Global Instance PrivRelW_ProperPreOrder : monocmra.ProperPreOrder RelW.
-  Proof.
-    split; [|apply _].
-    split; intro.
-    - destruct x. destruct b.
-      + apply RelW_pr. apply related_sts_priv_refl.
-      + apply RelW_pu. apply related_sts_pub_refl.
-    - intros y z. destruct x,y,z; inversion 1; inversion 1.
-      + constructor. apply related_sts_priv_trans with s0.1 s0.2; auto.
-      + constructor. apply related_sts_pub_trans with s0.1 s0.2; auto.
-      + subst. constructor. apply related_sts_pub_priv_trans with s0.1 s0.2; auto.
-      + subst. constructor. apply related_sts_priv_trans with s0.1 s0.2; auto.
-  Defined.
-
-End World.
-
-Definition logN : namespace := nroot .@ "logN".
 
 (* --------------------------- LTAC DEFINITIONS ----------------------------------- *)
 
@@ -277,13 +72,13 @@ Ltac option_locate_m m :=
 Ltac option_locate_r m :=
   repeat option_locate_r_once m.
 
+
 (* Permission-carrying memory type, used to describe maps of locations and permissions in the load and store cases *)
-Notation PermMem := (gmap Addr (Perm * Word)).
+(* Notation PermMem := (gmap Addr (Perm * Word)). *)
 
 Section cap_lang_rules.
   Context `{MachineParameters}.
-  Context `{memG Σ, regG Σ, MonRefG (leibnizO _) CapR_rtc Σ,
-            World: MonRefG (leibnizO _) RelW Σ}.
+  Context `{memG Σ, regG Σ}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
   Implicit Types c : cap_lang.expr.
@@ -299,38 +94,6 @@ Section cap_lang_rules.
   Implicit Types M : WORLD_S.
   Implicit Types W : (STS_states * STS_rels).
 
-  (* Definition atleast_p γ p := atleast (A:=P) PermFlows γ p. *)
-  (* Definition Exact_p γ p := Exact (A:=P) PermFlows γ p. *)
-
-  (* --------------------------- WORLD REL MONOID ----------------------------------- *)
-  Definition atleast_w γ M := atleast (A:=WORLD_S) RelW γ M.
-  Definition Exact_w γ M := Exact (A:=WORLD_S) RelW γ M.
-
-  Lemma RelW_private M W γ :
-    atleast_w γ M -∗ Exact_w γ (W,true) -∗ ⌜related_sts_priv M.1.1 W.1 M.1.2 W.2⌝.
-  Proof.
-    rewrite /atleast_w /Exact_w.
-    iIntros "#HM HW".
-    iDestruct (MonRef_related (A:=WORLD_S) with "HW HM") as %Hrel.
-      by inversion Hrel; subst.
-  Qed.
-
-  Lemma RelW_public M W γ :
-    atleast_w γ M -∗ Exact_w γ (W,false) -∗ ⌜related_sts_pub M.1.1 W.1 M.1.2 W.2⌝.
-  Proof.
-    rewrite /atleast_w /Exact_w.
-    iIntros "#HM HW".
-    iDestruct (MonRef_related (A:=WORLD_S) with "HW HM") as %Hrel.
-      by inversion Hrel; subst.
-  Qed.
-
-  Lemma RelW_public_to_private W γ :
-    Exact_w γ (W,false) ==∗ Exact_w γ (W,true) ∗ atleast_w γ (W,true).
-  Proof.
-    iIntros "HW".
-    iMod (MonRef_update (A:=WORLD_S) with "HW"); auto.
-    constructor. apply related_sts_priv_refl.
-  Qed.
 
   (* ----------------------------- LOCATΕ LEMMAS ----------------------------------- *)
 
@@ -541,113 +304,16 @@ Section cap_lang_rules.
     rewrite lookup_insert //.
   Qed.
 
-  (* --------------------------- CAPABILITY PREDICATE ------------------------------- *)
-  (* Points to predicates for memory *)
-  Notation "a ↦ₐ [ p ] w" := (∃ cap_γ, MonRefMapsto a cap_γ (w,p))%I
-              (at level 20, p at level 50, format "a  ↦ₐ [ p ]  w") : bi_scope.
-  Definition mapsto_nO (a: Addr) (p: Perm) (w: Word) := (a ↦ₐ[p] w ∗ ⌜p ≠ O⌝)%I.
+  (* ------------------------- memory points-to --------------------------------- *)
 
-  Lemma gen_heap_valid_cap
-        (σ : gmap Addr Word) (a : Addr) (w : Word) (p : Perm) :
-    p ≠ O →
-    gen_heap_ctx σ -∗ a ↦ₐ[p] w -∗ ⌜σ !! a = Some w⌝.
+  Lemma addr_dupl_false a w1 w2 :
+    a ↦ₐ w1 -∗ a ↦ₐ w2 -∗ False.
   Proof.
-    iIntros (Hne) "Hσ Ha".
-    iDestruct "Ha" as (γ_cap) "Ha".
-    rewrite MonRefMapsto_eq /MonRefMapsto_def /=.
-    iDestruct "Ha" as "(Hex & Hal & [Ha | %])"; [|contradiction].
-    iApply (gen_heap_valid with "Hσ Ha").
-  Qed.
-
-  Lemma cap_duplicate_false a p p' w w' :
-    p ≠ O ∧ p' ≠ O →
-    a ↦ₐ[p] w ∗ a ↦ₐ[p'] w' -∗ False.
-  Proof.
-    iIntros ([Hne1 Hne2]) "[Ha1 Ha2]".
-    iDestruct "Ha1" as (γ1) "Ha1".
-    iDestruct "Ha2" as (γ2) "Ha2".
-    do 2 rewrite MonRefMapsto_eq /MonRefMapsto_def /=.
-    iDestruct "Ha1" as "(_ & _ & [Ha | %])"; [|contradiction].
-    iDestruct "Ha2" as "(_ & _ & [Ha' | %])"; [|contradiction].
-    iDestruct (mapsto_valid_2 with "Ha Ha'") as %Hcontr. done.
-  Qed.
-
-  Lemma cap_restrict (a : Addr) (w : Word) (p p' : Perm) :
-    PermFlows p' p →
-    a ↦ₐ[p] w ==∗ a ↦ₐ[p'] w.
-  Proof.
-    iIntros (Hfl) "Ha".
-    iDestruct "Ha" as (γ_cap) "Ha". iExists (γ_cap).
-    do 2 rewrite MonRefMapsto_eq /MonRefMapsto_def /=.
-    iDestruct "Ha" as "(Hex & Hal & Ha)".
-    iMod (MonRef_update (A:=A) with "Hex") as "[HE HFr']"; eauto.
-    right with (w,p');[|left].
-    constructor; auto.
-    iFrame.
-    iDestruct "Ha" as "[Ha | %]".
-    - iLeft. by iFrame.
-    - subst. destruct p'; inversion Hfl. by iRight.
-  Qed.
-
-  Lemma gen_heap_update_cap (σ : gmap Addr Word) (a : Addr) (p : Perm) (w w' : Word) :
-    PermFlows (LeastPermUpd w') p →
-    gen_heap_ctx σ -∗ a ↦ₐ[p] w ==∗ gen_heap_ctx (<[a:=w']> σ) ∗ a ↦ₐ[p] w'.
-  Proof.
-    iIntros (Hf) "Hσ Ha".
-    iDestruct "Ha" as (γ_cap) "Ha". iApply bi.sep_exist_l. iExists γ_cap.
-    do 2 rewrite MonRefMapsto_eq /MonRefMapsto_def /=.
-    assert (p ≠ O) as Ho.
-    { assert (PermFlows URW p) as Hflp.
-      by etransitivity; eauto using LeastPermUpd_atleast.
-      inversion Hflp; destruct p; eauto. }
-    iDestruct "Ha" as "(Hex & Hal & [Ha | %])"; [|contradiction].
-    iMod (MonRef_update (A:=A) with "Hex") as "[$ $]"; eauto.
-    { right with (w',p); [|left]. by constructor. }
-    by iMod (gen_heap_update with "Hσ Ha") as "[$ $]".
-  Qed.
-
-  Lemma wp_lift_atomic_head_step_no_fork_determ {s E Φ} e1 :
-    to_val e1 = None →
-    (∀ (σ1:cap_lang.state) κ κs n, state_interp σ1 (κ ++ κs) n ={E}=∗
-     ∃ κ e2 (σ2:cap_lang.state) efs, ⌜cap_lang.prim_step e1 σ1 κ e2 σ2 efs⌝ ∗
-      (▷ |==> (state_interp σ2 κs n ∗ from_option Φ False (to_val e2))))
-      ⊢ WP e1 @ s; E {{ Φ }}.
-  Proof.
-    iIntros (?) "H". iApply wp_lift_atomic_head_step_no_fork; auto.
-    iIntros (σ1 κ κs n)  "Hσ1 /=".
-    iMod ("H" $! σ1 κ κs n with "[Hσ1]") as "H"; auto.
-    iDestruct "H" as (κ' e2 σ2 efs) "[H1 H2]".
-    iModIntro. iSplit.
-    - rewrite /head_reducible /=.
-      iExists κ', e2, σ2, efs. auto.
-    - iNext. iIntros (? ? ?) "H".
-      iDestruct "H" as %Hs1.
-      iDestruct "H1" as %Hs2.
-      destruct (cap_lang_determ _ _ _ _ _ _ _ _ _ _ Hs1 Hs2) as [Heq1 [Heq2 [Heq3 Heq4]]].
-      subst a; subst a0; subst a1.
-      iMod "H2". iModIntro. iFrame. inv Hs1; auto.
+    iIntros "Ha1 Ha2".
+    iDestruct (mapsto_valid_2 with "Ha1 Ha2") as %?. done.
   Qed.
 
   (* -------------- predicates on memory maps -------------------------- *)
-
-  Lemma resource_exists a p' w:
-    a ↦ₐ[p'] w ⊣⊢ (∃ (p : Perm) (w0 : Word), ⌜(p', w) = (p, w0)⌝ ∗ a ↦ₐ[p] w0).
-  Proof.
-    iSplit; first by auto.
-    iIntros "HH"; iDestruct "HH" as (p w0 Heq) "HH"; by inversion Heq.
-  Qed.
-
-  Lemma address_dupl_false a w1 w2 p1 p2 :
-    p1 ≠ O → p2 ≠ O → a ↦ₐ[p1] w1 -∗ a ↦ₐ[p2] w2 -∗ False.
-  Proof.
-    iIntros (p1ne p2ne) "Hr1 Hr2".
-    iDestruct "Hr1" as (g1) "Hr1".
-    iDestruct "Hr2" as (g2) "Hr2".
-    iDestruct (MonRefDealloc with "[$Hr1]") as "[[Hr1 | %] _]"; last congruence.
-    iDestruct (MonRefDealloc with "[$Hr2]") as "[[Hr2 | %] _]"; last congruence.
-    iDestruct (mapsto_valid_2 with "Hr1 Hr2") as %?.
-    contradiction.
-  Qed.
 
   Lemma extract_sep_if_split a pc_a P Q R:
      (if (a =? pc_a)%a then P else Q ∗ R)%I ≡
@@ -658,157 +324,163 @@ Section cap_lang_rules.
     iSplit; auto. iIntros "[H1 H2]"; auto.
   Qed.
 
-  Lemma address_neq a1 a2 w1 w2 p1 p2  :
-    p1 ≠ O → p2 ≠ O → a1 ↦ₐ[p1] w1 -∗ a2 ↦ₐ[p2] w2 -∗ ⌜ a1 ≠ a2 ⌝.
-  Proof.
-    iIntros (p1ne p2ne) "H1 H2". iIntros (contr). subst a1. iApply (address_dupl_false with "H1 H2");auto.
-  Qed.
-
   Lemma memMap_resource_0  :
-        True ⊣⊢ ([∗ map] a↦pw ∈ ∅, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w).
+        True ⊣⊢ ([∗ map] a↦w ∈ ∅, a ↦ₐ w).
   Proof.
     by rewrite big_sepM_empty.
   Qed.
 
 
-  Lemma memMap_resource_1 (a : Addr) (p' : Perm) (w : Word)  :
-        a ↦ₐ[p'] w  ⊣⊢ ([∗ map] a↦pw ∈ <[a:=(p',w)]> ∅, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w)%I.
+  Lemma memMap_resource_1 (a : Addr) (w : Word)  :
+        a ↦ₐ w  ⊣⊢ ([∗ map] a↦w ∈ <[a:=w]> ∅, a ↦ₐ w)%I.
   Proof.
     rewrite big_sepM_delete; last by apply lookup_insert.
     rewrite delete_insert; last by auto. rewrite -memMap_resource_0.
     iSplit; iIntros "HH".
-    - rewrite resource_exists. by iSplitL.
-    - rewrite resource_exists. by iDestruct "HH" as "[HH _]".
+    - iFrame.
+    - by iDestruct "HH" as "[HH _]".
   Qed.
 
-  Lemma memMap_resource_2ne (a1 a2 : Addr) (p1' p2' : Perm) (w1 w2 : Word)  :
-    a1 ≠ a2 → ([∗ map] a↦pw ∈  <[a1:=(p1',w1)]> (<[a2:=(p2',w2)]> ∅), ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w)%I ⊣⊢ a1 ↦ₐ[p1'] w1 ∗ a2 ↦ₐ[p2'] w2.
+  Lemma memMap_resource_2ne (a1 a2 : Addr) (w1 w2 : Word)  :
+    a1 ≠ a2 → ([∗ map] a↦w ∈  <[a1:=w1]> (<[a2:=w2]> ∅), a ↦ₐ w)%I ⊣⊢ a1 ↦ₐ w1 ∗ a2 ↦ₐ w2.
   Proof.
     intros.
     rewrite big_sepM_delete; last by apply lookup_insert.
-    rewrite (big_sepM_delete _ _ a2 (p2',w2)); rewrite delete_insert; try by rewrite lookup_insert_ne. 2: by rewrite lookup_insert.
+    rewrite (big_sepM_delete _ _ a2 w2); rewrite delete_insert; try by rewrite lookup_insert_ne. 2: by rewrite lookup_insert.
     rewrite delete_insert; auto.
     rewrite -memMap_resource_0.
     iSplit; iIntros "HH".
-    - iDestruct "HH" as "[H1 [H2 _ ] ]".  iSplitL "H1"; by rewrite -resource_exists.
-    - iDestruct "HH" as "[H1 H2]". iSplitL "H1"; auto.
+    - iDestruct "HH" as "[H1 [H2 _ ] ]".  iFrame.
+    - iDestruct "HH" as "[H1 H2]". iFrame.
   Qed.
 
-  Lemma memMap_resource_2ne_apply (a1 a2 : Addr) (p1' p2' : Perm) (w1 w2 : Word)  :
-    p1' ≠ O → p2' ≠ O → a1 ↦ₐ[p1'] w1 -∗ a2 ↦ₐ[p2'] w2 -∗ ([∗ map] a↦pw ∈  <[a1:=(p1',w1)]> (<[a2:=(p2',w2)]> ∅), ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗ ⌜a1 ≠ a2⌝.
+  Lemma address_neq a1 a2 w1 w2 :
+    a1 ↦ₐ w1 -∗ a2 ↦ₐ w2 -∗ ⌜a1 ≠ a2⌝.
   Proof.
-    iIntros (Hne1 Hne2) "Hi Hr2a".
+    iIntros "Ha1 Ha2".
+    destruct (addr_eq_dec a1 a2); auto. subst.
+    iExFalso. iApply (addr_dupl_false with "[$Ha1] [$Ha2]").
+  Qed.
+
+  Lemma memMap_resource_2ne_apply (a1 a2 : Addr) (w1 w2 : Word)  :
+    a1 ↦ₐ w1 -∗ a2 ↦ₐ w2 -∗ ([∗ map] a↦w ∈  <[a1:=w1]> (<[a2:=w2]> ∅), a ↦ₐ w) ∗ ⌜a1 ≠ a2⌝.
+  Proof.
+    iIntros "Hi Hr2a".
     iDestruct (address_neq  with "Hi Hr2a") as %Hne; auto.
     iSplitL; last by auto.
     iApply memMap_resource_2ne; auto. iSplitL "Hi"; auto.
   Qed.
 
-  Lemma memMap_resource_2gen (a1 a2 : Addr) (p1' p2' : Perm) (w1 w2 : Word)  :
-    ( ∃ mem, ([∗ map] a↦pw ∈ mem, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∧
+  Lemma memMap_resource_2gen (a1 a2 : Addr) (w1 w2 : Word)  :
+    ( ∃ mem, ([∗ map] a↦w ∈ mem, a ↦ₐ w) ∧
        ⌜ if  (a2 =? a1)%a
-       then mem =  (<[a1:=(p1',w1)]> ∅)
-       else mem = <[a1:=(p1',w1)]> (<[a2:=(p2',w2)]> ∅)⌝
-    )%I ⊣⊢ (a1 ↦ₐ[p1'] w1 ∗ if (a2 =? a1)%a then emp else a2 ↦ₐ[p2'] w2) .
+       then mem =  (<[a1:=w1]> ∅)
+       else mem = <[a1:=w1]> (<[a2:=w2]> ∅)⌝
+    )%I ⊣⊢ (a1 ↦ₐ w1 ∗ if (a2 =? a1)%a then emp else a2 ↦ₐ w2) .
   Proof.
     destruct (a2 =? a1)%a eqn:Heq.
     - apply Z.eqb_eq, z_of_eq in Heq. rewrite memMap_resource_1.
       iSplit.
       * iDestruct 1 as (mem) "[HH ->]".  by iSplit.
-      * iDestruct 1 as "[Hmap _]". iExists (<[a1:=(p1', w1)]> ∅); iSplitL; auto.
+      * iDestruct 1 as "[Hmap _]". iExists (<[a1:=w1]> ∅); iSplitL; auto.
     - apply Z.eqb_neq in Heq.
       rewrite -memMap_resource_2ne; auto. 2 : congruence.
       iSplit.
       * iDestruct 1 as (mem) "[HH ->]". done.
-      * iDestruct 1 as "Hmap". iExists (<[a1:=(p1', w1)]> (<[a2:=(p2', w2)]> ∅)); iSplitL; auto.
+      * iDestruct 1 as "Hmap". iExists (<[a1:=w1]> (<[a2:=w2]> ∅)); iSplitL; auto.
   Qed.
 
-  Lemma memMap_resource_2gen_d (a1 a2 : Addr) (p1' p2' : Perm) (w1 w2 : Word)  :
-    ( ∃ mem, ([∗ map] a↦pw ∈ mem, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∧
+  Lemma memMap_resource_2gen_d (Φ : Addr → Word → iProp Σ) (a1 a2 : Addr) (w1 w2 : Word)  :
+    ( ∃ mem, ([∗ map] a↦w ∈ mem, Φ a w) ∧
        ⌜ if  (a2 =? a1)%a
-       then mem =  (<[a1:=(p1',w1)]> ∅)
-       else mem = <[a1:=(p1',w1)]> (<[a2:=(p2',w2)]> ∅)⌝
-    ) -∗ (a1 ↦ₐ[p1'] w1 ∗ if (a2 =? a1)%a then emp else a2 ↦ₐ[p2'] w2) .
+       then mem =  (<[a1:=w1]> ∅)
+       else mem = <[a1:=w1]> (<[a2:=w2]> ∅)⌝
+    ) -∗ (Φ a1 w1 ∗ if (a2 =? a1)%a then emp else Φ a2 w2) .
   Proof.
-    iIntros. by rewrite memMap_resource_2gen.
+    iIntros "Hmem". iDestruct "Hmem" as (mem) "[Hmem Hif]".
+    destruct ((a2 =? a1)%a) eqn:Heq.
+    - iDestruct "Hif" as %->.
+      iDestruct (big_sepM_insert with "Hmem") as "[$ Hmem]". auto.
+    - iDestruct "Hif" as %->. iDestruct (big_sepM_insert with "Hmem") as "[$ Hmem]".
+      { rewrite lookup_insert_ne;auto. apply Z.eqb_neq in Heq. solve_addr. }
+      iDestruct (big_sepM_insert with "Hmem") as "[$ Hmem]". auto.
   Qed.
 
   (* Not the world's most beautiful lemma, but it does avoid us having to fiddle around with a later under an if in proofs *)
-  Lemma memMap_resource_2gen_clater (a1 a2 : Addr) (p1' p2' : Perm) (w1 w2 : Word)  :
-    (▷ a1 ↦ₐ[p1'] w1) -∗
-    (if (a2 =? a1)%a then emp else ▷ a2 ↦ₐ[p2'] w2) -∗
-    (∃ mem, ▷ ([∗ map] a↦pw ∈ mem, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗
+  Lemma memMap_resource_2gen_clater (a1 a2 : Addr) (w1 w2 : Word) (Φ : Addr -> Word -> iProp Σ)  :
+    (▷ Φ a1 w1) -∗
+    (if (a2 =? a1)%a then emp else ▷ Φ a2 w2) -∗
+    (∃ mem, ▷ ([∗ map] a↦w ∈ mem, Φ a w) ∗
        ⌜if  (a2 =? a1)%a
-       then mem =  (<[a1:=(p1',w1)]> ∅)
-       else mem = <[a1:=(p1',w1)]> (<[a2:=(p2',w2)]> ∅)⌝
+       then mem =  (<[a1:=w1]> ∅)
+       else mem = <[a1:=w1]> (<[a2:=w2]> ∅)⌝
     )%I.
   Proof.
     iIntros "Hc1 Hc2".
     destruct (a2 =? a1)%a eqn:Heq.
-    - iExists (<[a1:=(p1', w1)]> ∅); iSplitL; auto. iNext. by rewrite memMap_resource_1.
-    - iExists (<[a1:=(p1', w1)]> (<[a2:=(p2', w2)]> ∅)); iSplitL; auto.
-      iNext. iDestruct (memMap_resource_2ne with "[$Hc1 $Hc2]") as "Hmem".
-      {apply Z.eqb_neq in Heq. congruence. }
-      done.
+    - iExists (<[a1:= w1]> ∅); iSplitL; auto. iNext. iApply big_sepM_insert;[|by iFrame].
+      auto.
+    - iExists (<[a1:=w1]> (<[a2:=w2]> ∅)); iSplitL; auto.
+      iNext.
+      iApply big_sepM_insert;[|iFrame].
+      { apply Z.eqb_neq in Heq. rewrite lookup_insert_ne//. congruence. }
+      iApply big_sepM_insert;[|by iFrame]. auto.
   Qed.
 
   Lemma memMap_delete:
-    ∀(a : Addr) (p' : Perm) (w : Word) (mem0 : PermMem),
-      mem0 !! a = Some (p', w) →
-      ([∗ map] a↦pw ∈ mem0, ∃ (p : Perm) (w0 : Word), ⌜pw = (p, w0)⌝ ∗ a ↦ₐ[p] w0)
-      ⊣⊢ (a ↦ₐ[p'] w
-         ∗ ([∗ map] k↦y ∈ delete a mem0, ∃ (p : Perm) (w0 : Word),
-               ⌜y = (p, w0)⌝ ∗ k ↦ₐ[p] w0)).
+    ∀(a : Addr) (w : Word) mem0,
+      mem0 !! a = Some w →
+      ([∗ map] a↦w ∈ mem0, a ↦ₐ w)
+      ⊣⊢ (a ↦ₐ w
+         ∗ ([∗ map] k↦y ∈ delete a mem0,
+               k ↦ₐ y)).
   Proof.
-    intros a p' w mem0 Hmem0a.
-    rewrite resource_exists.
+    intros a w mem0 Hmem0a.
     rewrite -(big_sepM_delete _ _ a); auto.
   Qed.
 
   Lemma gen_mem_valid_inSepM:
-    ∀ (a : Addr) (p' : Perm) (r1 r2 : RegName) (w : Word) (mem0 : PermMem) (r : Reg) (m : Mem),
-      p' ≠ O →
-      mem0 !! a = Some (p', w) →
+    ∀ (a : Addr) (r1 r2 : RegName) (w : Word) mem0 (r : Reg) (m : Mem),
+      mem0 !! a = Some w →
       gen_heap_ctx m
-                   -∗ ([∗ map] a↦pw ∈ mem0, ∃ (p : Perm) (w0 : Word), ⌜pw = (p, w0)⌝ ∗ a ↦ₐ[p] w0)
+                   -∗ ([∗ map] a↦w ∈ mem0, a ↦ₐ w)
                    -∗ ⌜m !! a = Some w⌝.
   Proof.
-    iIntros (a p' r1 r2 w mem0 r m Hpnz Hmem_pc) "Hm Hmem".
+    iIntros (a r1 r2 w mem0 r m Hmem_pc) "Hm Hmem".
     iDestruct (memMap_delete a with "Hmem") as "[Hpc_a Hmem]"; eauto.
-    iDestruct (gen_heap_valid_cap with "Hm Hpc_a") as %?; auto.
+    iDestruct (gen_heap_valid with "Hm Hpc_a") as %?; auto.
   Qed.
 
   Lemma mem_v_implies_m_v:
-    ∀ (mem0 : PermMem) (m : Mem) (p : Perm) (g : Locality) (b e a : Addr) (p' : Perm) (v : Word),
-      mem0 !! a = Some (p', v)
-      → p' ≠ O
-      → ([∗ map] a0↦pw ∈ mem0, ∃ (p0 : Perm) (w : Word),
-            ⌜pw = (p0, w)⌝ ∗ a0 ↦ₐ[p0] w)
+    ∀ mem0 (m : Mem) (b e a : Addr) (v : Word),
+      mem0 !! a = Some v
+      → ([∗ map] a0↦w ∈ mem0, a0 ↦ₐ w)
           -∗ gen_heap_ctx m -∗ ⌜m !m! a = v⌝.
   Proof.
-    iIntros (mem0 m p g b e a p' v Hmema HPFp) "Hmem Hm".
+    iIntros (mem0 m b e a p' v) "Hmem Hm".
     iDestruct (memMap_delete a with "Hmem") as "[H_a Hmem]"; eauto.
-    iDestruct (gen_heap_valid_cap with "Hm H_a") as %?; auto.
+    iDestruct (gen_heap_valid with "Hm H_a") as %?; auto.
     by option_locate_mr_once m r.
   Qed.
 
   Lemma gen_mem_update_inSepM :
     ∀ {Σ : gFunctors} {gen_heapG0 : gen_heapG Addr Word Σ}
-      (σ : gmap Addr Word) (mem : PermMem) (l : Addr) (p : Perm) (v' v : Word),
-      mem !! l = Some (p,v') → PermFlows (LeastPermUpd v) p →
+      (σ : gmap Addr Word) mem0 (l : Addr) (v' v : Word),
+      mem0 !! l = Some v' →
       gen_heap_ctx σ
-      -∗ ([∗ map] a0↦pw ∈ mem, ∃ (p0 : Perm) (w0 : Word),
-             ⌜pw = (p0, w0)⌝ ∗ a0 ↦ₐ[p0] w0)
+      -∗ ([∗ map] a↦w ∈ mem0, a ↦ₐ w)
       ==∗ gen_heap_ctx (<[l:=v]> σ)
-          ∗ ([∗ map] a0↦pw ∈ <[l:=(p,v)]> mem, ∃ (p0 : Perm) (w0 : Word),
-             ⌜pw = (p0, w0)⌝ ∗ a0 ↦ₐ[p0] w0).
+          ∗ ([∗ map] a↦w ∈ <[l:=v]> mem0, a ↦ₐ w).
   Proof.
     intros.
-    rewrite (memMap_delete l) //. iIntros "Hh [Hl Hmap]".
-    iMod (gen_heap_update_cap with "Hh Hl") as "[Hh Hl]"; eauto.
+    rewrite (big_sepM_delete _ _ l);[|eauto].
+    iIntros "Hh [Hl Hmap]".
+    iMod (gen_heap_update with "Hh Hl") as "[Hh Hl]"; eauto.
     iModIntro.
     iSplitL "Hh"; eauto.
-    iApply (memMap_delete l); first by rewrite lookup_insert.
-    rewrite delete_insert_delete. iFrame.
+    iDestruct (big_sepM_insert _ _ l with "[$Hmap $Hl]") as "H".
+    apply lookup_delete.
+    rewrite insert_delete. iFrame.
   Qed.
 
   (* ----------------------------------- FAIL RULES ---------------------------------- *)
@@ -866,24 +538,21 @@ Section cap_lang_rules.
 
   (* ----------------------------------- ATOMIC RULES -------------------------------- *)
 
-  Lemma wp_halt E pc_p pc_g pc_b pc_e pc_a w pc_p' :
+  Lemma wp_halt E pc_p pc_g pc_b pc_e pc_a w :
     decodeInstrW w = Halt →
-    PermFlows pc_p pc_p' →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
 
-    {{{ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a) ∗ pc_a ↦ₐ[pc_p'] w }}}
+    {{{ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a) ∗ pc_a ↦ₐ w }}}
       Instr Executable @ E
-    {{{ RET HaltedV; PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a) ∗ pc_a ↦ₐ[pc_p'] w }}}.
+    {{{ RET HaltedV; PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a) ∗ pc_a ↦ₐ w }}}.
   Proof.
-    intros Hinstr Hfl Hvpc.
+    intros Hinstr Hvpc.
     iIntros (φ) "[Hpc Hpca] Hφ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
     iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [r m]; simpl.
     iDestruct "Hσ1" as "[Hr Hm]".
     iDestruct (@gen_heap_valid with "Hr Hpc") as %?.
-    iDestruct (@gen_heap_valid_cap with "Hm Hpca") as %?.
-    { destruct pc_p'; auto. destruct pc_p; inversion Hfl.
-      inversion Hvpc; subst. naive_solver. }
+    iDestruct (@gen_heap_valid with "Hm Hpca") as %?.
     iModIntro.
     iSplitR. by iPureIntro; apply normal_always_head_reducible.
     iIntros (e2 σ2 efs Hstep).
@@ -892,24 +561,21 @@ Section cap_lang_rules.
     iNext. iModIntro. iSplitR; eauto. iFrame. iApply "Hφ". by iFrame.
   Qed.
 
-  Lemma wp_fail E pc_p pc_g pc_b pc_e pc_a w pc_p' :
+  Lemma wp_fail E pc_p pc_g pc_b pc_e pc_a w :
     decodeInstrW w = Fail →
-    PermFlows pc_p pc_p' →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
 
-    {{{ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a) ∗ pc_a ↦ₐ[pc_p'] w }}}
+    {{{ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a) ∗ pc_a ↦ₐ w }}}
       Instr Executable @ E
-    {{{ RET FailedV; PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a) ∗ pc_a ↦ₐ[pc_p'] w }}}.
+    {{{ RET FailedV; PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a) ∗ pc_a ↦ₐ w }}}.
   Proof.
-    intros Hinstr Hfl Hvpc.
+    intros Hinstr Hvpc.
     iIntros (φ) "[Hpc Hpca] Hφ".
     iApply wp_lift_atomic_head_step_no_fork; auto.
     iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [r m]; simpl.
     iDestruct "Hσ1" as "[Hr Hm]".
     iDestruct (@gen_heap_valid with "Hr Hpc") as %?.
-    iDestruct (@gen_heap_valid_cap with "Hm Hpca") as %?.
-    { destruct pc_p'; auto. destruct pc_p; inversion Hfl.
-      inversion Hvpc; subst. naive_solver. }
+    iDestruct (@gen_heap_valid with "Hm Hpca") as %?.
     iModIntro.
     iSplitR. by iPureIntro; apply normal_always_head_reducible.
     iIntros (e2 σ2 efs Hstep).
@@ -940,12 +606,6 @@ Section cap_lang_rules.
   Proof. by solve_exec_pure. Qed.
 
 End cap_lang_rules.
-
-(* Points to predicates for memory *)
-Notation "a ↦ₐ [ p ] w" := (∃ cap_γ, MonRefMapsto a cap_γ (w,p))%I
-  (at level 20, p at level 50, format "a  ↦ₐ [ p ]  w") : bi_scope.
-Notation "a ↦ₐ < p > w" := (mapsto_nO a p w)
-    (at level 20, p at level 50, format "a  ↦ₐ < p >  w") : bi_scope.
 
 (* Used to close the failing cases of the ftlr.
   - Hcont is the (iris) name of the closing hypothesis (usually "Hφ")

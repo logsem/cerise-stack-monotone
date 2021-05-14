@@ -1,4 +1,4 @@
-From cap_machine.ftlr Require Export Jmp Store StoreU. (*Jnz Get AddSubLt IsPtr Lea Load Mov Restrict Subseg LoadU PromoteU. *)
+From cap_machine.ftlr Require Export Jmp Store StoreU Load. (*Jnz Get AddSubLt IsPtr Lea Mov Restrict Subseg LoadU PromoteU. *)
 From iris.proofmode Require Import tactics.
 From iris.program_logic Require Import weakestpre adequacy lifting.
 From stdpp Require Import base.
@@ -7,7 +7,7 @@ From cap_machine Require Export logrel region_invariants.
 Section fundamental.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MP: MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
@@ -44,11 +44,18 @@ Section fundamental.
 
   Instance addr_inhabited: Inhabited Addr := populate (A 0%Z eq_refl eq_refl).
 
-  (*TODO: change to region_conditions *)
+  Global Instance ifcond_pers : Persistent (if writeAllowed p then read_write_cond a interp else ∃ P : D, ⌜∀ Wv : WORLD * leibnizO Word, Persistent (P Wv.1 Wv.2)⌝ ∧ read_cond a P interp)%I.
+  Proof. intros. destruct (writeAllowed p);apply _. Qed.
+  Global Instance ifwcond_pers : Persistent (if decide (writeAllowed_in_r_a (<[PC:=inr (p, g, b, e, a)]> r) a) then wcond P interp else emp)%I.
+  Proof. intros. case_decide;apply _. Qed.
+  Global Instance if_pers (P: D) : Persistent (if decide (ρ = Monotemporary)
+                                               then future_pub_a_mono a (λ Wv, P Wv.1 Wv.2) w
+                                               else future_priv_mono (λ Wv, P Wv.1 Wv.2) w).
+  Proof. intros. case_decide;apply _. Qed.
+
   Theorem fundamental W r p g b e (a : Addr) :
     ⊢ ((⌜p = RX⌝ ∨ ⌜p = RWX⌝ ∨ ⌜p = RWLX ∧ g = Monotone⌝) →
-      ([∗ list] a ∈ (region_addrs b e), ∃ p', ⌜PermFlows p p'⌝ ∗ (read_write_cond a p' interp)
-                                             ∧ ⌜if pwl p then region_state_pwl_mono W a else region_state_nwl W a g⌝) →
+      region_conditions W p g b e →
       interp_expression r W (inr ((p,g),b,e,a))).
   Proof.
     iIntros (Hp) "#Hinv /=".
@@ -64,21 +71,23 @@ Section fundamental.
       assert ((b <= a)%a ∧ (a < e)%a) as Hbae.
       { eapply in_range_is_correctPC; eauto.
         unfold le_addr; lia. }
-      iDestruct (extract_from_region_inv _ _ a with "Hinv") as (p' Hfp) "(Hinva & Hstate_a)"; auto.
+      iDestruct (extract_from_region_inv_regs a a with "[Hmreg] Hinv") as (P Hpers) "(#Hinva & #Hrcond & #Hwcond)";auto;[|iFrame "# %"|].
+      { destruct Hp as [-> | [-> | [? ->] ] ];auto. subst;auto. }
+      iDestruct (extract_from_region_inv _ _ a with "Hinv") as "[_ Hstate_a]";auto.
       iDestruct "Hstate_a" as %Hstate_a.
       assert (∃ (ρ : region_type), (std W) !! a = Some ρ ∧ ρ ≠ Revoked
                                    ∧ (∀ g, ρ ≠ Monostatic g) ∧ (∀ w, ρ ≠ Uninitialized w))
         as [ρ [Hρ [Hne_rev [Hne_mono Hne_uninit] ] ] ].
       { destruct (pwl p); [rewrite Hstate_a;eexists;eauto|].
         destruct g; [rewrite Hstate_a|rewrite Hstate_a|destruct Hstate_a as [-> | ->] ];eexists;eauto. }
-      iDestruct (region_open W a p' with "[$Hinva $Hr $Hsts]")
-        as (w) "(Hr & Hsts & Hstate & Ha & % & Hmono & #Hw) /=";[|apply Hρ|].
+      iDestruct (region_open W a with "[$Hinva $Hr $Hsts]")
+        as (w) "(Hr & Hsts & Hstate & Ha & #Hmono & Hw) /=";[|apply Hρ|].
       { destruct ρ;auto;[done|by specialize (Hne_mono g0)|by specialize (Hne_uninit w)]. }
       iDestruct ((big_sepM_delete _ _ PC) with "Hmreg") as "[HPC Hmap]";
         first apply (lookup_insert _ _ (inr (p, g, b, e, a))).
       destruct (decodeInstrW w) eqn:Hi. (* proof by cases on each instruction *)
       + (* Jmp *)
-        iApply (jmp_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]");
+        iApply (jmp_case with "[] [] [] [] [Hmono] [] [] [Hw] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]");
           try iAssumption; eauto.
       + (* Jnz *)
         (* iApply (jnz_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
@@ -87,47 +96,47 @@ Section fundamental.
         (* iApply (mov_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
         (*   try iAssumption; eauto. *) admit.
       + (* Load *)
-        (* iApply (load_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto.a *) admit. 
+        iApply (load_case with "[] [] [] [] [Hmono] [] [] [Hw] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]");
+          try iAssumption; eauto.
       + (* Store *)
-        iApply (store_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]");
+        iApply (store_case with "[] [] [] [] [Hmono] [] [] [Hw] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]");
           try iAssumption; eauto.
       + (* Lt *)
         (* iApply (add_sub_lt_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* Add *)
         (* iApply (add_sub_lt_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* Sub *)
         (* iApply (add_sub_lt_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* Lea *)
         (* iApply (lea_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* Restrict *)
         (* iApply (restrict_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* Subseg *)
         (* iApply (subseg_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* IsPtr *)
         (* iApply (isptr_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* GetL *)
         (* iApply (get_case _ _ _ _ _ _ _ _ _ _ _ _ (GetL _ _) with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* GetP *)
         (* iApply (get_case _ _ _ _ _ _ _ _ _ _ _ _ (GetP _ _) with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* GetB *)
         (* iApply (get_case _ _ _ _ _ _ _ _ _ _ _ _ (GetB _ _) with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* GetE *)
         (* iApply (get_case _ _ _ _ _ _ _ _ _ _ _ _ (GetE _ _) with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* GetA *)
         (* iApply (get_case _ _ _ _ _ _ _ _ _ _ _ _ (GetA _ _) with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); *)
-        (*   try iAssumption; eauto. *) admit. 
+        (*   try iAssumption; eauto. *) admit.
       + (* Fail *)
         iApply (wp_fail with "[HPC Ha]"); eauto; iFrame.
         iNext. iIntros "[HPC Ha] /=".
@@ -137,7 +146,7 @@ Section fundamental.
       + (* Halt *)
         iApply (wp_halt with "[HPC Ha]"); eauto; iFrame.
         iNext. iIntros "[HPC Ha] /=".
-        iDestruct (region_close _ _ _ _ _ ρ with "[$Hr $Ha $Hstate $Hmono]") as "Hr";[auto|iFrame "#"; auto|].
+        iDestruct (region_close _ _ _ _ ρ with "[$Hr $Ha $Hstate $Hmono Hw]") as "Hr";[auto|iFrame "#"; auto|].
         { destruct ρ;auto;[|specialize (Hne_mono g0)|specialize (Hne_uninit w0)]; contradiction. }
         iApply wp_pure_step_later; auto.
         iApply wp_value.
@@ -155,12 +164,12 @@ Section fundamental.
         iExact "HA".
       + (* LoadU *)
       (* iApply (loadU_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); try iAssumption; eauto. *)
-        admit. 
+        admit.
       + (* StoreU *)
-        iApply (storeU_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); try iAssumption; eauto.
+        iApply (storeU_case with "[] [] [] [] [Hmono] [] [] [Hw] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); try iAssumption; eauto.
       + (* PromoteU *)
     (* iApply (promoteU_case with "[] [] [] [] [Hmono] [] [Hsts] [Hown] [Hr] [Hstate] [Ha] [HPC] [Hmap]"); try iAssumption; eauto. *)
-        admit. 
+        admit.
    - (* Not correct PC *)
      iDestruct ((big_sepM_delete _ _ PC) with "Hmreg") as "[HPC Hmap]";
        first apply (lookup_insert _ _ (inr (p, g, b, e, a))).
@@ -201,7 +210,7 @@ Section fundamental.
       interp_expression r W (inr (p,g,b,e,a)).
   Proof.
     iIntros (Hp) "HV". iApply fundamental; auto.
-    rewrite fixpoint_interp1_eq.
+    iApply (readAllowed_implies_region_conditions with "HV").
     destruct Hp as [-> | [-> | [ -> -> ] ] ]; eauto.
   Qed.
 

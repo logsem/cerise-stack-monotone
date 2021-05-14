@@ -7,7 +7,7 @@ From cap_machine Require Export iris_extra addr_reg_sample region_macros contigu
 Section stack_object.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
@@ -63,11 +63,11 @@ Section stack_object.
     rclear_instrs (list_difference all_registers [PC;r_t1]) ++
     [jmp r_t1].
 
-  Definition stack_object_passing a p stack_obj f_a :=
-    ([∗ list] a_i;w_i ∈ a;(stack_object_passing_instrs stack_obj f_a), a_i ↦ₐ[p] w_i)%I.
+  Definition stack_object_passing a stack_obj f_a :=
+    ([∗ list] a_i;w_i ∈ a;(stack_object_passing_instrs stack_obj f_a), a_i ↦ₐ w_i)%I.
 
 
-  Lemma stack_object_spec W pc_p pc_p' pc_g pc_b pc_e (* PC *)
+  Lemma stack_object_spec W pc_p pc_g pc_b pc_e (* PC *)
         stack_object_passing_addrs (* program addresses *)
         a_first a_last (* special adresses *)
         f_a b_link e_link a_link a_entry fail_cap (* linking table variables *)
@@ -78,7 +78,6 @@ Section stack_object.
 
     (* PC assumptions *)
     isCorrectPC_range pc_p pc_g pc_b pc_e a_first a_last ->
-    PermFlows pc_p pc_p' ->
 
     (* Program adresses assumptions *)
     contiguous_between stack_object_passing_addrs a_first a_last ->
@@ -107,9 +106,9 @@ Section stack_object.
       (* token which states all non atomic invariants are closed *)
       ∗ na_own logrel_nais ⊤
       (* trusted code *)
-      ∗ na_inv logrel_nais ι1 (stack_object_passing stack_object_passing_addrs pc_p' stack_obj f_a)
+      ∗ na_inv logrel_nais ι1 (stack_object_passing stack_object_passing_addrs stack_obj f_a)
       (* linking table *)
-      ∗ na_inv logrel_nais ι2 (pc_b ↦ₐ[pc_p'] inr (RO,Global,b_link,e_link,a_link) ∗ a_entry ↦ₐ[RO] fail_cap)
+      ∗ na_inv logrel_nais ι2 (pc_b ↦ₐ inr (RO,Global,b_link,e_link,a_link) ∗ a_entry ↦ₐ fail_cap)
       (* we start out with arbitrary sts *)
       ∗ sts_full_world W
       ∗ region W
@@ -122,7 +121,7 @@ Section stack_object.
                          ∗ sts_full_world W'
                          ∗ region W' }}}.
   Proof.
-    iIntros (Hvpc Hfl Hcont Hlt_wb Hlt_link Hpcmono Hdom Hndisj φ).
+    iIntros (Hvpc Hcont Hlt_wb Hlt_link Hpcmono Hdom Hndisj φ).
     iIntros "(Hr_stk & HPC & Hregs & Hr_adv & #Hadv_valid & #Hwstk_valid & Hown & #Hlse_prog & #Htable & Hsts & Hr) Hφ".
     iMod (na_inv_acc with "Hlse_prog Hown") as "(>Hprog & Hown & Hcls)";auto.
 
@@ -168,25 +167,24 @@ Section stack_object.
     (* we can extract the validity of the parameters passed on the stack *)
     (* we only need the validity of the stack object parameter, not need for the return pointer yet *)
     destruct (bstk + 1)%a eqn:Hsome;[|exfalso;clear -Ha_param Hsome;solve_addr].
-    iDestruct (read_allowedU_inv _ a with "Hwstk_valid") as (p' Hflows) "Hcond2";[clear -Hbounds Hsize Hsome;solve_addr|auto|].
+    iDestruct (read_allowedU_inv _ a with "Hwstk_valid") as "Hcond2";[clear -Hbounds Hsize Hsome;solve_addr|auto|].
     iDestruct (writeLocalAllowedU_valid_cap_below_implies _ _ _ _ _ _ a with "Hwstk_valid") as %Hmono2;
       [auto|apply le_addr_withinBounds|..];[clear -Hbounds Hsize Hsome;solve_addr..|].
-    destruct p';inversion Hflows;clear Hflows.
 
     (* loadU r_param1 r_stk -1 *)
     iPrologue_multi "Hprog" Hcont Hvpc link1.
     iDestruct (big_sepL2_length with "Hcode") as %Hlength_code1.
     destruct_addr_list l_code1.
-    iDestruct (region_open_monotemp_pwl with "[$Hcond2 $Hr $Hsts]") as
-        (wsecret) "(Hr & Hsts & Hstate & Ha & % & #Hmono & #Hwsecret_valid)";[auto..|].
+    iDestruct (region_open_monotemp with "[$Hcond2 $Hr $Hsts]") as
+        (wsecret) "(Hr & Hsts & Hstate & Ha & #Hmono & #Hwsecret_valid)";[auto..|].
     iPrologue "Hcode". apply contiguous_between_cons_inv_first in Hcont_code1 as Heq. subst l_code1.
     iApply (wp_loadU_success with "[$HPC $Hi $Hr_param1 $Hr_stk $Ha]");
-      [apply decode_encode_instrW_inv|apply Hfl|auto|iCorrectPC link0 link1|auto..].
+      [apply decode_encode_instrW_inv|iCorrectPC link0 link1|auto..].
     { clear -Hsome Ha_param Hbounds Hsize. apply le_addr_withinBounds;solve_addr. }
     { apply Hlink1. }
     { clear -Hsome Ha_param Hbounds Hsize. solve_addr. }
     iEpilogue "(HPC & Hr_param1 & Hprog_done & Hr_stk & Ha)".
-    iDestruct (region_close_monotemp_pwl with "[$Hstate $Hr $Ha $Hcond2]") as "Hr";auto. iClear "Hcode".
+    iDestruct (region_close_monotemp with "[$Hstate $Hr $Ha $Hcond2]") as "Hr";auto. iClear "Hcode".
 
     (* check the passed object is RA *)
     iPrologue_multi "Hprog" Hcont Hvpc link2.
@@ -213,16 +211,21 @@ Section stack_object.
     (* next we can open the region at b_stk, which we will first assert is in m *)
     iDestruct (valid_uninitialized_condition_weak _ m with "Hwstk_valid") as %Hstk_cond;eauto. clear. solve_addr.
     iSimpl in "Hwsecret_valid". iDestruct (valid_readAllowed_condition_weak _ m with "Hwsecret_valid") as %Hsec_cond;eauto. clear. solve_addr.
+    iDestruct (pers_res_to_sec_res with "Hvalids []") as "Hsec_res";[auto|iNext;iFrame "Hsecret_cond"|].
 
     (* opening [bsec,esec] while remembering the words in case of uninitialized state in (uninit m W) *)
     iDestruct (open_stack_object with "[$Hsts $Hr]") as "(Hsts & Hws)";eauto.
     { iApply big_sepL_forall. iIntros (k x Hx).
       assert (x ∈ region_addrs bsec esec) as Hinx;[apply elem_of_list_lookup;eauto|].
-      iApply read_allowed_inv. apply elem_of_region_addrs in Hinx. eauto. eauto.
-      iFrame "Hwsecret_valid". }
-    iDestruct "Hws" as (wps) "(Hbesec & Hcls' & #Hsecret_states & #Hperms)".
+      iDestruct (read_allowed_inv with "Hwsecret_valid") as "Hasw".
+      apply elem_of_region_addrs in Hinx. eauto. eauto.
+      destruct (writeAllowed l).
+      iExists interp. iSplit;[iPureIntro;apply _|]. iSplit. iFrame "Hasw". rewrite /rcond.
+      iSplit;[auto|]. iNext. iModIntro. iIntros (W1 W2 z) "_". iClear "#". rewrite fixpoint_interp1_eq;done.
+      iDestruct "Hasw" as (P) "(?&?&?)". iExists P;iFrame "#". }
+    iDestruct "Hws" as (wps) "(Hbesec & Hcls' & #Hsecret_states)".
     iDestruct (big_sepL2_length with "Hbesec") as %Hbesec_length.
-    iDestruct "Hsecret_states" as %Hsecret_states. iDestruct "Hperms" as %Hperm_flows.
+    iDestruct "Hsecret_states" as %Hsecret_states.
 
     (* Now we are ready to apply the checkints macro *)
     iPrologue_multi "Hprog" Hcont Hvpc link3.
@@ -244,19 +247,19 @@ Section stack_object.
     (* first we must know that a fully uninitialized world satisfies the revoke condition *)
     apply uninitialize_revoke_condition in Hmcond as Hrevoked.
     (* next we may revoke it *)
-    iMod (uninitialize_to_revoked_cond (region_addrs a_param frame_end) _ _ RWLX (λ Wv, interp Wv.1 Wv.2) with "[$Hr $Hsts]") as "(Hr & Hsts & Hframe)";[auto|apply region_addrs_NoDup|..].
+    iMod (uninitialize_to_revoked_cond (region_addrs a_param frame_end) _ _ (λ Wv, interp Wv.1 Wv.2) with "[$Hr $Hsts]") as "(Hr & Hsts & Hframe)";[auto|apply region_addrs_NoDup|..].
     { apply Forall_forall. intros x Hin%elem_of_region_addrs. apply Hstk_cond. clear -Hbounds Ha_param Hsome Hsize Hframe_delim Hin. solve_addr. }
     { iApply big_sepL_forall. iIntros (k x Hlookup).
       assert (x ∈ (region_addrs a_param frame_end)) as Hin;[apply elem_of_list_lookup;eauto|].
       apply elem_of_region_addrs in Hin.
-      iDestruct (read_allowedU_inv _ x with "Hwstk_valid") as (p' Hflows) "Hcond".
+      iDestruct (read_allowedU_inv _ x with "Hwstk_valid") as "Hcond".
       clear -Hin Hframe_delim Ha_param Hsome Hsize Hbounds. solve_addr.
-      auto. destruct p';inversion Hflows. iFrame "Hcond". }
+      auto. iFrame "Hcond". }
 
     (* finally we clean up our resources a bit *)
-    iAssert (∃ ws,[[a_param,frame_end]]↦ₐ[RWLX][[ws]])%I with "[Hframe]" as (wsstk) "Hframe".
+    iAssert (∃ ws,[[a_param,frame_end]]↦ₐ[[ws]])%I with "[Hframe]" as (wsstk) "Hframe".
     { iDestruct (region_addrs_exists with "Hframe") as (ws) "Hframe".
-      iExists ws. iApply (big_sepL2_mono with "Hframe"). iIntros (k y1 y2 Hin1 Hin2) "[_ H]". iFrame. }
+      iExists ws. iApply (big_sepL2_mono with "Hframe"). iIntros (k y1 y2 Hin1 Hin2) "H". iFrame. }
     iDestruct (big_sepL2_length with "Hframe") as %Hframe_length.
     rewrite region_addrs_length in Hframe_length.
     apply (incr_addr_region_size_iff _ _ 12)in Hframe_delim as Hframe_det.
@@ -278,7 +281,7 @@ Section stack_object.
     iDestruct "Hcode" as "[Hi Hcode]".
     apply contiguous_between_cons_inv_first in Hcont_code4 as Heq. subst l_code3.
     iApply (pushU_z_spec with "[- $HPC $Hf1 $Hr_stk $Hi]");
-      [iCorrectPC link3 link4|apply Hfl|auto| |iContiguous_next_a Hcont_code4|apply Haf2|].
+      [iCorrectPC link3 link4|auto|iContiguous_next_a Hcont_code4|apply Haf2|].
     { clear -Hbounds Ha_param Hsize Hframe_delim. apply le_addr_withinBounds; solve_addr. }
     iNext. iIntros "(HPC & Hprog_done2 & Hr_stk & Hf1)".
 
@@ -290,7 +293,7 @@ Section stack_object.
       [apply Haf3|clear -Haf2 Haf3 Hframe_delim;solve_addr|..].
     iDestruct "Hcode" as "[Hi Hcode]".
     iApply (pushU_z_spec with "[- $HPC $Hf2 $Hr_stk $Hi]");
-      [iCorrectPC link3 link4|apply Hfl|auto| |iContiguous_next_a Hcont_code4|apply Haf3|].
+      [iCorrectPC link3 link4|auto|iContiguous_next_a Hcont_code4|apply Haf3|].
     { clear -Hbounds Ha_param Hsize Hframe_delim Haf2 Haf3.
       apply le_addr_withinBounds; solve_addr. }
     iNext. iIntros "(HPC & Hi & Hr_stk & Hf2)". iCombine "Hi" "Hprog_done2" as "Hprog_done2".
@@ -298,30 +301,30 @@ Section stack_object.
     (* move r_param2 r_stk *)
     iPrologue "Hcode".
     iApply (wp_move_success_reg with "[$HPC $Hi $Hr_param2 $Hr_stk]");
-      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link3 link4|iContiguous_next_a Hcont_code4|].
+      [apply decode_encode_instrW_inv|iCorrectPC link3 link4|iContiguous_next_a Hcont_code4|].
     iEpilogue "(HPC & Hi & Hr_param2 & Hr_stk)"; iCombine "Hi" "Hprog_done2" as "Hprog_done2".
     (* getb r_t1 r_stk *)
     iPrologue "Hcode".
     iApply (wp_Get_success with "[$HPC $Hi $Hr_t1 $Hr_stk]");
-      [apply decode_encode_instrW_inv|eauto|apply Hfl|iCorrectPC link3 link4|iContiguous_next_a Hcont_code4|auto..|].
+      [apply decode_encode_instrW_inv|eauto|iCorrectPC link3 link4|iContiguous_next_a Hcont_code4|auto..|].
     iEpilogue "(HPC & Hi & Hr_stk & Hr_t1)"; iCombine "Hi" "Hprog_done2" as "Hprog_done2".
     iSimpl in "Hr_t1".
     (* gete r_t2 r_stk *)
     iPrologue "Hcode".
     iApply (wp_Get_success with "[$HPC $Hi $Hr_t2 $Hr_stk]");
-      [apply decode_encode_instrW_inv|eauto|apply Hfl|iCorrectPC link3 link4|iContiguous_next_a Hcont_code4|auto..|].
+      [apply decode_encode_instrW_inv|eauto|iCorrectPC link3 link4|iContiguous_next_a Hcont_code4|auto..|].
     iEpilogue "(HPC & Hi & Hr_stk & Hr_t2)"; iCombine "Hi" "Hprog_done2" as "Hprog_done2".
     iSimpl in "Hr_t2".
     (* add r_t1 r_t1 3 *)
     iPrologue "Hcode".
     iApply (wp_add_sub_lt_success_dst_z with "[$HPC $Hi $Hr_t1]");
-      [apply decode_encode_instrW_inv|eauto|iContiguous_next_a Hcont_code4|apply Hfl|iCorrectPC link3 link4|].
+      [apply decode_encode_instrW_inv|eauto|iContiguous_next_a Hcont_code4|iCorrectPC link3 link4|].
     iEpilogue "(HPC & Hi & Hr_t1)"; iCombine "Hi" "Hprog_done2" as "Hprog_done2".
     iSimpl in "Hr_t1".
     (* subseg r_param2 r_t1 r_t2 *)
     iPrologue "Hcode".
     iApply (wp_subseg_success _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ af2 estk with "[$HPC $Hi $Hr_param2 $Hr_t1 $Hr_t2]");
-      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link3 link4| |auto|auto| |iContiguous_next_a Hcont_code4|].
+      [apply decode_encode_instrW_inv|iCorrectPC link3 link4| |auto| |iContiguous_next_a Hcont_code4|].
     { split;[|apply z_to_addr_z_of]. clear -Haf2 Ha_param. assert (bstk + 3 = Some af2)%a;[solve_addr|].
       apply incr_addr_of_z_i in H as Heq. rewrite Heq. apply z_to_addr_z_of. }
     { rewrite /isWithin. apply andb_true_iff. rewrite !Z.leb_le. clear -Ha_param Haf2. solve_addr. }
@@ -329,7 +332,7 @@ Section stack_object.
     (* promoteU r_param2 *)
     iPrologue "Hcode".
     iApply (rules_PromoteU_derived.wp_promoteU_success with "[$HPC $Hi $Hr_param2]");
-      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link3 link4|auto|..].
+      [apply decode_encode_instrW_inv|iCorrectPC link3 link4|auto|..].
     { eapply contiguous_between_last. apply Hcont_code4. auto. }
     iEpilogue "(HPC & Hi & Hr_param2)"; iCombine "Hi" "Hprog_done2" as "Hprog_done2".
     iSimpl in "Hr_param2". assert (addr_reg.min af3 estk = af3) as ->;[clear -Hbounds Hsize Ha_param Haf2 Haf3;solve_addr|].
@@ -367,7 +370,7 @@ Section stack_object.
     apply contiguous_between_cons_inv_first in Hcont_code6 as Heq. subst l_code4.
 
     iApply (scallU_prologue_spec with "[- $HPC $Hact $Hscall $Hregs $Hr_stk]");
-      [apply Hvpc_code5| | |apply Hcont_code5|apply Hfl|auto..|apply Ha_r_adv|apply Hb_r_adv| |].
+      [apply Hvpc_code5| | |apply Hcont_code5|auto..|apply Ha_r_adv|apply Hb_r_adv| |].
     { clear -Ha_param Haf3 Hbounds Hsize Hframe_delim Haf2. apply le_addr_withinBounds;solve_addr. }
     { clear -Ha_param Haf3 Hbounds Hsize Hframe_delim Haf2 Hb_r_adv. apply le_addr_withinBounds;solve_addr. }
     { repeat (apply not_elem_of_cons; split;auto). apply not_elem_of_nil. }
@@ -385,7 +388,7 @@ Section stack_object.
     iDestruct (region_mapsto_cons with "Hparams") as "[Hp1 Hparams]";[apply Hparam1|clear -Hb_r_adv Haf3 Haf2 Ha_param Hparam1 Hframe_delim;solve_addr|].
     iDestruct "Hcode" as "[Hi Hcode]".
     iApply (pushU_r_or_fail_spec with "[- $HPC $Hi $Hr_param1 $Hr_stk $Hp1]");
-      [iCorrectPC link5 link6|apply Hfl|auto| |iContiguous_next_a Hcont_code6|apply Hparam1|].
+      [iCorrectPC link5 link6|auto|iContiguous_next_a Hcont_code6|apply Hparam1|].
     { clear -Hbounds Ha_param Hsize Hframe_delim Haf2 Haf3 Hparam1 Hb_r_adv Ha_r_adv.
       apply le_addr_withinBounds; solve_addr. }
     iSplitR;[iNext;by iRight|].
@@ -398,7 +401,7 @@ Section stack_object.
     iDestruct (region_mapsto_cons with "Hparams") as "[Hp2 Hparams]";[apply Hparam2|clear -Hb_r_adv Haf3 Haf2 Ha_param Hparam1 Hparam2 Hframe_delim;solve_addr|].
     iDestruct "Hcode" as "[Hi Hcode]".
     iApply (pushU_r_spec with "[- $HPC $Hi $Hr_param2 $Hr_stk $Hp2]");
-      [iCorrectPC link5 link6|apply Hfl|auto| |iContiguous_next_a Hcont_code6|apply Hparam2|..].
+      [iCorrectPC link5 link6|auto|iContiguous_next_a Hcont_code6|apply Hparam2|..].
     { clear -Hbounds Ha_param Hsize Hframe_delim Haf2 Haf3 Hparam1 Hb_r_adv Ha_r_adv.
       apply le_addr_withinBounds; solve_addr. }
     { simpl. intros _. clear -Hb_r_adv Hparam1. rewrite Z.leb_le. solve_addr. }
@@ -410,7 +413,7 @@ Section stack_object.
     iDestruct (region_mapsto_cons with "Hparams") as "[Hp3 Hparams]";[apply Hparam3|clear -Hb_r_adv Haf3 Haf2 Ha_param Hparam1 Hparam2 Hparam3 Hframe_delim;solve_addr|].
     iDestruct "Hcode" as "[Hi Hcode]".
     iApply (pushU_r_spec with "[- $HPC $Hi $Hr_t0 $Hr_stk $Hp3]");
-      [iCorrectPC link5 link6|apply Hfl|auto| |iContiguous_next_a Hcont_code6|apply Hparam3|..].
+      [iCorrectPC link5 link6|auto|iContiguous_next_a Hcont_code6|apply Hparam3|..].
     { clear -Hbounds Ha_param Hsize Hframe_delim Haf2 Haf3 Hparam1 Hparam2 Hparam3 Hb_r_adv Ha_r_adv.
       apply le_addr_withinBounds; solve_addr. }
     { simpl. intros _. clear -Hb_r_adv Hparam1 Hparam2. rewrite Z.leb_le. solve_addr. }
@@ -419,22 +422,22 @@ Section stack_object.
     (* move r_param1 0 *)
     iPrologue "Hcode".
     iApply (wp_move_success_z with "[$HPC $Hi $Hr_param1]");
-      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link5 link6|iContiguous_next_a Hcont_code6|].
+      [apply decode_encode_instrW_inv|iCorrectPC link5 link6|iContiguous_next_a Hcont_code6|].
     iEpilogue "(HPC & Hi & Hr_param1)"; iCombine "Hi" "Hprog_done3" as "Hprog_done3".
     (* move r_param2 0 *)
     iPrologue "Hcode".
     iApply (wp_move_success_z with "[$HPC $Hi $Hr_param2]");
-      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link5 link6|iContiguous_next_a Hcont_code6|].
+      [apply decode_encode_instrW_inv|iCorrectPC link5 link6|iContiguous_next_a Hcont_code6|].
     iEpilogue "(HPC & Hi & Hr_param2)"; iCombine "Hi" "Hprog_done3" as "Hprog_done3".
     (* move r_t0 0 *)
     iPrologue "Hcode".
     iApply (wp_move_success_z with "[$HPC $Hi $Hr_t0]");
-      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link5 link6|iContiguous_next_a Hcont_code6|].
+      [apply decode_encode_instrW_inv|iCorrectPC link5 link6|iContiguous_next_a Hcont_code6|].
     iEpilogue "(HPC & Hi & Hr_t0)"; iCombine "Hi" "Hprog_done3" as "Hprog_done3".
     (* jmp r_adv *)
     iPrologue "Hcode".
     iApply (wp_jmp_success with "[$HPC $Hi $Hr_adv]");
-      [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link5 link6|].
+      [apply decode_encode_instrW_inv|iCorrectPC link5 link6|].
 
     (* prepare to use the ftlr by reconstructoring the register state *)
     iDestruct (big_sepM_insert with "[$Hregs $Hr_param2]") as "Hregs".
@@ -452,7 +455,7 @@ Section stack_object.
                  (<[PC:=inl 0%Z]>
                   (<[r_stk:=inr (URWLX, Monotone, b_r_adv, estk, frame_end)]>
                    (<[r_adv:=inr (g, Global, b, e, a')]> rmap2))).
-    match goal with |- context [ [[af3,b_r_adv]]↦ₐ[RWLX][[?act]]%I ] =>
+    match goal with |- context [ [[af3,b_r_adv]]↦ₐ[[?act]]%I ] =>
                     set actw := act
     end.
     set lframe : gmap Addr Word := list_to_map (zip (a_param :: (region_addrs af3 b_r_adv)) (inl 2%Z :: actw)).
@@ -469,7 +472,7 @@ Section stack_object.
       as %Hsec_cond'.
     { iIntros (x Hin%elem_of_region_addrs). iRevert "Hsecret_cond". iClear "∗ #". iIntros "#Hregion_cond".
       iDestruct (big_sepL_elem_of with "Hregion_cond") as "Hx";[apply Hin|].
-      iDestruct "Hx" as (p' Hflows) "[_ Hcond]".
+      iDestruct "Hx" as "[_ Hcond]".
       rewrite /region_state_pwl_mono /region_state_nwl /=. destruct (pwl l). iRight;auto.
       destruct p;auto. 1,2:iLeft;auto. iDestruct "Hcond" as "[Hcond | Hcond]";[iRight|iLeft];auto. }
 
@@ -497,10 +500,10 @@ Section stack_object.
     { apply revoke_condition_std_multiple_updates;auto. }
     { iApply big_sepL2_to_big_sepM. apply Hnodup.
       iSimpl.
-      iDestruct (read_allowedU_inv _ a_param with "Hwstk_valid") as (p'' Hflows) "Hcond3";
-        [clear -Hbounds Hsize Ha_param Haf2;solve_addr|auto|destruct p'';inversion Hflows].
+      iDestruct (read_allowedU_inv _ a_param with "Hwstk_valid") as "Hcond3";
+        [clear -Hbounds Hsize Ha_param Haf2;solve_addr|auto|].
       iSplitL "Hf1".
-      { iExists RWLX,(λ Wv, interp Wv.1 Wv.2). repeat iSplit;auto. iPureIntro. apply _. }
+      { iExists (λ Wv, interp Wv.1 Wv.2). repeat iSplit;auto. iPureIntro. apply _. }
       iDestruct (read_allowedU_inv_range _ _ _ _ _ _ af3 b_r_adv with "Hwstk_valid") as "Hconds";auto.
       { clear -Hsome Haf2 Haf3 Hb_r_adv Hsize Hbounds Ha_param. solve_addr. }
       iDestruct (big_sepL2_length with "Hact") as %Hact_length.
@@ -508,8 +511,8 @@ Section stack_object.
       iDestruct (big_sepL2_sep with "[Hconds' Hact]") as "Hact";[iSplitL;[iFrame "Hact"|iFrame "Hconds'"]|].
       iApply (big_sepL2_mono with "Hact").
       iIntros (k y1 y2 Hin1 Hin2) "[Hy Hy1] /=".
-      iDestruct "Hy1" as (p'' Hflows') "Hcond". iExists _,_;destruct p'';inversion Hflows'. iFrame.
-      iPureIntro. split; auto; apply _. }
+      iDestruct "Hy1" as "Hcond". iExists _;iFrame.
+      iPureIntro. apply _. }
 
     (* a bit of world cleanup: This part is quite tedious, and could maybe be delegated to lemma! *)
     assert (region_addrs a_param frame_end = a_param :: af2 :: region_addrs af3 b_r_adv ++ region_addrs b_r_adv frame_end) as Heqapp2.
@@ -534,8 +537,8 @@ Section stack_object.
     iAssert (⌜if pwl l then p = Monotone else True⌝)%I as %Hmono.
     { destruct (pwl l) eqn:Hpwl. iDestruct (writeLocalAllowed_implies_local with "Hwsecret_valid") as %HH;auto.
       iPureIntro. destruct p;inversion HH;auto. auto. }
-    iMod (close_stack_object with "Hsecret_cond Hsts Hr") as "(Hsts & Hr & #Hvalid)";
-      [apply Hmono|auto|apply Hbesec_length|apply Hints|apply Hsecret_states|..].
+    iMod (close_stack_object with "Hsecret_cond Hsec_res Hsts Hr") as "(Hsts & Hr & #Hvalid)";
+      [apply Hmono|auto|apply Hbesec_length|apply Hints|apply Hsecret_states|auto..].
     { clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim . apply elem_of_disjoint. intros x Hin.
       apply elem_of_disjoint in Hdisj. apply Hdisj in Hin as Hnin.
       apply not_elem_of_cons. split.
@@ -553,8 +556,8 @@ Section stack_object.
     (* we close the first parameter *)
     iDestruct (read_allowedU_inv _ b_r_adv with "Hwstk_valid") as "#Hb_r_adv_rel";[|auto|].
     { clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim. solve_addr. }
-    iDestruct "Hb_r_adv_rel" as (p'' Hflows) "Hb_r_adv_rel". destruct p'';inversion Hflows;clear Hflows.
-    iMod (update_region_revoked_monotemp_pwl with "[] Hsts Hr Hp1 [] Hb_r_adv_rel") as "[Hr Hsts]";[|auto|auto|..].
+    iDestruct "Hb_r_adv_rel" as "Hb_r_adv_rel".
+    iMod (update_region_revoked_monotemp with "[] Hsts Hr Hp1 [] Hb_r_adv_rel") as "[Hr Hsts]";[|auto|auto|..].
     { rewrite /W1 /= initialize_list_nin. rewrite lookup_insert_ne. rewrite std_sta_update_multiple_lookup_in_i//.
       apply elem_of_region_addrs. all: clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim Hdisj. 1,2: solve_addr.
       apply elem_of_disjoint in Hdisj. intros Hcontr. apply Hdisj in Hcontr.
@@ -569,13 +572,11 @@ Section stack_object.
       assert (isU l = false) as ->;[destruct l;auto;inversion Hra|].
       eapply related_sts_a_weak_world;[|eauto]. revert Hmonocond; rewrite Z.leb_le =>Hmonocond.
       destruct l;inversion Hra;apply Hmonocond;auto. }
-    { iSimpl. iFrame "Hvalid". }
 
     (* our new stack object at addess af2: we go from Revoked to Monotemporary *)
     iDestruct (read_allowedU_inv _ af2 with "Hwstk_valid") as "#Hf2_rel";[|auto|].
     { clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim. solve_addr. }
-    iDestruct "Hf2_rel" as (p'' Hflows) "Hf2_rel". destruct p'';inversion Hflows;clear Hflows.
-    iMod (update_region_revoked_monotemp_pwl with "[] Hsts Hr Hf2 [] Hf2_rel") as "[Hr Hsts]";[|auto|auto|..].
+    iMod (update_region_revoked_monotemp with "[] Hsts Hr Hf2 [] Hf2_rel") as "[Hr Hsts]";[|auto|auto|..].
     { rewrite lookup_insert_ne. 2: clear -Hb_r_adv Haf3;solve_addr. rewrite /W1 /= initialize_list_nin. rewrite lookup_insert//.
       apply elem_of_disjoint in Hdisj. intros Hcontr. apply Hdisj in Hcontr.
       apply Hcontr. apply elem_of_region_addrs. clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim. solve_addr. }
@@ -585,8 +586,7 @@ Section stack_object.
     (* we close the second parameter *)
     iDestruct (read_allowedU_inv _ a14 with "Hwstk_valid") as "#Ha14_rel";[|auto|].
     { clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim Hparam1. solve_addr. }
-    iDestruct "Ha14_rel" as (p'' Hflows) "Ha14_rel". destruct p'';inversion Hflows;clear Hflows.
-    iMod (update_region_revoked_monotemp_pwl with "[] Hsts Hr Hp2 [] Ha14_rel") as "[Hr Hsts]";[|auto|auto|..].
+    iMod (update_region_revoked_monotemp with "[] Hsts Hr Hp2 [] Ha14_rel") as "[Hr Hsts]";[|auto|auto|..].
     { rewrite lookup_insert_ne;[|clear -Hb_r_adv Hparam1 Haf3;solve_addr].
       rewrite lookup_insert_ne;[|clear -Hb_r_adv Hparam1;solve_addr].
       rewrite /W1 /= initialize_list_nin. rewrite lookup_insert_ne. rewrite std_sta_update_multiple_lookup_in_i//.
@@ -598,7 +598,7 @@ Section stack_object.
       clear -Hparam1 Hb_r_adv Hrelated.
       eapply related_sts_a_weak_world;[|eauto]. solve_addr. }
     { iSimpl. rewrite !fixpoint_interp1_eq. iSimpl. rewrite region_addrs_single;auto. iSimpl.
-      iSplit;auto. iExists RWLX. iFrame "Hf2_rel". iSplit;auto. rewrite /region_state_pwl_mono. rewrite lookup_insert. auto. }
+      iSplit;auto. iFrame "Hf2_rel". rewrite /region_state_pwl_mono. rewrite lookup_insert. auto. }
 
     (* We are almost ready to apply the expression relation of the adversary *)
     (* We have two remaining steps: first we must show that the continuation is in the value relation *)
@@ -622,8 +622,7 @@ Section stack_object.
     (* Let's close the final stack parameter address *)
     iDestruct (read_allowedU_inv _ a15 with "Hwstk_valid") as "#Ha15_rel";[|auto|].
     { clear -Hdisj Hsize Hbounds Hb_r_adv Ha_param Haf2 Haf3 Hframe_delim Hparam1 Hparam2. solve_addr. }
-    iDestruct "Ha15_rel" as (p'' Hflows) "Ha15_rel". destruct p'';inversion Hflows;clear Hflows.
-    iMod (update_region_revoked_monotemp_updated_pwl with "[] Hsts Hr Hp3 [] Ha15_rel") as "[Hr Hsts]";[|auto|auto|..].
+    iMod (update_region_revoked_monotemp_updated with "[] Hsts Hr Hp3 [] Ha15_rel") as "[Hr Hsts]";[|auto|auto|..].
     { rewrite lookup_insert_ne;[|clear -Hb_r_adv Hparam1 Hparam2 Haf3;solve_addr].
       rewrite lookup_insert_ne;[|clear -Hb_r_adv Hparam1 Hparam2 Haf3;solve_addr].
       rewrite lookup_insert_ne;[|clear -Hb_r_adv Hparam1 Hparam2;solve_addr].
@@ -673,7 +672,7 @@ Section stack_object.
         destruct Hcontr as [Hcontr _]. rewrite Hlframe' in Hcontr. done. }
       rewrite /static_resources.
       (* cleanup the resources *)
-      iAssert (a_param ↦ₐ[RWLX] inl 2%Z ∗ [[af3,b_r_adv]]↦ₐ[RWLX][[ actw ]])%I with "[Hframe]" as "[Ha_param Hact]".
+      iAssert (a_param ↦ₐ inl 2%Z ∗ [[af3,b_r_adv]]↦ₐ[[ actw ]])%I with "[Hframe]" as "[Ha_param Hact]".
       { iDestruct (read_allowedU_inv_range _ _ _ _ _ _ af3 b_r_adv with "Hwstk_valid") as "Hconds";[|auto|].
         { clear -Hsize Hb_r_adv Haf2 Haf3 Ha_param. solve_addr. }
         iDestruct (big_sepM_to_big_sepL2 with "Hframe") as "Hframe".
@@ -681,19 +680,15 @@ Section stack_object.
           clear -Haf2 Haf3. solve_addr. }
         { rewrite /= region_addrs_length /region_size. clear -Hb_r_adv. solve_addr. }
         iDestruct "Hframe" as "[Ha Hframe]". iSplitL "Ha".
-        - iDestruct "Ha" as (q φ') "[#Hrel Ha]".
-          iDestruct (read_allowedU_inv _ a_param with "Hwstk_valid") as (p'' Hflows) "Hrel_a_param";[|auto|].
-          { clear -Ha_param Hsize. solve_addr. }
-          destruct p'';inversion Hflows.
-          iDestruct (rel_agree a_param q RWLX with "[Hrel_a_param Hrel]") as "[-> _]";auto.
+        - iDestruct "Ha" as (φ') "[#Hrel Ha]".
+          iDestruct (read_allowedU_inv _ a_param with "Hwstk_valid") as "Hrel_a_param";[|auto|].
+          { clear -Ha_param Hsize. solve_addr. } auto.
         - iDestruct (big_sepL2_to_big_sepL_l _ _ actw with "Hconds") as "Hconds'".
           { rewrite /= region_addrs_length /region_size. clear -Hb_r_adv. solve_addr. }
           iDestruct (big_sepL2_sep with "[$Hframe $Hconds']") as "Hframe".
           iApply (big_sepL2_mono with "Hframe").
           iIntros (k y1 y2 Hy1 Hy2) "[Hrel1 Hrel2]".
-          iDestruct "Hrel1" as (p0 φ0) "[#Hrel1 Ha]".
-          iDestruct "Hrel2" as (p1 Hflows) "#Hrel2". destruct p1;inversion Hflows.
-          iDestruct (rel_agree y1 p0 RWLX with "[]") as "[-> _]";auto. }
+          iDestruct "Hrel1" as (φ0) "[#Hrel1 Ha]". iFrame. }
       (* apply the activation record *)
       specialize (Hr_all r_t1) as Hr_t1; specialize (Hr_all r_stk) as Hr_stk;
         destruct Hr_t1 as [w1' Hr_t1]; destruct Hr_stk as [wstk' Hr_stk].
@@ -731,7 +726,7 @@ Section stack_object.
       assert (a_r_adv + (-6) = Some af3)%a as Hlea;[clear -Ha_r_adv;solve_addr|].
       iPrologue "Hcode".
       iApply (wp_lea_success_z with "[$HPC $Hi $Hr_stk]");
-        [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link5 link6| |apply Hlea|auto..].
+        [apply decode_encode_instrW_inv|iCorrectPC link5 link6| |apply Hlea|auto..].
       { eapply contiguous_between_last;[apply Hcont_code6|auto]. }
       { simpl. clear -Ha_r_adv. solve_addr. }
       iEpilogue "(HPC & Hi & Hr_stk)"; iCombine "Hi" "Hprog_done" as "Hprog_done".
@@ -746,7 +741,7 @@ Section stack_object.
       specialize (Hr_all r_adv) as Hr_adv;destruct Hr_adv as [wadv Hr_adv].
       iDestruct (big_sepM_delete _ _ r_adv with "Hregs") as "[Hr_adv Hregs]"; [rewrite !lookup_delete_ne//|].
       iApply (wp_loadU_success_any with "[$HPC $Hi $Hr_adv $Hr_stk $Ha_param]");
-        [apply decode_encode_instrW_inv|apply Hfl|auto|iCorrectPC link6 link7|auto|..|clear;lia|].
+        [apply decode_encode_instrW_inv|iCorrectPC link6 link7|auto..|clear;lia|].
       { clear -Hsize Ha_param Haf3 Haf2. solve_addr. }
       { clear -Hsize Ha_param Haf3 Haf2. apply le_addr_withinBounds;solve_addr. }
       { eapply contiguous_between_last. apply Hcont_code7. auto. }
@@ -762,7 +757,7 @@ Section stack_object.
       iDestruct (big_sepM_delete _ _ r_t2 with "Hregs") as "[Hr_t2 Hregs]"; [rewrite !lookup_delete_ne//|].
       iDestruct (big_sepM_delete _ _ r_t3 with "Hregs") as "[Hr_t3 Hregs]"; [rewrite !lookup_delete_ne//|].
       iApply (assert_r_z_success with "[- $HPC $Hcode $Hpc_b $Ha_entry $Hr_adv]");
-        [apply Hvpc_code8|apply Hfl|apply Hcont_code8|auto..|eauto|].
+        [apply Hvpc_code8|apply Hcont_code8|auto..|eauto|].
       iSplitL "Hr_t1";[eauto|]. iSplitL "Hr_t2";[eauto|]. iSplitL "Hr_t3";[eauto|].
       iNext. iIntros "(Hr_t1 & Hr_t2 & Hr_t3 & Hr_adv & HPC & Hassert & Hpc_b & Ha_entry)".
       iMod ("Hown" with "[$Hcls' $Hpc_b $Ha_entry]") as "Hown".
@@ -779,10 +774,9 @@ Section stack_object.
           split;auto. apply elem_of_cons in Hx as [-> | Hx%elem_of_region_addrs];auto;solve_addr. }
       { iApply big_sepL2_to_big_sepM. auto. iSimpl. iSplitL "Ha_param".
         - iDestruct (read_allowedU_inv _ a_param with "Hwstk_valid")
-            as (p'' Hflows) "Hrel_a_param";[|auto|].
-          { clear -Ha_param Hsize. solve_addr. }
-          destruct p''; inversion Hflows. iExists RWLX, _.
-          iFrame "Ha_param Hrel_a_param". iSplit;auto. iPureIntro. apply _.
+            as  "Hrel_a_param";[|auto|].
+          { clear -Ha_param Hsize. solve_addr. } iExists _.
+          iFrame "Ha_param Hrel_a_param". iPureIntro. apply _.
         - iDestruct (read_allowedU_inv_range _ _ _ _ _ _ af3 b_r_adv with "Hwstk_valid") as "Hconds";[|auto|].
         { clear -Hsize Hb_r_adv Haf2 Haf3 Ha_param. solve_addr. }
         iDestruct (big_sepL2_to_big_sepL_l _ _ actw with "Hconds") as "Hconds'".
@@ -790,8 +784,7 @@ Section stack_object.
         iDestruct (big_sepL2_sep with "[$Hact $Hconds']") as "Hframe".
         iApply (big_sepL2_mono with "Hframe").
         iIntros (k y1 y2 Hy1 Hy2) "(Hy & Hconds)".
-        iDestruct "Hconds" as (p'' Hflows) "Hrel". destruct p'';inversion Hflows.
-        iExists RWLX, _. iFrame. iSplit;auto. iPureIntro. apply _. }
+        iExists  _. iFrame. iPureIntro. apply _. }
 
 
       (* once the assertion has succeeded, the final step is to return to the caller *)
@@ -814,10 +807,9 @@ Section stack_object.
          apply Hparam2| |apply Hmcond|apply Hmcond'|apply Hrelated|]. eauto. eauto.
       { simpl. rewrite region_addrs_length /region_size. clear -Hb_r_adv. solve_addr. }
 
-      iDestruct (read_allowedU_inv _ bstk with "Hwstk_valid") as (p'' Hflows) "#Hbstk_rel";[|auto..|].
+      iDestruct (read_allowedU_inv _ bstk with "Hwstk_valid") as "#Hbstk_rel";[|auto..|].
       { clear -Hsize. solve_addr. }
-      destruct p'';inversion Hflows;clear Hflows.
-      iDestruct (region_open_uninitialized with "[$Hbstk_rel $Hr $Hsts]") as "(Hr & Hsts & Hstate & Hbstk & _)";
+      iDestruct (region_open_uninitialized with "[$Hbstk_rel $Hr $Hsts]") as "(Hr & Hsts & Hstate & Hbstk)";
         [apply Hwret_in|..].
 
       iPrologue_multi "Hprog" Hcont Hvpc link9.
@@ -826,7 +818,7 @@ Section stack_object.
 
       iPrologue "Hcode". iClear "Hcode".
       iApply (wp_loadU_success_any with "[$HPC $Hi $Hr_t1 $Hr_stk $Hbstk]");
-        [apply decode_encode_instrW_inv|apply Hfl|auto|iCorrectPC link8 link9|auto| | |apply Hlink9|..].
+        [apply decode_encode_instrW_inv|iCorrectPC link8 link9|auto| | |apply Hlink9|..].
       { clear -Ha_param Haf2 Haf3 Hsize. solve_addr. }
       { clear -Ha_param Haf2 Haf3 Hsize. apply le_addr_withinBounds;solve_addr. }
       { clear -Ha_param Haf2 Haf3 Hsize. solve_addr. }
@@ -846,7 +838,7 @@ Section stack_object.
       iDestruct (big_sepL2_length with "Hcode") as %Hlength_code10.
       iApply (rclear_spec_gmap with "[- $HPC $Hcode $Hregs]");
       [apply Hcont_code10|apply not_elem_of_list; constructor|
-       |apply Hvpc_code10|apply Hfl| |].
+       |apply Hvpc_code10| |].
       { clear -Hlength_code10 Hcont_code10. rewrite rclear_length in Hlength_code10.
         assert (r_t2 ∈ (list_difference all_registers [PC; r_t1])) as Hin.
         { apply elem_of_list_difference. split;[apply all_registers_correct|set_solver]. }
@@ -866,7 +858,7 @@ Section stack_object.
       destruct_addr_list l_rest10. apply contiguous_between_cons_inv_first in Hcont as Heq. subst l_rest10.
       iPrologue "Hprog". iClear "Hprog".
       iApply (wp_jmp_success with "[$HPC $Hi $Hr_t1]");
-        [apply decode_encode_instrW_inv|apply Hfl|iCorrectPC link10 a_last|].
+        [apply decode_encode_instrW_inv|iCorrectPC link10 a_last|].
 
       assert (related_sts_a_world W' (override_uninitialize lframe (uninitialize W' m')) bstk) as Hrelated'.
       { eapply related_sts_a_trans_world; [|eapply related_sts_pub_world_monostatic_to_uninitialized].
@@ -911,8 +903,8 @@ Section stack_object.
           iIntros (k x Hin). iModIntro. assert (x ∈ maddrs) as Hin';[apply elem_of_list_lookup;eauto|].
           apply elem_of_list_filter in Hin' as [Hle Hin'].
           apply elem_of_elements,elem_of_gmap_dom in Hin' as [v Hv].
-          iDestruct (big_sepM_lookup with "Hvalids") as (p'' φ' Hpers') "[Hx Hrelx]";[apply Hv|].
-          iExists p'',φ',v. iDestruct "Hx" as (Hne) "[Hmonox Hφx]". iFrame "#".
+          iDestruct (big_sepM_lookup with "Hvalids") as (φ' Hpers') "[Hx Hrelx]";[apply Hv|].
+          iExists φ',v. iDestruct "Hx" as "[Hmonox Hφx]". iFrame "#".
           destruct Hmcond with x as [ [Hmonox _] _];[eauto|].
           iSplit.
           { iPureIntro. clear -Hle Hv Hmonox Hrelated Hrelated' Ha_param Haf2 Haf3
@@ -954,10 +946,9 @@ Section stack_object.
                 apply eq_None_not_Some. intros [_ Hcontr]%Hmcond'. clear -Hcontr Hle. solve_addr.
                 clear -Hle Ha_param Haf2 Haf3 Hb_r_adv;solve_addr. }
           repeat iSplit;auto.
-          destruct (pwl p'').
           all: iApply ("Hmonox" with "[] Hφx").
           all: iPureIntro.
-          2: eapply related_sts_pub_plus_priv_world,related_sts_a_pub_plus_world,Hrelated2.
+
           apply related_sts_a_weak_world with bstk. clear -Hle;solve_addr. apply Hrelated2.
         }
         iDestruct ("Hcont_final" with "[$Hr $Hsts $Hown $Hregs]") as "[_ Hφ]".
@@ -1058,19 +1049,19 @@ Section stack_object.
           + iApply big_sepL_forall. iIntros (k x Hin).
             assert (x ∈ region_addrs b_r_adv frame_end) as Hin'%elem_of_region_addrs.
             { apply elem_of_list_lookup;eauto. }
-            iDestruct (read_allowedU_inv _ x with "Hwstk_valid") as (p'' Hflows) "Hrel".
+            iDestruct (read_allowedU_inv _ x with "Hwstk_valid") as "Hrel".
             { clear -Ha_param Hsize Hb_r_adv Haf2 Haf3 Hparam1 Hparam2 Hparam3 Hin'. solve_addr. }
             { auto. }
-            destruct p'';inversion Hflows. iExists RWLX. iFrame "Hrel". iSplitR;auto.
+            iFrame "Hrel".
             rewrite /region_state_pwl_mono. iPureIntro. eapply stack_state_W2_params;eauto.
             apply elem_of_region_addrs. auto.
           + iApply big_sepL_forall. iIntros (k x Hin).
             assert (x ∈ region_addrs frame_end estk) as Hin'%elem_of_region_addrs.
             { apply elem_of_list_lookup;eauto. }
-            iDestruct (read_allowedU_inv _ x with "Hwstk_valid") as (p'' Hflows) "Hrel".
+            iDestruct (read_allowedU_inv _ x with "Hwstk_valid") as "Hrel".
             { clear -Ha_param Hsize Hb_r_adv Haf2 Haf3 Hparam1 Hparam2 Hparam3 Hin'. solve_addr. }
             { auto. }
-            destruct p'';inversion Hflows. iExists RWLX. iFrame "Hrel". iSplitR;auto.
+            iFrame "Hrel".
             rewrite /region_state_U_pwl_mono. iPureIntro. eapply stack_state_W2;eauto.
             apply elem_of_region_addrs. auto.
         }

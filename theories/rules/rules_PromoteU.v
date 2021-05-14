@@ -5,7 +5,7 @@ From iris.proofmode Require Import tactics.
 From iris.algebra Require Import frac.
 
 Section cap_lang_rules.
-  Context `{memG Σ, regG Σ, MonRef: MonRefG (leibnizO _) CapR_rtc Σ}.
+  Context `{memG Σ, regG Σ}.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
@@ -40,31 +40,28 @@ Section cap_lang_rules.
       PromoteU_failure regs dst ->
       PromoteU_spec regs dst regs' FailedV.
 
-  Lemma wp_PromoteU Ep pc_p pc_g pc_b pc_e pc_a pc_p' dst w regs :
+  Lemma wp_PromoteU Ep pc_p pc_g pc_b pc_e pc_a dst w regs :
    decodeInstrW w = PromoteU dst →
-   PermFlows pc_p pc_p' →
    isCorrectPC (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
    regs !! PC = Some (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
    regs_of (PromoteU dst) ⊆ dom _ regs →
 
-   {{{ ▷ pc_a ↦ₐ[pc_p'] w ∗
+   {{{ ▷ pc_a ↦ₐ w ∗
        ▷ [∗ map] k↦y ∈ regs, k ↦ᵣ y }}}
      Instr Executable @ Ep
    {{{ regs' retv, RET retv;
        ⌜ PromoteU_spec regs dst regs' retv⌝ ∗
-       pc_a ↦ₐ[pc_p'] w ∗
+       pc_a ↦ₐ w ∗
        [∗ map] k↦y ∈ regs', k ↦ᵣ y }}}.
   Proof.
-     iIntros (Hinstr Hfl Hvpc HPC Dregs φ) "(>Hpc_a & >Hmap) Hφ".
+     iIntros (Hinstr Hvpc HPC Dregs φ) "(>Hpc_a & >Hmap) Hφ".
      iApply wp_lift_atomic_head_step_no_fork; auto.
      iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [r m]; simpl.
      iDestruct "Hσ1" as "[Hr Hm]".
-     assert (pc_p' ≠ O).
-     { destruct pc_p'; auto. destruct pc_p; inversion Hfl. inversion Hvpc; naive_solver. }
      iDestruct (gen_heap_valid_inclSepM with "Hr Hmap") as %Hregs.
      pose proof (regs_lookup_eq _ _ _ HPC) as HPC'.
      pose proof (lookup_weaken _ _ _ _ HPC Hregs).
-     iDestruct (@gen_heap_valid_cap with "Hm Hpc_a") as %Hpc_a; auto.
+     iDestruct (@gen_heap_valid with "Hm Hpc_a") as %Hpc_a; auto.
      iModIntro. iSplitR. by iPureIntro; apply normal_always_head_reducible.
      iNext. iIntros (e2 σ2 efs Hpstep).
      apply prim_step_exec_inv in Hpstep as (-> & -> & (c & -> & Hstep)).

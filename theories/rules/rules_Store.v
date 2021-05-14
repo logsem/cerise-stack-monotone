@@ -5,7 +5,7 @@ From iris.proofmode Require Import tactics.
 From iris.algebra Require Import frac.
 
 Section cap_lang_rules.
-  Context `{memG Σ, regG Σ, MonRef: MonRefG (leibnizO _) CapR_rtc Σ}.
+  Context `{memG Σ, regG Σ}.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
@@ -16,24 +16,6 @@ Section cap_lang_rules.
   Implicit Types w : Word.
   Implicit Types reg : gmap RegName Word.
   Implicit Types ms : gmap Addr Word.
-
-  Lemma wa_and_locality_allows_update (p p' : Perm) (storev : Word):
-      writeAllowed p = true
-      → PermFlows p p'
-      → (isLocalWord storev = false ∨ pwl p = true)
-      → PermFlows (LeastPermUpd storev) p'.
-  Proof.
-    intros Hwa HPFp HLocal.
-    destruct (isLocalWord storev) eqn:HiLW.
-    - apply isLocal_RWL in HiLW; rewrite HiLW.
-      destruct HLocal as [Hcontr | Hpwl]; first by exfalso.
-      apply pwl_implies_RWL_RWLX in Hpwl.
-      destruct Hpwl as [-> | ->]; eapply PermFlows_trans; eauto; econstructor.
-    - apply not_isLocal_WL in HiLW; rewrite HiLW.
-      cbv in Hwa.
-      refine (PermFlows_trans _ _ _ _ HPFp).
-      destruct p; cbv in Hwa; try congruence; done.
-  Qed.
 
   Definition word_of_argument (regs: Reg) (a: Z + RegName) : option Word :=
     match a with
@@ -62,7 +44,7 @@ Section cap_lang_rules.
     writeAllowed p = true ∧ withinBounds ((p, g), b, e, a) = true ∧
     (canStore p a storev = true).
 
-  Inductive Store_failure (regs: Reg) (r1 : RegName)(r2 : Z + RegName) (mem : PermMem):=
+  Inductive Store_failure (regs: Reg) (r1 : RegName)(r2 : Z + RegName) (mem : Mem):=
   | Store_fail_const z:
       regs !! r1 = Some(inl z) ->
       Store_failure regs r1 r2 mem
@@ -84,13 +66,13 @@ Section cap_lang_rules.
 
   Inductive Store_spec
     (regs: Reg) (r1 : RegName) (r2 : Z + RegName)
-    (regs': Reg) (mem mem' : PermMem) : cap_lang.val → Prop
+    (regs': Reg) (mem mem' : Mem) : cap_lang.val → Prop
   :=
-  | Store_spec_success p p' g b e a storev oldv :
+  | Store_spec_success p g b e a storev oldv :
     word_of_argument regs r2 = Some storev ->
     reg_allows_store regs r1 p g b e a storev  →
-    mem !! a = Some(p', oldv) →
-    mem' = (<[a := (p', storev)]> mem) →
+    mem !! a = Some oldv →
+    mem' = (<[a := storev]> mem) →
     incrementPC(regs) = Some regs' ->
     Store_spec regs r1 r2 regs' mem mem' NextIV
   | Store_spec_failure :
@@ -98,23 +80,23 @@ Section cap_lang_rules.
     Store_spec regs r1 r2 regs' mem mem' FailedV.
 
 
-  Definition allow_store_map_or_true (r1 : RegName) (r2 : Z + RegName) (regs : Reg) (mem : PermMem):=
+  Definition allow_store_map_or_true (r1 : RegName) (r2 : Z + RegName) (regs : Reg) (mem : Mem):=
     ∃ p g b e a storev,
       read_reg_inr regs r1 p g b e a ∧ word_of_argument regs r2 = Some storev ∧
       if decide (reg_allows_store regs r1 p g b e a storev) then
-        ∃ p' w, mem !! a = Some (p', w) ∧ PermFlows p p'
+        ∃ w, mem !! a = Some w
       else True.
 
   Lemma allow_store_implies_storev:
-    ∀ (r1 : RegName)(r2 : Z + RegName) (mem0 : PermMem) (r : Reg) (p : Perm) (g : Locality) (b e a : Addr) storev,
+    ∀ (r1 : RegName)(r2 : Z + RegName) (mem0 : Mem) (r : Reg) (p : Perm) (g : Locality) (b e a : Addr) storev,
       allow_store_map_or_true r1 r2 r mem0
       → r !r! r1 = inr (p, g, b, e, a)
       → word_of_argument r r2 = Some storev
       → writeAllowed p = true
       → withinBounds (p, g, b, e, a) = true
       → (canStore  p a storev = true)
-      → ∃ (p' : Perm) (storev : Word),
-          mem0 !! a = Some (p', storev) ∧ PermFlows p p'.
+      → ∃ (storev : Word),
+          mem0 !! a = Some  storev.
   Proof.
     intros r1 r2 mem0 r p g b e a storev HaStore Hr2v Hwoa Hwa Hwb HLocal.
     unfold allow_store_map_or_true in HaStore.
@@ -129,81 +111,72 @@ Section cap_lang_rules.
   Qed.
 
   Lemma mem_eq_implies_allow_store_map:
-    ∀ (regs : Reg)(mem : PermMem)(r1 : RegName)(r2 : Z + RegName)(w storev : Word) p g b e a
-      (p' : Perm)  ,
-      mem = <[a:=(p', w)]> ∅
+    ∀ (regs : Reg)(mem : Mem)(r1 : RegName)(r2 : Z + RegName)(w storev : Word) p g b e a,
+      mem = <[a:=w]> ∅
       → regs !! r1 = Some (inr (p,g,b,e,a))
-      → PermFlows p p'
       → word_of_argument regs r2 = Some storev
       → allow_store_map_or_true r1 r2 regs mem.
   Proof.
-    intros regs mem r1 r2 w storev p g b e a p' Hmem Hrr2 Hpc_p' Hwoa.
+    intros regs mem r1 r2 w storev p g b e a Hmem Hrr2 Hwoa.
     exists p,g,b,e,a,storev; split.
     - left. by simplify_map_eq.
     - case_decide; last done.
-      split; auto. exists p', w. simplify_map_eq. auto.
+      split; auto. exists w. simplify_map_eq. auto.
   Qed.
 
   Lemma mem_neq_implies_allow_store_map:
-    ∀ (regs : Reg)(mem : PermMem)(r1 : RegName)(r2 : Z + RegName)(pc_a : Addr)
-      (w w' storev : Word) p g b e a
-      (pc_p' p' : Perm)  ,
+    ∀ (regs : Reg)(mem : Mem)(r1 : RegName)(r2 : Z + RegName)(pc_a : Addr)
+      (w w' storev : Word) p g b e a,
       a ≠ pc_a
-      → mem = <[pc_a:=(pc_p', w)]> (<[a:=(p', w')]> ∅)
+      → mem = <[pc_a:= w]> (<[a:= w']> ∅)
       → regs !! r1 = Some (inr (p,g,b,e,a))
-      → PermFlows p p'
       → word_of_argument regs r2 = Some storev
       → allow_store_map_or_true r1 r2 regs mem.
   Proof.
-    intros regs mem r1 r2 pc_a w w' storev p g b e a pc_p' p' H4 Hrr2 Hp' Hpc_p' Hwoa.
+    intros regs mem r1 r2 pc_a w w' storev p g b e a H4 Hrr2 Hwoa.
     exists p,g,b,e,a,storev; split.
     - left. by simplify_map_eq.
     - case_decide; last done.
-      split; auto. exists p', w'. simplify_map_eq. split; auto.
+      split; auto. exists w'. simplify_map_eq. split; auto.
   Qed.
 
   Lemma mem_implies_allow_store_map:
-    ∀ (regs : Reg)(mem : PermMem)(r1 : RegName)(r2 : Z + RegName)(pc_a : Addr)
-      (w w' storev : Word) p g b e a
-      (pc_p' p' : Perm)  ,
+    ∀ (regs : Reg)(mem : Mem)(r1 : RegName)(r2 : Z + RegName)(pc_a : Addr)
+      (w w' storev : Word) p g b e a,
       (if (a =? pc_a)%a
-       then mem = <[pc_a:=(pc_p', w)]> ∅
-       else mem = <[pc_a:=(pc_p', w)]> (<[a:=(p', w')]> ∅))
+       then mem = <[pc_a:= w]> ∅
+       else mem = <[pc_a:= w]> (<[a:= w']> ∅))
       → regs !! r1 = Some (inr (p,g,b,e,a))
-      → (if (a =? pc_a)%a then PermFlows p pc_p' else PermFlows p p')
       → word_of_argument regs r2 = Some storev
       → allow_store_map_or_true r1 r2 regs mem.
   Proof.
-    intros regs mem r1 r2 pc_a w w' storev p g b e a pc_p' p' H4 Hrr2 Hpf Hwoa.
+    intros regs mem r1 r2 pc_a w w' storev p g b e a H4 Hrr2 Hwoa.
     destruct (a =? pc_a)%a eqn:Heq.
       + apply Z.eqb_eq, z_of_eq in Heq. subst a. eapply mem_eq_implies_allow_store_map; eauto.
       + apply Z.eqb_neq in Heq.  eapply mem_neq_implies_allow_store_map; eauto. congruence.
   Qed.
 
    Lemma wp_store Ep
-     pc_p pc_g pc_b pc_e pc_a pc_p'
+     pc_p pc_g pc_b pc_e pc_a
      r1 (r2 : Z + RegName) w mem regs :
    decodeInstrW w = Store r1 r2 →
-   PermFlows pc_p pc_p' →
    isCorrectPC (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
    regs !! PC = Some (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
    regs_of (Store r1 r2) ⊆ dom _ regs →
-   mem !! pc_a = Some (pc_p', w) →
+   mem !! pc_a = Some w →
    allow_store_map_or_true r1 r2 regs mem →
 
-   {{{ (▷ [∗ map] a↦pw ∈ mem, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗
+   {{{ (▷ [∗ map] a↦w ∈ mem, a ↦ₐ w) ∗
        ▷ [∗ map] k↦y ∈ regs, k ↦ᵣ y }}}
      Instr Executable @ Ep
    {{{ regs' mem' retv, RET retv;
        ⌜ Store_spec regs r1 r2 regs' mem mem' retv⌝ ∗
-         ([∗ map] a↦pw ∈ mem', ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗
+         ([∗ map] a↦w ∈ mem', a ↦ₐ w) ∗
          [∗ map] k↦y ∈ regs', k ↦ᵣ y }}}.
    Proof.
-     iIntros (Hinstr Hfl Hvpc HPC Dregs Hmem_pc HaStore φ) "(>Hmem & >Hmap) Hφ".
+     iIntros (Hinstr Hvpc HPC Dregs Hmem_pc HaStore φ) "(>Hmem & >Hmap) Hφ".
      iApply wp_lift_atomic_head_step_no_fork; auto.
      iIntros (σ1 l1 l2 n) "[Hr Hm] /=". destruct σ1 as [r m]; simpl.
-     assert (pc_p' ≠ O).
-     { destruct pc_p'; auto. destruct pc_p; inversion Hfl. inversion Hvpc; naive_solver. }
      iDestruct (gen_heap_valid_inclSepM with "Hr Hmap") as %Hregs.
 
      (* Derive necessary register values in r *)
@@ -211,7 +184,7 @@ Section cap_lang_rules.
      specialize (indom_regs_incl _ _ _ Dregs Hregs) as Hri. unfold regs_of in Hri.
      feed destruct (Hri r1) as [r1v [Hr'1 Hr1]]. by set_solver+.
      pose proof (regs_lookup_eq _ _ _ Hr'1) as Hr''1.
-     iDestruct (gen_mem_valid_inSepM pc_a _ _ _ _ mem _ m with "Hm Hmem") as %Hma; eauto.
+     iDestruct (gen_mem_valid_inSepM pc_a _ _ _ mem _ m with "Hm Hmem") as %Hma; eauto.
 
      iModIntro.
      iSplitR. by iPureIntro; apply normal_always_head_reducible.
@@ -247,7 +220,7 @@ Section cap_lang_rules.
          cbn in HSV. rewrite Hr0 in HSV. inversion HSV.
      }
      assert (word_of_argument r r2 = Some(storev)) as HSVr.
-     { destruct r2; cbn in HSV. inversion HSV; by rewrite H4.
+     { destruct r2; cbn in HSV. inversion HSV; by rewrite H3.
        destruct (Hri r0) as [r0v [Hregs0 Hr0] ].  by set_solver+.
        rewrite -Hr0 in Hregs0; rewrite Hregs0 in HSV. exact HSV.
      }
@@ -288,13 +261,11 @@ Section cap_lang_rules.
      (* } clear n0. *)
 
      (* Prove that a is in the memory map now, otherwise we cannot continue *)
-     pose proof (allow_store_implies_storev r1 r2 mem regs p g b e a storev) as (p' & oldv & Hmema & HPFp); auto.
+     pose proof (allow_store_implies_storev r1 r2 mem regs p g b e a storev) as (oldv & Hmema); auto.
 
      (* Given this, prove that a is also present in the memory itself *)
-     iDestruct (mem_v_implies_m_v mem m p g b e a p' oldv with "Hmem Hm" ) as %Hma ; auto. by apply (writeAllowed_nonO p p').
+     iDestruct (mem_v_implies_m_v mem m  with "Hmem Hm" ) as %Hma ; auto. eauto.
 
-     (* Prove that p' gives us sufficient permissions to update the memory *)
-     pose proof (wa_and_locality_allows_update p p' storev Hwa HPFp HLocal) as HLoadA.
      (* Regardless of whether we increment the PC, the memory will change: destruct on the PC later *)
      assert (updatePC (update_mem (r, m) a storev) = (c, σ2)) as HH.
       { destruct r2.
@@ -339,21 +310,20 @@ Section cap_lang_rules.
       Unshelve. all: auto.
    Qed.
 
-  Lemma wp_store_success_z_PC E pc_p pc_p' pc_g pc_b pc_e pc_a pc_a' w z :
+  Lemma wp_store_success_z_PC E pc_p pc_g pc_b pc_e pc_a pc_a' w z :
      decodeInstrW w = Store PC (inl z) →
-     PermFlows pc_p pc_p' →
      isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
      (pc_a + 1)%a = Some pc_a' →
      writeAllowed pc_p = true →
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w }}}
+           ∗ ▷ pc_a ↦ₐ w }}}
        Instr Executable @ E
        {{{ RET NextIV;
            PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-              ∗ pc_a ↦ₐ[pc_p'] (inl z) }}}.
+              ∗ pc_a ↦ₐ (inl z) }}}.
   Proof.
-    iIntros (Hinstr Hfl Hvpc Hpca' Hwa φ)
+    iIntros (Hinstr Hvpc Hpca' Hwa φ)
             "(>HPC & >Hi) Hφ".
     iDestruct (map_of_regs_1 with "HPC") as "Hmap".
     iDestruct (memMap_resource_1 with "Hi") as "Hmem".
@@ -472,24 +442,22 @@ Section cap_lang_rules.
    (*  Qed. *)
 
    Lemma wp_store_success_same E pc_p pc_g pc_b pc_e pc_a pc_a' w dst z w'
-         p g b e pc_p' :
+         p g b e :
      decodeInstrW w = Store dst (inl z) →
-     PermFlows pc_p pc_p' →
-     PermFlows p pc_p' →
      isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
      (pc_a + 1)%a = Some pc_a' →
      writeAllowed p = true ∧ withinBounds ((p, g), b, e, pc_a) = true →
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ pc_a ↦ₐ w
            ∗ ▷ dst ↦ᵣ inr ((p,g),b,e,pc_a) }}}
        Instr Executable @ E
        {{{ RET NextIV;
            PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-              ∗ pc_a ↦ₐ[pc_p'] (inl z)
+              ∗ pc_a ↦ₐ (inl z)
               ∗ dst ↦ᵣ inr ((p,g),b,e,pc_a) }}}.
     Proof.
-     iIntros (Hinstr Hfl Hfl' Hvpc Hpca' [Hwa Hwb] φ)
+     iIntros (Hinstr Hvpc Hpca' [Hwa Hwb] φ)
             "(>HPC & >Hi & >Hdst) Hφ".
      iDestruct (map_of_regs_2 with "HPC Hdst") as "[Hmap %]".
      iDestruct (memMap_resource_1 with "Hi") as "Hmem".
@@ -787,10 +755,8 @@ Section cap_lang_rules.
   (*  Qed. *)
 
     Lemma wp_store_success_reg E pc_p pc_g pc_b pc_e pc_a pc_a' w dst src w'
-         p g b e a w'' pc_p' p' :
+         p g b e a w'' :
       decodeInstrW w = Store dst (inr src) →
-      PermFlows pc_p pc_p' →
-      PermFlows p p' →
      isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
      (pc_a + 1)%a = Some pc_a' →
      writeAllowed p = true ∧ withinBounds ((p, g), b, e, a) = true →
@@ -798,28 +764,26 @@ Section cap_lang_rules.
      (* (isLocalWord w'' = false ∨ (p = RWLX ∨ p = RWL)) → *)
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ pc_a ↦ₐ w
            ∗ ▷ src ↦ᵣ w''
            ∗ ▷ dst ↦ᵣ inr ((p,g),b,e,a)
-           ∗ ▷ a ↦ₐ[p'] w' }}}
+           ∗ ▷ a ↦ₐ w' }}}
        Instr Executable @ E
        {{{ RET NextIV;
            PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-              ∗ pc_a ↦ₐ[pc_p'] w
+              ∗ pc_a ↦ₐ w
               ∗ src ↦ᵣ w''
               ∗ dst ↦ᵣ inr ((p,g),b,e,a)
-              ∗ a ↦ₐ[p'] w'' }}}.
+              ∗ a ↦ₐ w'' }}}.
     Proof.
-      iIntros (Hinstr Hfl Hfl' Hvpc Hpca' [Hwa Hwb] Hloc φ)
+      iIntros (Hinstr Hvpc Hpca' [Hwa Hwb] Hloc φ)
              "(>HPC & >Hi & >Hsrc & >Hdst & >Hsrca) Hφ".
     iDestruct (map_of_regs_3 with "HPC Hsrc Hdst") as "[Hmap (%&%&%)]".
-    pose proof (writeAllowed_nonO _ _ Hfl' Hwa) as Hp''.
-    pose proof (correctPC_nonO _ _ _ _ _ _ Hfl Hvpc) as Hpc_p'.
     iDestruct (memMap_resource_2ne_apply with "Hi Hsrca") as "[Hmem %]"; auto.
 
     iApply (wp_store _ pc_p with "[$Hmap $Hmem]"); eauto; simplify_map_eq; eauto.
     { by rewrite !dom_insert; set_solver+. }
-    { eapply mem_neq_implies_allow_store_map with (a := a) (p' := p'); eauto.
+    { eapply mem_neq_implies_allow_store_map with (a := a); eauto.
       all: by simplify_map_eq. }
     iNext. iIntros (regs' mem' retv) "(#Hspec & Hmem & Hmap)".
     iDestruct "Hspec" as %Hspec.
@@ -841,10 +805,8 @@ Section cap_lang_rules.
     Qed.
 
    Lemma wp_store_success_reg_same E pc_p pc_g pc_b pc_e pc_a pc_a' w dst w'
-         p g b e a pc_p' p' :
+         p g b e a :
      decodeInstrW w = Store dst (inr dst) →
-     PermFlows pc_p pc_p' →
-     PermFlows p p' →
      isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
      (pc_a + 1)%a = Some pc_a' →
      writeAllowed p = true ∧ withinBounds ((p, g), b, e, a) = true →
@@ -852,26 +814,24 @@ Section cap_lang_rules.
      (* (isLocal g = false ∨ (p = RWLX ∨ p = RWL)) → *)
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ pc_a ↦ₐ w
            ∗ ▷ dst ↦ᵣ inr ((p,g),b,e,a)
-           ∗ ▷ a ↦ₐ[p'] w' }}}
+           ∗ ▷ a ↦ₐ w' }}}
        Instr Executable @ E
        {{{ RET NextIV;
            PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-              ∗ pc_a ↦ₐ[pc_p'] w
+              ∗ pc_a ↦ₐ w
               ∗ dst ↦ᵣ inr ((p,g),b,e,a)
-              ∗ a ↦ₐ[p'] inr ((p,g),b,e,a) }}}.
+              ∗ a ↦ₐ inr ((p,g),b,e,a) }}}.
    Proof.
-    iIntros (Hinstr Hfl Hfl' Hvpc Hpca' [Hwa Hwb] Hloc φ)
+    iIntros (Hinstr Hvpc Hpca' [Hwa Hwb] Hloc φ)
              "(>HPC & >Hi & >Hdst & >Hsrca) Hφ".
     iDestruct (map_of_regs_2 with "HPC Hdst") as "[Hmap %]".
-    pose proof (writeAllowed_nonO _ _ Hfl' Hwa) as Hp''.
-    pose proof (correctPC_nonO _ _ _ _ _ _ Hfl Hvpc) as Hpc_p'.
     iDestruct (memMap_resource_2ne_apply with "Hi Hsrca") as "[Hmem %]"; auto.
 
     iApply (wp_store _ pc_p with "[$Hmap $Hmem]"); eauto; simplify_map_eq; eauto.
     { by rewrite !dom_insert; set_solver+. }
-    { eapply mem_neq_implies_allow_store_map with (a := a) (p' := p'); eauto.
+    { eapply mem_neq_implies_allow_store_map with (a := a); eauto.
       all: by simplify_map_eq. }
     iNext. iIntros (regs' mem' retv) "(#Hspec & Hmem & Hmap)".
     iDestruct "Hspec" as %Hspec.
@@ -893,35 +853,31 @@ Section cap_lang_rules.
     Qed.
 
    Lemma wp_store_success_z E pc_p pc_g pc_b pc_e pc_a pc_a' w dst z w'
-         p g b e a pc_p' p' :
+         p g b e a :
      decodeInstrW w = Store dst (inl z) →
-     PermFlows pc_p pc_p' →
-     PermFlows p p' →
      isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
      (pc_a + 1)%a = Some pc_a' →
      writeAllowed p = true ∧ withinBounds ((p, g), b, e, a) = true →
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ pc_a ↦ₐ w
            ∗ ▷ dst ↦ᵣ inr ((p,g),b,e,a)
-           ∗ ▷ a ↦ₐ[p'] w' }}}
+           ∗ ▷ a ↦ₐ w' }}}
        Instr Executable @ E
        {{{ RET NextIV;
            PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-              ∗ pc_a ↦ₐ[pc_p'] w
+              ∗ pc_a ↦ₐ w
               ∗ dst ↦ᵣ inr ((p,g),b,e,a)
-              ∗ a ↦ₐ[p'] inl z }}}.
+              ∗ a ↦ₐ inl z }}}.
    Proof.
-     iIntros (Hinstr Hfl Hfl' Hvpc Hpca' [Hwa Hwb] φ)
+     iIntros (Hinstr Hvpc Hpca' [Hwa Hwb] φ)
              "(>HPC & >Hi & >Hdst & >Hsrca) Hφ".
     iDestruct (map_of_regs_2 with "HPC Hdst") as "[Hmap %]".
-    pose proof (writeAllowed_nonO _ _ Hfl' Hwa) as Hp''.
-    pose proof (correctPC_nonO _ _ _ _ _ _ Hfl Hvpc) as Hpc_p'.
     iDestruct (memMap_resource_2ne_apply with "Hi Hsrca") as "[Hmem %]"; auto.
 
     iApply (wp_store _ pc_p with "[$Hmap $Hmem]"); eauto; simplify_map_eq; eauto.
     { by rewrite !dom_insert; set_solver+. }
-    { eapply mem_neq_implies_allow_store_map with (a := a) (p' := p'); eauto.
+    { eapply mem_neq_implies_allow_store_map with (a := a); eauto.
       all: by simplify_map_eq. }
     iNext. iIntros (regs' mem' retv) "(#Hspec & Hmem & Hmap)".
     iDestruct "Hspec" as %Hspec.

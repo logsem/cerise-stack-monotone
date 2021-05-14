@@ -5,7 +5,7 @@ From iris.proofmode Require Import tactics.
 From iris.algebra Require Import frac.
 
 Section cap_lang_rules.
-  Context `{memG Σ, regG Σ, MonRef: MonRefG (leibnizO _) CapR_rtc Σ}.
+  Context `{memG Σ, regG Σ}.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
@@ -17,7 +17,7 @@ Section cap_lang_rules.
   Implicit Types reg : gmap RegName Word.
   Implicit Types ms : gmap Addr Word.
 
-  Inductive LoadU_failure (regs: Reg) (rdst rsrc: RegName) (offs: Z + RegName) (mem : PermMem):=
+  Inductive LoadU_failure (regs: Reg) (rdst rsrc: RegName) (offs: Z + RegName) (mem : Mem):=
   | LoadU_fail_const z:
       regs !! rsrc = Some (inl z) ->
       LoadU_failure regs rdst rsrc offs mem
@@ -36,25 +36,25 @@ Section cap_lang_rules.
       z_of_argument regs offs = Some noffs ->
       verify_access (LoadU_access b e a noffs) = None ->
       LoadU_failure regs rdst rsrc offs mem
-  | LoadU_fail_incrementPC p g b e a noffs a' p' w:
+  | LoadU_fail_incrementPC p g b e a noffs a' w:
       regs !! rsrc = Some (inr ((p, g), b, e, a)) ->
       isU p = true ->
       z_of_argument regs offs = Some noffs ->
       verify_access (LoadU_access b e a noffs) = Some a' ->
-      mem !! a' = Some(p', w) →
+      mem !! a' = Some w →
       incrementPC (<[ rdst := w ]> regs) = None ->
       LoadU_failure regs rdst rsrc offs mem.
 
   Inductive LoadU_spec
     (regs: Reg) (rdst rsrc: RegName) (offs: Z + RegName)
-    (regs': Reg) (mem : PermMem) : cap_lang.val → Prop
+    (regs': Reg) (mem : Mem) : cap_lang.val → Prop
   :=
-  | LoadU_spec_success p p' g b e a a' noffs w :
+  | LoadU_spec_success p g b e a a' noffs w :
       regs !! rsrc = Some (inr ((p, g), b, e, a)) ->
       isU p = true ->
       z_of_argument regs offs = Some noffs ->
       verify_access (LoadU_access b e a noffs) = Some a' ->
-      mem !! a' = Some(p', w) →
+      mem !! a' = Some w →
       incrementPC (<[ rdst := w ]> regs) = Some regs' ->
       LoadU_spec regs rdst rsrc offs regs' mem NextIV
   | LoadU_spec_failure :
@@ -62,14 +62,13 @@ Section cap_lang_rules.
     LoadU_spec regs rdst rsrc offs regs' mem FailedV.
   
   Lemma wp_loadU Ep
-     pc_p pc_g pc_b pc_e pc_a pc_p'
+     pc_p pc_g pc_b pc_e pc_a
      rdst rsrc offs w mem regs :
    decodeInstrW w = LoadU rdst rsrc offs →
-   pc_p' ≠ O →
    isCorrectPC (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
    regs !! PC = Some (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
    regs_of (LoadU rdst rsrc offs) ⊆ dom _ regs →
-   mem !! pc_a = Some (pc_p', w) →
+   mem !! pc_a = Some w →
    match regs !! rsrc with
    | None => True
    | Some (inl _) => True
@@ -81,22 +80,22 @@ Section cap_lang_rules.
                       | None => True
                       | Some a' => match mem !! a' with
                                   | None => False
-                                  | Some (p', w) => p' <> O
+                                  | Some w => True
                                   end
                       end
        end
      else True
    end ->
 
-   {{{ (▷ [∗ map] a↦pw ∈ mem, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗
+   {{{ (▷ [∗ map] a↦w ∈ mem, a ↦ₐ w) ∗
        ▷ [∗ map] k↦y ∈ regs, k ↦ᵣ y }}}
      Instr Executable @ Ep
    {{{ regs' retv, RET retv;
        ⌜ LoadU_spec regs rdst rsrc offs regs' mem retv⌝ ∗
-         ([∗ map] a↦pw ∈ mem, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗
+         ([∗ map] a↦w ∈ mem, a ↦ₐ w) ∗
          [∗ map] k↦y ∈ regs', k ↦ᵣ y }}}.
    Proof.
-     iIntros (Hinstr Hfl Hvpc HPC Dregs Hmem_pc HaLoad φ) "(>Hmem & >Hmap) Hφ".
+     iIntros (Hinstr Hvpc HPC Dregs Hmem_pc HaLoad φ) "(>Hmem & >Hmap) Hφ".
      iApply wp_lift_atomic_head_step_no_fork; auto.
      iIntros (σ1 l1 l2 n) "[Hr Hm] /=". destruct σ1 as [r m]; simpl.
      iDestruct (gen_heap_valid_inclSepM with "Hr Hmap") as %Hregs.
@@ -109,8 +108,8 @@ Section cap_lang_rules.
      pose proof (regs_lookup_eq _ _ _ Hrsrc') as Hrsrc''.
      pose proof (regs_lookup_eq _ _ _ Hrdst') as Hrdst''.
      (* Derive the PC in memory *)
-     iDestruct (gen_mem_valid_inSepM pc_a _ _ _ _ mem _ m with "Hm Hmem") as %Hma; eauto.
-     
+     iDestruct (gen_mem_valid_inSepM pc_a _ _ _ mem _ m with "Hm Hmem") as %Hma; eauto.
+
      iModIntro.
      iSplitR. by iPureIntro; apply normal_always_head_reducible.
      iNext. iIntros (e2 σ2 efs Hpstep).
@@ -138,9 +137,9 @@ Section cap_lang_rules.
      destruct (verify_access (LoadU_access b e a zoffs)) as [a'|] eqn:Hverify; cycle 1.
      { inv Hstep. iFailWP "Hφ" LoadU_fail_verify_access. }
      simpl in Hstep. rewrite Hrsrc' HisU Hverify in HaLoad.
-     rewrite /MemLocate in Hstep. destruct (mem !! a') as [(p', wa)|] eqn:Ha'; cycle 1.
+     rewrite /MemLocate in Hstep. destruct (mem !! a') as [wa|] eqn:Ha'; cycle 1.
      { inv HaLoad. }
-     iDestruct (gen_mem_valid_inSepM a' _ _ _ _ mem _ m with "Hm Hmem") as %Hma'; eauto.
+     iDestruct (gen_mem_valid_inSepM a' _ _ _ mem _ m with "Hm Hmem") as %Hma'; eauto.
      rewrite Hma' in Hstep. destruct (incrementPC (<[rdst:=wa]> regs)) eqn:Hincr; cycle 1.
      { assert _ as Hincr' by (eapply (incrementPC_overflow_mono (<[rdst:=wa]> regs) (<[rdst:=wa]> r) _ _ _)).
        rewrite incrementPC_fail_updatePC in Hstep; eauto.
