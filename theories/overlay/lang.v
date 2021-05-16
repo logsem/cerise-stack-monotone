@@ -1,7 +1,7 @@
 From iris.algebra Require Import base.
 From iris.program_logic Require Import language ectx_language ectxi_language.
 From stdpp Require Import gmap fin_maps list finite.
-From cap_machine Require Export addr_reg machine_base machine_parameters.
+From cap_machine Require Export addr_reg machine_base machine_parameters linking.
 From cap_machine.overlay Require Import base call.
 
 Inductive ConfFlag : Type :=
@@ -1172,3 +1172,11 @@ Proof.
   generalize (normal_always_step σ); intros (?&?&?).
   eapply head_reducible_from_step. eauto.
 Qed.
+
+Definition overlay_component: Type := component nat _ _ overlay.base.Word.
+
+Definition initial_state `{MachineParameters} (b_stk e_stk: Addr) (c: overlay_component): cfg overlay_lang :=
+  match c with
+  | Lib _ _ _ _ pre_comp => ([Seq (Instr Executable)], (∅, ∅, ∅, [])) (* dummy value *)
+  | Main _ _ _ _ (ms, _, _) c_main => ([Seq (Instr Executable)], (<[r_stk := inr (Stk 0 URWLX b_stk e_stk b_stk)]> (<[PC := c_main]> (gset_to_gmap (inl 0%Z) (list_to_set all_registers))), ms, ∅, []))
+  end.

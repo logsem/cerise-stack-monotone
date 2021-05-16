@@ -16,6 +16,7 @@ Section Linking.
   Variable Word: Type.
   Variable can_address_only: Word -> gset Addr -> Prop.
   Variable pwl: Word -> bool.
+  Variable is_global: Word -> bool.
 
   Definition imports: Type := gset (Symbols * Addr).
   Definition exports: Type := gmap Symbols Word.
@@ -31,7 +32,8 @@ Section Linking.
       forall ms imp exp
         (Hdisj: forall s, is_Some (exp !! s) -> ~ exists a, (s, a) ∈ imp)
         (Hexp: forall s w, exp !! s = Some w -> can_address_only w (dom _ ms))
-        (Hnpwl: forall a w, ms !! a = Some w -> can_address_only w (dom _ ms) /\ pwl w = false)
+        (Himp: forall s a, (s, a) ∈ imp -> is_Some (ms !! a))
+        (Hnpwl: forall a w, ms !! a = Some w -> can_address_only w (dom _ ms) /\ pwl w = false /\ is_global w = true)
         (Hdisjstk: forall a, a ∈ dom (gset _) ms -> (e_stk <= a)%a), (* \/ (a < b_stk)%a *)
         well_formed_pre_comp (ms, imp, exp).
 
@@ -79,9 +81,9 @@ Section Linking.
         (Hlink: link_pre_comp comp1 comp2 comp),
         link (Main comp1 w_main) (Lib comp2) (Main comp w_main).
 
-  Inductive is_context (c comp: component): Prop :=
+  Inductive is_context (c comp p: component): Prop :=
   | is_context_intro:
-      forall (His_program: exists p, link c comp p /\ is_program p),
-      is_context c comp.
+      forall (His_program: link c comp p /\ is_program p),
+      is_context c comp p.
 
 End Linking.
