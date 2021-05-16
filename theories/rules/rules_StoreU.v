@@ -5,7 +5,7 @@ From iris.proofmode Require Import tactics.
 From iris.algebra Require Import frac.
 
 Section cap_lang_rules.
-  Context `{memG Σ, regG Σ, MonRef: MonRefG (leibnizO _) CapR_rtc Σ}.
+  Context `{memG Σ, regG Σ}.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
@@ -78,8 +78,8 @@ Section cap_lang_rules.
     isU p = true ∧ (b <= a')%a ∧ (a' <= a)%a ∧ (a < e)%a ∧
     (canStoreU p a' storev = true).
 
-  Inductive StoreU_spec (regs: Reg) (rdst: RegName) (offs rsrc: Z + RegName) (regs': Reg) (mem mem': PermMem) : cap_lang.val → Prop :=
-  | StoreU_spec_success p p' g b e a w zoffs a' old:
+  Inductive StoreU_spec (regs: Reg) (rdst: RegName) (offs rsrc: Z + RegName) (regs': Reg) (mem mem': Mem) : cap_lang.val → Prop :=
+  | StoreU_spec_success p g b e a w zoffs a' old:
       (* regs !! rdst = Some (inr ((p, g), b, e, a)) -> *)
       word_of_argument regs rsrc = Some w ->
       (* isU p = true -> *)
@@ -88,8 +88,8 @@ Section cap_lang_rules.
       (a + zoffs)%a = Some a' →
       reg_allows_storeU regs rdst p g b e a a' w →
       (* verify_access (StoreU_acCAPcess b e a zoffs) = Some a' -> *)
-      mem !! a' = Some (p', old) ->
-      mem' = (<[ a' := (p', w) ]> mem) ->
+      mem !! a' = Some old ->
+      mem' = (<[ a' := w ]> mem) ->
       (if addr_eq_dec a a' then
          match (a + 1)%a with
          | Some a'' => incrementPC (<[ rdst := inr ((p, g), b, e, a'') ]> regs) = Some regs'
@@ -101,15 +101,15 @@ Section cap_lang_rules.
       StoreU_failure regs rdst offs rsrc ->
       StoreU_spec regs rdst offs rsrc regs' mem mem' FailedV.
 
-  Definition allow_storeU_map_or_true (r1 : RegName) (r2 : Z + RegName) (offs : Z + RegName) (regs : Reg) (mem : PermMem):=
+  Definition allow_storeU_map_or_true (r1 : RegName) (r2 : Z + RegName) (offs : Z + RegName) (regs : Reg) (mem : Mem):=
     ∃ p g b e a storev,
       read_reg_inr regs r1 p g b e a ∧ word_of_argument regs r2 = Some storev ∧
       match z_of_argument regs offs with
       | None => True
       | Some zoffs =>
-        match (a + zoffs)%a with 
+        match (a + zoffs)%a with
         | Some a' => if decide (reg_allows_storeU regs r1 p g b e a a' storev) then
-                      ∃ p' w, mem !! a' = Some (p', w) ∧ PermFlows p p'
+                      ∃ w, mem !! a' = Some w
                     else True
         | None => True
         end
@@ -130,7 +130,7 @@ Section cap_lang_rules.
                       | Some a' => if isU p && canStoreU p a' wsr then
                                     match mem !! a' with
                                     | None => False
-                                    | Some (p', w) => PermFlows p p'
+                                    | Some w => True
                                     end
                                   else True
                       end
@@ -148,7 +148,7 @@ Section cap_lang_rules.
     apply verify_access_spec in Hverify as (Haz & Hconds).
     rewrite Haz in Hcond.
     case_decide.
-    - destruct Hcond as (p' & w & -> & Hperm);auto.
+    - destruct Hcond as (w & ->);auto.
     - exfalso. apply H2.
       apply andb_prop in Hstore as [? ?].
       destruct Hconds as (?&?&?). 
@@ -156,14 +156,13 @@ Section cap_lang_rules.
   Qed.
 
   Lemma wp_storeU Ep
-     pc_p pc_g pc_b pc_e pc_a pc_p'
+     pc_p pc_g pc_b pc_e pc_a
      rdst rsrc offs w wsrc mem regs :
    decodeInstrW w = StoreU rdst offs rsrc →
-   pc_p' ≠ O →
    isCorrectPC (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
    regs !! PC = Some (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
    regs_of (StoreU rdst offs rsrc) ⊆ dom _ regs →
-   mem !! pc_a = Some (pc_p', w) →
+   mem !! pc_a = Some w →
    word_of_argument regs rsrc = Some wsrc ->
    match regs !! rdst with
    | None => True
@@ -176,22 +175,22 @@ Section cap_lang_rules.
                       | Some a' => if isU p && canStoreU p a' wsrc then
                                     match mem !! a' with
                                     | None => False
-                                    | Some (p', w) => PermFlows p p'
+                                    | Some w => True
                                     end
                                   else True
                       end
        end
    end ->
 
-   {{{ (▷ [∗ map] a↦pw ∈ mem, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗
+   {{{ (▷ [∗ map] a↦w ∈ mem, a ↦ₐ w) ∗
        ▷ [∗ map] k↦y ∈ regs, k ↦ᵣ y }}}
      Instr Executable @ Ep
    {{{ regs' mem' retv, RET retv;
        ⌜ StoreU_spec regs rdst offs rsrc regs' mem mem' retv⌝ ∗
-         ([∗ map] a↦pw ∈ mem', ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗
+         ([∗ map] a↦w ∈ mem', a ↦ₐ w) ∗
          [∗ map] k↦y ∈ regs', k ↦ᵣ y }}}.
    Proof.
-     iIntros (Hinstr Hfl Hvpc HPC Dregs Hmem_pc Hwsrc HaStore φ) "(>Hmem & >Hmap) Hφ".
+     iIntros (Hinstr Hvpc HPC Dregs Hmem_pc Hwsrc HaStore φ) "(>Hmem & >Hmap) Hφ".
      iApply wp_lift_atomic_head_step_no_fork; auto.
      iIntros (σ1 l1 l2 n) "[Hr Hm] /=". destruct σ1 as [r m]; simpl.
      iDestruct (gen_heap_valid_inclSepM with "Hr Hmap") as %Hregs.
@@ -202,7 +201,7 @@ Section cap_lang_rules.
      feed destruct (Hri rdst) as [rdstv [Hrdst' Hrdst'']]. by set_solver+.
      pose proof (regs_lookup_eq _ _ _ Hrdst') as Hrdst'''.
      (* Derive the PC in memory *)
-     iDestruct (gen_mem_valid_inSepM pc_a _ _ _ _ mem _ m with "Hm Hmem") as %Hma; eauto.
+     iDestruct (gen_mem_valid_inSepM pc_a _ _ _ mem _ m with "Hm Hmem") as %Hma; eauto.
 
      iModIntro.
      iSplitR. by iPureIntro; apply normal_always_head_reducible.
@@ -252,24 +251,15 @@ Section cap_lang_rules.
 
      destruct (canStoreU p a' wsrc) eqn:HcanStoreU; cycle 1.
      { simpl in Hstep. inversion Hstep. iFailWP "Hφ" StoreU_fail_perm2. }
-     
-     rewrite Hrdst' HisU Hverify HcanStoreU /= in HaStore. 
-     destruct (mem !! a') as [(p', wa)|]eqn:Ha; try (inv HaStore; fail).
+
+     rewrite Hrdst' HisU Hverify HcanStoreU /= in HaStore.
+     destruct (mem !! a') as [wa|]eqn:Ha; try (inv HaStore; fail).
 
      destruct (addr_eq_dec a a').
      { subst a'. destruct (a + 1)%a as [a'|] eqn:Hap1; cycle 1.
        { inv Hstep. iFailWP "Hφ" StoreU_fail_incrPC1. }
 
        iMod ((gen_mem_update_inSepM _ _ a) with "Hm Hmem") as "[Hm Hmem]"; eauto.
-       { instantiate (1 := wsrc). assert (Hpf1: PermFlows URW p).
-         { destruct p; simpl in HisU; try congruence; auto. }
-         destruct wsrc; simpl; auto; [eapply PermFlows_trans; eauto|].
-         destruct_cap c0. destruct c4; [eapply PermFlows_trans; eauto| |].
-         simpl in HcanStoreU. destruct (pwlU p) eqn:HpwlU; try congruence.
-         eapply (PermFlows_trans _ p p'); eauto.
-         simpl in HcanStoreU. destruct (pwlU p) eqn:HpwlU; try congruence.
-         eapply (PermFlows_trans URWL p p'); eauto.
-         simpl in HcanStoreU. congruence. }
 
        destruct (incrementPC (<[rdst:=inr (p, g, b, e, a')]> regs)) eqn:Hincr; cycle 1.
        { assert _ as Hincr' by (eapply (incrementPC_overflow_mono (<[rdst:=_]> regs) (<[rdst:=_]> r) Hincr _ _)).
@@ -286,21 +276,12 @@ Section cap_lang_rules.
        iMod ((gen_heap_update_inSepM _ _ PC) with "Hr Hmap") as "[Hr Hmap]"; eauto.
        rewrite <- Hwsrc'. iFrame. iModIntro; iApply "Hφ".
        iFrame. iPureIntro. apply verify_access_spec in Hverify as (? & ? & ? & ?). econstructor; eauto.
-       - repeat split;eauto. 
+       - repeat split;eauto.
        - rewrite Hwsrc'. auto.
        - destruct (addr_eq_dec a a); try congruence.
          rewrite Hap1. auto. }
-     
+
      iMod ((gen_mem_update_inSepM _ _ a') with "Hm Hmem") as "[Hm Hmem]"; eauto.
-     { instantiate (1 := wsrc). assert (Hpf1: PermFlows URW p).
-       { destruct p; simpl in HisU; try congruence; auto. }
-       destruct wsrc; simpl; auto; [eapply PermFlows_trans; eauto|].
-       destruct_cap c0. destruct c4; [eapply PermFlows_trans; eauto| |].
-       simpl in HcanStoreU. destruct (pwlU p) eqn:HpwlU; try congruence.
-       eapply (PermFlows_trans _ p p'); eauto.
-       simpl in HcanStoreU. destruct (pwlU p) eqn:HpwlU; try congruence.
-       eapply (PermFlows_trans _ p p'); eauto.
-       simpl in HcanStoreU; congruence. }
 
      destruct (incrementPC regs) eqn:Hincr; cycle 1.
      { assert _ as Hincr' by (eapply (incrementPC_overflow_mono regs r Hincr _ _)).
@@ -329,25 +310,24 @@ Section cap_lang_rules.
 
 
   Lemma wp_storeU_alt Ep
-     pc_p pc_g pc_b pc_e pc_a pc_p'
+     pc_p pc_g pc_b pc_e pc_a
      rdst rsrc offs w mem regs :
    decodeInstrW w = StoreU rdst offs rsrc →
-   pc_p' ≠ O →
    isCorrectPC (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
    regs !! PC = Some (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
    regs_of (StoreU rdst offs rsrc) ⊆ dom _ regs →
-   mem !! pc_a = Some (pc_p', w) →
+   mem !! pc_a = Some w →
    allow_storeU_map_or_true rdst rsrc offs regs mem  ->
 
-   {{{ (▷ [∗ map] a↦pw ∈ mem, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗
+   {{{ (▷ [∗ map] a↦w ∈ mem, a ↦ₐ w) ∗
        ▷ [∗ map] k↦y ∈ regs, k ↦ᵣ y }}}
      Instr Executable @ Ep
    {{{ regs' mem' retv, RET retv;
        ⌜ StoreU_spec regs rdst offs rsrc regs' mem mem' retv⌝ ∗
-         ([∗ map] a↦pw ∈ mem', ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗
+         ([∗ map] a↦w ∈ mem', a ↦ₐ w) ∗
          [∗ map] k↦y ∈ regs', k ↦ᵣ y }}}.
    Proof.
-     iIntros (Hinstr Hfl Hvpc HPC Dregs Hmem_pc HaStore φ) "(>Hmem & >Hmap) Hφ".
+     iIntros (Hinstr Hvpc HPC Dregs Hmem_pc HaStore φ) "(>Hmem & >Hmap) Hφ".
      apply allow_storeU_map_or_true_match in HaStore as (wsrc & Hwsrc & HaStore).
      iApply (wp_storeU with "[$Hmem $Hmap]");eauto.
    Qed.

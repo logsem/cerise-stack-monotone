@@ -8,7 +8,7 @@ From cap_machine Require Export iris_extra.
 Section region_macros.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MP: MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
@@ -164,30 +164,28 @@ Section region_macros.
          iExists M,Mρ; iFrame.
    Qed.
 
-   Lemma region_addrs_open_aux W l a n p :
+   Lemma region_addrs_open_aux W l a n :
      (∃ a', (a + (Z.of_nat n))%a = Some a') →
      region_addrs_aux a n ## l ->
-     pwl p = true ->
      (Forall (λ a, (std W) !! a = Some Monotemporary) (region_addrs_aux a n)) ->
      open_region_many l W
      -∗ sts_full_world W
-     -∗ ([∗ list] a0 ∈ region_addrs_aux a n, read_write_cond a0 p (fixpoint interp1))
+     -∗ ([∗ list] a0 ∈ region_addrs_aux a n, read_write_cond a0 (fixpoint interp1))
      -∗ ([∗ list] a0 ∈ region_addrs_aux a n,
-         (∃ w : Word, a0 ↦ₐ[p] w
+         (∃ w : Word, a0 ↦ₐ w
                          ∗ ▷ (fixpoint interp1) W w
-                         ∗ ⌜p ≠ O⌝
                          ∗ ▷ future_pub_a_mono a0 (λ Wv, (fixpoint interp1) Wv.1 Wv.2) w
                          ∗ sts_state_std a0 Monotemporary))
      ∗ open_region_many (region_addrs_aux a n ++ l) W
      ∗ sts_full_world W.
    Proof.
      iInduction (n) as [| n] "IHn" forall (a l).
-     - iIntros (Hne Hdisj Hpwl Hforall) "Hr Hsts #Hinv /=".
+     - iIntros (Hne Hdisj Hforall) "Hr Hsts #Hinv /=".
        iFrame.
-     - iIntros (Hne Hdisj Hpwl Hforall) "Hr Hsts #Hinv /=".
+     - iIntros (Hne Hdisj Hforall) "Hr Hsts #Hinv /=".
        iDestruct "Hinv" as "[Ha Hinv]".
        simpl in *.
-       iDestruct (region_open_next_monotemp_pwl with "[$Ha $Hr $Hsts]") as (v) "(Hr & Hsts & Hstate & Ha0 & #Hp & #Hmono & Hav)"; auto.
+       iDestruct (region_open_next_monotemp with "[$Ha $Hr $Hsts]") as (v) "(Hr & Hsts & Hstate & Ha0 & #Hmono & Hav)"; auto.
        { by apply disjoint_cons with (region_addrs_aux (get_addr_from_option_addr (a + 1)%a) n). }
        { apply Forall_inv in Hforall. done. }
        (* apply subseteq_difference_r with _ _ (↑logN.@a) in HleE; auto.  *)
@@ -195,7 +193,7 @@ Section region_macros.
                ∨ n = 0) as [Hnen | Hn0].
        { destruct Hne as [an Hne]. zify_addr; solve [ eauto | lia ]. }
        + apply Forall_cons_1 in Hforall as [Ha Hforall].
-         iDestruct ("IHn" $! _ _ Hnen _ Hpwl Hforall with "Hr Hsts Hinv") as "(Hreg & Hr & Hsts)".
+         iDestruct ("IHn" $! _ _ Hnen _ Hforall with "Hr Hsts Hinv") as "(Hreg & Hr & Hsts)".
          iFrame "Hreg Hsts".
          iDestruct (open_region_many_swap with "Hr") as "$".
          iExists _; iFrame "∗ #".
@@ -222,25 +220,23 @@ Section region_macros.
        split;auto.
    Qed.
 
-   Lemma region_addrs_open W l a b p :
+   Lemma region_addrs_open W l a b :
      (∃ a', (a + region_size a b)%a = Some a') →
      region_addrs a b ## l →
-     pwl p = true →
      open_region_many l W
      -∗ sts_full_world W
-     -∗ ([∗ list] a0 ∈ region_addrs a b, read_write_cond a0 p (fixpoint interp1)
+     -∗ ([∗ list] a0 ∈ region_addrs a b, read_write_cond a0 (fixpoint interp1)
                                          ∧ ⌜region_state_pwl_mono W a0⌝)
      -∗ ([∗ list] a0 ∈ region_addrs a b,
-             (∃ w : Word, a0 ↦ₐ[p] w
+             (∃ w : Word, a0 ↦ₐ w
                          ∗ ▷ (fixpoint interp1) W w
-                         ∗ ⌜p ≠ O⌝
                          ∗ ▷ future_pub_a_mono a0 (λ Wv, (fixpoint interp1) Wv.1 Wv.2) w
                          ∗ sts_state_std a0 Monotemporary))
      ∗ open_region_many (region_addrs a b ++ l) W
      ∗ sts_full_world W.
    Proof.
      rewrite /region_addrs.
-     iIntros (Ha' Hdiff Hpwl) "Hr Hsts #Hinv".
+     iIntros (Ha' Hdiff) "Hr Hsts #Hinv".
      iDestruct (region_state_pwl_forall_temp W with "Hinv") as %Hforall.
      iApply (region_addrs_open_aux with "Hr Hsts"); auto.
      iApply (big_sepL_mono with "Hinv"). iIntros (n y Hlookup) "[$ _]".

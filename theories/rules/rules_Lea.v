@@ -5,7 +5,7 @@ From iris.proofmode Require Import tactics.
 From iris.algebra Require Import frac.
 
 Section cap_lang_rules.
-  Context `{HM: memG Σ, HR: regG Σ, MonRef: MonRefG (leibnizO _) CapR_rtc Σ}.
+  Context `{HM: memG Σ, HR: regG Σ}.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
@@ -71,30 +71,27 @@ Section cap_lang_rules.
     Lea_failure regs r1 rv ->
     Lea_spec regs r1 rv regs' FailedV.
 
-   Lemma wp_lea Ep pc_p pc_g pc_b pc_e pc_a pc_p' r1 w arg (regs: Reg) :
+   Lemma wp_lea Ep pc_p pc_g pc_b pc_e pc_a r1 w arg (regs: Reg) :
      decodeInstrW w = Lea r1 arg →
-     PermFlows pc_p pc_p' →
      isCorrectPC (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
      regs !! PC = Some (inr ((pc_p, pc_g), pc_b, pc_e, pc_a)) →
      regs_of (Lea r1 arg) ⊆ dom _ regs →
-     {{{ ▷ pc_a ↦ₐ[pc_p'] w ∗
+     {{{ ▷ pc_a ↦ₐ w ∗
          ▷ [∗ map] k↦y ∈ regs, k ↦ᵣ y }}}
        Instr Executable @ Ep
      {{{ regs' retv, RET retv;
          ⌜ Lea_spec regs r1 arg regs' retv ⌝ ∗
-         pc_a ↦ₐ[pc_p'] w ∗
+         pc_a ↦ₐ w ∗
          [∗ map] k↦y ∈ regs', k ↦ᵣ y }}}.
    Proof.
-     iIntros (Hinstr Hfl Hvpc HPC Dregs φ) "(>Hpc_a & >Hmap) Hφ".
+     iIntros (Hinstr Hvpc HPC Dregs φ) "(>Hpc_a & >Hmap) Hφ".
      iApply wp_lift_atomic_head_step_no_fork; auto.
      iIntros (σ1 l1 l2 n) "Hσ1 /=". destruct σ1 as [r m]; simpl.
      iDestruct "Hσ1" as "[Hr Hm]".
-     assert (pc_p' ≠ O).
-     { destruct pc_p'; auto. destruct pc_p; inversion Hfl. inversion Hvpc; naive_solver. }
      iDestruct (gen_heap_valid_inclSepM with "Hr Hmap") as %Hregs.
      pose proof (regs_lookup_eq _ _ _ HPC) as HPC'.
      pose proof (lookup_weaken _ _ _ _ HPC Hregs).
-     iDestruct (@gen_heap_valid_cap with "Hm Hpc_a") as %Hpc_a; auto.
+     iDestruct (@gen_heap_valid with "Hm Hpc_a") as %Hpc_a; auto.
      iModIntro. iSplitR. by iPureIntro; apply normal_always_head_reducible.
      iNext. iIntros (e2 σ2 efs Hpstep).
      apply prim_step_exec_inv in Hpstep as (-> & -> & (c & -> & Hstep)).
@@ -199,23 +196,23 @@ Section cap_lang_rules.
      Unshelve. all: assumption.
    Qed.
 
-   Lemma wp_lea_success_reg_PC Ep pc_p pc_g pc_b pc_e pc_a pc_a' w rv z a' pc_p' :
+   Lemma wp_lea_success_reg_PC Ep pc_p pc_g pc_b pc_e pc_a pc_a' w rv z a' :
      decodeInstrW w = Lea PC (inr rv) →
-     PermFlows pc_p pc_p' → isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
+     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
      (a' + 1)%a = Some pc_a' →
      (pc_a + z)%a = Some a' →
      pc_p ≠ E →
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ pc_a ↦ₐ w
            ∗ ▷ rv ↦ᵣ inl z }}}
        Instr Executable @ Ep
        {{{ RET NextIV;
            PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-              ∗ pc_a ↦ₐ[pc_p'] w
+              ∗ pc_a ↦ₐ w
               ∗ rv ↦ᵣ inl z }}}.
    Proof.
-     iIntros (Hinstr Hfl Hvpc Hpca' Ha' Hnep φ) "(>HPC & >Hpc_a & >Hrv) Hφ".
+     iIntros (Hinstr Hvpc Hpca' Ha' Hnep φ) "(>HPC & >Hpc_a & >Hrv) Hφ".
      iDestruct (map_of_regs_2 with "HPC Hrv") as "[Hmap %]".
      iApply (wp_lea with "[$Hmap Hpc_a]"); eauto; simplify_map_eq; eauto.
      by rewrite !dom_insert; set_solver+.
@@ -232,29 +229,29 @@ Section cap_lang_rules.
        inv Hvpc. naive_solver. }
    Qed.
 
-   Lemma wp_lea_success_reg Ep pc_p pc_g pc_b pc_e pc_a pc_a' w r1 rv p g b e a z a' pc_p' :
+   Lemma wp_lea_success_reg Ep pc_p pc_g pc_b pc_e pc_a pc_a' w r1 rv p g b e a z a' :
      decodeInstrW w = Lea r1 (inr rv) →
-     PermFlows pc_p pc_p' → isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
+     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
      (pc_a + 1)%a = Some pc_a' →
      (a + z)%a = Some a' →
-     r1 ≠ PC → p ≠ E →
+     p ≠ E →
      (match p with
       | URW | URWL | URWX | URWLX => (a' <= a)%a
       | _ => True
       end) ->
      
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ pc_a ↦ₐ w
            ∗ ▷ r1 ↦ᵣ inr ((p,g),b,e,a)
            ∗ ▷ rv ↦ᵣ inl z }}}
        Instr Executable @ Ep
        {{{ RET NextIV;
            PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-              ∗ pc_a ↦ₐ[pc_p'] w
+              ∗ pc_a ↦ₐ w
               ∗ rv ↦ᵣ inl z
               ∗ r1 ↦ᵣ inr ((p,g),b,e,a') }}}.
    Proof.
-     iIntros (Hinstr Hfl Hvpc Hpca' Ha' Hne1 Hnep HU ϕ) "(>HPC & >Hpc_a & >Hr1 & >Hrv) Hφ".
+     iIntros (Hinstr Hvpc Hpca' Ha' Hnep HU ϕ) "(>HPC & >Hpc_a & >Hr1 & >Hrv) Hφ".
      iDestruct (map_of_regs_3 with "HPC Hrv Hr1") as "[Hmap (%&%&%)]".
      iApply (wp_lea with "[$Hmap Hpc_a]"); eauto; simplify_map_eq; eauto.
      by rewrite !dom_insert; set_solver+.
@@ -273,21 +270,21 @@ Section cap_lang_rules.
        destruct p0; tauto. }
    Qed.
 
-   Lemma wp_lea_success_z_PC Ep pc_p pc_g pc_b pc_e pc_a pc_a' w z a' pc_p' :
+   Lemma wp_lea_success_z_PC Ep pc_p pc_g pc_b pc_e pc_a pc_a' w z a' :
      decodeInstrW w = Lea PC (inl z) →
-     PermFlows pc_p pc_p' → isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
+     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
      (a' + 1)%a = Some pc_a' →
      (pc_a + z)%a = Some a' →
      pc_p ≠ E →
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w }}}
+           ∗ ▷ pc_a ↦ₐ w }}}
        Instr Executable @ Ep
      {{{ RET NextIV;
          PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-            ∗ pc_a ↦ₐ[pc_p'] w }}}.
+            ∗ pc_a ↦ₐ w }}}.
    Proof.
-     iIntros (Hinstr Hfl Hvpc Hpca' Ha' Hnep ϕ) "(>HPC & >Hpc_a) Hφ".
+     iIntros (Hinstr Hvpc Hpca' Ha' Hnep ϕ) "(>HPC & >Hpc_a) Hφ".
      iDestruct (map_of_regs_1 with "HPC") as "Hmap".
      iApply (wp_lea with "[$Hmap Hpc_a]"); eauto; simplify_map_eq; eauto.
      by rewrite !dom_insert; set_solver+.
@@ -303,27 +300,27 @@ Section cap_lang_rules.
        inv Hvpc. naive_solver. }
    Qed.
 
-   Lemma wp_lea_success_z Ep pc_p pc_g pc_b pc_e pc_a pc_a' w r1 p g b e a z a' pc_p' :
+   Lemma wp_lea_success_z Ep pc_p pc_g pc_b pc_e pc_a pc_a' w r1 p g b e a z a' :
      decodeInstrW w = Lea r1 (inl z) →
-     PermFlows pc_p pc_p' → isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
+     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
      (pc_a + 1)%a = Some pc_a' →
      (a + z)%a = Some a' →
-     r1 ≠ PC → p ≠ E →
+     p ≠ E →
      (match p with
       | URW | URWL | URWX | URWLX => (a' <= a)%a
       | _ => True
       end) ->
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ pc_a ↦ₐ w
            ∗ ▷ r1 ↦ᵣ inr ((p,g),b,e,a) }}}
        Instr Executable @ Ep
      {{{ RET NextIV;
          PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-            ∗ pc_a ↦ₐ[pc_p'] w
+            ∗ pc_a ↦ₐ w
             ∗ r1 ↦ᵣ inr ((p,g),b,e,a') }}}.
    Proof.
-     iIntros (Hinstr Hfl Hvpc Hpca' Ha' Hne1 Hnep HU ϕ) "(>HPC & >Hpc_a & >Hr1) Hφ".
+     iIntros (Hinstr Hvpc Hpca' Ha' Hnep HU ϕ) "(>HPC & >Hpc_a & >Hr1) Hφ".
      iDestruct (map_of_regs_2 with "HPC Hr1") as "[Hmap %]".
      iApply (wp_lea with "[$Hmap Hpc_a]"); eauto; simplify_map_eq; eauto.
      by rewrite !dom_insert; set_solver+.

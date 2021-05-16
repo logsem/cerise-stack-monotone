@@ -10,8 +10,7 @@ Section std_updates.
   (* ----------------------- UPDATING MULTIPLE REGION STATES ------------------------- *)
 
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
-          {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ}.
+          {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).

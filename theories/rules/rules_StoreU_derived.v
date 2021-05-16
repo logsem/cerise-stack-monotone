@@ -6,7 +6,7 @@ From iris.algebra Require Import frac.
 From cap_machine.rules Require Import rules_StoreU.
 
 Section cap_lang_rules.
-  Context `{memG Σ, regG Σ, MonRef: MonRefG (leibnizO _) CapR_rtc Σ}.
+  Context `{memG Σ, regG Σ}.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
@@ -17,12 +17,6 @@ Section cap_lang_rules.
   Implicit Types w : Word.
   Implicit Types reg : gmap RegName Word.
   Implicit Types ms : gmap Addr Word.
-
-  Lemma isU_nonO p p' :
-    PermFlows p p' → isU p = true → p' ≠ O.
-  Proof.
-    intros Hfl' Hra. destruct p'; auto. destruct p; inversion Hfl'. inversion Hra.
-  Qed.
 
   Lemma wb_implies_verify_access p g:
     ∀ b e a,
@@ -46,10 +40,8 @@ Section cap_lang_rules.
 
   (* store and increment *)
   Lemma wp_storeU_success_0_reg E pc_p pc_g pc_b pc_e pc_a pc_a' w dst src w'
-         p g b e a a' w'' pc_p' p' :
+         p g b e a a' w'' :
     decodeInstrW w = StoreU dst (inl 0%Z) (inr src) →
-    PermFlows pc_p pc_p' →
-    PermFlows p p' →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
     (pc_a + 1)%a = Some pc_a' →
     isU p  = true -> canStoreU p a w'' = true ->
@@ -58,23 +50,21 @@ Section cap_lang_rules.
 
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ pc_a ↦ₐ w
            ∗ ▷ src ↦ᵣ w''
            ∗ ▷ dst ↦ᵣ inr ((p,g),b,e,a)
-           ∗ ▷ a ↦ₐ[p'] w' }}}
+           ∗ ▷ a ↦ₐ w' }}}
        Instr Executable @ E
        {{{ RET NextIV;
            PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-              ∗ pc_a ↦ₐ[pc_p'] w
+              ∗ pc_a ↦ₐ w
               ∗ src ↦ᵣ w''
               ∗ dst ↦ᵣ inr ((p,g),b,e,a')
-              ∗ a ↦ₐ[p'] w'' }}}.
+              ∗ a ↦ₐ w'' }}}.
   Proof.
-      iIntros (Hinstr Hfl Hfl' Hvpc Hpca' HU HstoreU Hwb Ha' φ)
+      iIntros (Hinstr Hvpc Hpca' HU HstoreU Hwb Ha' φ)
              "(>HPC & >Hi & >Hsrc & >Hdst & >Hsrca) Hφ".
     iDestruct (map_of_regs_3 with "HPC Hsrc Hdst") as "[Hmap (%&%&%)]".
-    pose proof (isU_nonO _ _ Hfl' HU) as Hp''.
-    pose proof (correctPC_nonO _ _ _ _ _ _ Hfl Hvpc) as Hpc_p'.
     iDestruct (memMap_resource_2ne_apply with "Hi Hsrca") as "[Hmem %]"; auto.
 
     iApply (wp_storeU _ pc_p with "[$Hmap $Hmem]"); eauto; simplify_map_eq; eauto.
@@ -108,10 +98,8 @@ Section cap_lang_rules.
   Qed.
 
   Lemma wp_storeU_failure_0_reg E pc_p pc_g pc_b pc_e pc_a pc_a' w dst src w'
-         p g b e a a' w'' pc_p' p' :
+         p g b e a a' w'' :
     decodeInstrW w = StoreU dst (inl 0%Z) (inr src) →
-    PermFlows pc_p pc_p' →
-    PermFlows p p' →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
     (pc_a + 1)%a = Some pc_a' →
     isU p  = true -> canStoreU p a w'' = false ->
@@ -120,18 +108,16 @@ Section cap_lang_rules.
 
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ pc_a ↦ₐ w
            ∗ ▷ src ↦ᵣ w''
            ∗ ▷ dst ↦ᵣ inr ((p,g),b,e,a)
-           ∗ ▷ a ↦ₐ[p'] w' }}}
+           ∗ ▷ a ↦ₐ w' }}}
        Instr Executable @ E
        {{{ RET FailedV; True }}}.
   Proof.
-      iIntros (Hinstr Hfl Hfl' Hvpc Hpca' HU HstoreU Hwb Ha' φ)
+      iIntros (Hinstr Hvpc Hpca' HU HstoreU Hwb Ha' φ)
              "(>HPC & >Hi & >Hsrc & >Hdst & >Hsrca) Hφ".
     iDestruct (map_of_regs_3 with "HPC Hsrc Hdst") as "[Hmap (%&%&%)]".
-    pose proof (isU_nonO _ _ Hfl' HU) as Hp''.
-    pose proof (correctPC_nonO _ _ _ _ _ _ Hfl Hvpc) as Hpc_p'.
     iDestruct (memMap_resource_2ne_apply with "Hi Hsrca") as "[Hmem %]"; auto.
 
     iApply (wp_storeU _ pc_p with "[$Hmap $Hmem]"); eauto; simplify_map_eq; eauto.
@@ -156,10 +142,8 @@ Section cap_lang_rules.
 
   (* store and increment from and to the same register *)
   Lemma wp_storeU_success_0_reg_same E pc_p pc_g pc_b pc_e pc_a pc_a' w dst w'
-         p g b e a a' pc_p' p' :
+         p g b e a a' :
     decodeInstrW w = StoreU dst (inl 0%Z) (inr dst) →
-    PermFlows pc_p pc_p' →
-    PermFlows p p' →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
     (pc_a + 1)%a = Some pc_a' →
     isU p  = true -> canStoreU p a (inr (p, g, b, e, a)) = true ->
@@ -168,21 +152,19 @@ Section cap_lang_rules.
 
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ pc_a ↦ₐ w
            ∗ ▷ dst ↦ᵣ inr ((p,g),b,e,a)
-           ∗ ▷ a ↦ₐ[p'] w' }}}
+           ∗ ▷ a ↦ₐ w' }}}
        Instr Executable @ E
        {{{ RET NextIV;
            PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-              ∗ pc_a ↦ₐ[pc_p'] w
+              ∗ pc_a ↦ₐ w
               ∗ dst ↦ᵣ inr ((p,g),b,e,a')
-              ∗ a ↦ₐ[p'] inr ((p,g),b,e,a)}}}.
+              ∗ a ↦ₐ inr ((p,g),b,e,a)}}}.
   Proof.
-    iIntros (Hinstr Hfl Hfl' Hvpc Hpca' HU HstoreU Hwb Ha' φ)
+    iIntros (Hinstr Hvpc Hpca' HU HstoreU Hwb Ha' φ)
              "(>HPC & >Hi & >Hdst & >Hsrca) Hφ".
     iDestruct (map_of_regs_2 with "HPC Hdst") as "[Hmap %]".
-    pose proof (isU_nonO _ _ Hfl' HU) as Hp''.
-    pose proof (correctPC_nonO _ _ _ _ _ _ Hfl Hvpc) as Hpc_p'.
     iDestruct (memMap_resource_2ne_apply with "Hi Hsrca") as "[Hmem %]"; auto.
 
     iApply (wp_storeU _ pc_p with "[$Hmap $Hmem]"); eauto; simplify_map_eq; eauto.
@@ -215,10 +197,8 @@ Section cap_lang_rules.
   Qed.
 
   Lemma wp_storeU_success_0_z E pc_p pc_g pc_b pc_e pc_a pc_a' w dst z w'
-         p g b e a a' pc_p' p' :
+         p g b e a a' :
     decodeInstrW w = StoreU dst (inl 0%Z) (inl z) →
-    PermFlows pc_p pc_p' →
-    PermFlows p p' →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
     (pc_a + 1)%a = Some pc_a' →
     isU p  = true ->
@@ -227,21 +207,19 @@ Section cap_lang_rules.
 
 
      {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-           ∗ ▷ pc_a ↦ₐ[pc_p'] w
+           ∗ ▷ pc_a ↦ₐ w
            ∗ ▷ dst ↦ᵣ inr ((p,g),b,e,a)
-           ∗ ▷ a ↦ₐ[p'] w' }}}
+           ∗ ▷ a ↦ₐ w' }}}
        Instr Executable @ E
        {{{ RET NextIV;
            PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
-              ∗ pc_a ↦ₐ[pc_p'] w
+              ∗ pc_a ↦ₐ w
               ∗ dst ↦ᵣ inr ((p,g),b,e,a')
-              ∗ a ↦ₐ[p'] (inl z) }}}.
+              ∗ a ↦ₐ (inl z) }}}.
   Proof.
-    iIntros (Hinstr Hfl Hfl' Hvpc Hpca' HU Hwb Ha' φ)
+    iIntros (Hinstr Hvpc Hpca' HU Hwb Ha' φ)
              "(>HPC & >Hi & >Hdst & >Hsrca) Hφ".
     iDestruct (map_of_regs_2 with "HPC Hdst") as "[Hmap %]".
-    pose proof (isU_nonO _ _ Hfl' HU) as Hp''.
-    pose proof (correctPC_nonO _ _ _ _ _ _ Hfl Hvpc) as Hpc_p'.
     iDestruct (memMap_resource_2ne_apply with "Hi Hsrca") as "[Hmem %]"; auto.
 
     iApply (wp_storeU _ pc_p with "[$Hmap $Hmem]"); eauto; simplify_map_eq; eauto.

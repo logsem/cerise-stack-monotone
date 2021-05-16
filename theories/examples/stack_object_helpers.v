@@ -68,13 +68,15 @@ Qed.
 Section stack_object.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
   Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
+
+  Notation D := (WORLD -n> (leibnizO Word) -n> iPropO Σ).
 
   (* TODO:move this to multiple_updates *)
   Lemma std_update_multiple_disjoint W l1 l2 ρ1 ρ2 :
@@ -115,7 +117,7 @@ Section stack_object.
     iIntros (Hincr Hra Hforall) "[#Hvalid #Hmono] /=".
     rewrite elem_of_disjoint. iIntros (i Hin1 Hin2).
     iDestruct (readAllowed_implies_region_conditions with "Hvalid") as "Hcond";auto.
-    iDestruct (big_sepL_elem_of with "Hcond") as (p' Hflows) "[Hrwcond %]";eauto.
+    iDestruct (big_sepL_elem_of with "Hcond") as "[Hrwcond %]";eauto.
     assert (W.1 !! i = Some Monotemporary ∨ W.1 !! i = Some Permanent) as Hi.
     { destruct (pwl p);auto. destruct l;auto. }
     revert Hforall; rewrite Forall_forall =>Hforall. apply Hforall in Hin2 as Ha.
@@ -131,7 +133,7 @@ Section stack_object.
       - rewrite lookup_insert_ne// Hx in Hy. inversion Hy. left. }
     iSpecialize ("Hmono" $! W _ Hpub with "Hvalid").
     iDestruct (readAllowed_implies_region_conditions with "Hmono") as "Hcond'";auto.
-    iDestruct (big_sepL_elem_of with "Hcond'") as (p'' Hflows') "[_ %]";eauto.
+    iDestruct (big_sepL_elem_of with "Hcond'") as "[_ %]";eauto.
     iPureIntro.
     destruct (pwl p).
     - rewrite /region_state_pwl_mono /= lookup_insert in H1. done.
@@ -156,25 +158,25 @@ Section stack_object.
     - assert (addr_reg.min astk estk = astk) as ->;[solve_addr|].
       assert (addr_reg.max bstk astk = astk) as ->;[solve_addr|].
       destruct (decide (x < astk)%Z).
-      + iDestruct (big_sepL_elem_of _ _ x with "Hlo") as (p Hflows) "[Hcond Hpure]".
+      + iDestruct (big_sepL_elem_of _ _ x with "Hlo") as "[Hcond Hpure]".
         { apply elem_of_region_addrs. solve_addr. }
         iDestruct "Hpure" as %Hcond. auto.
-      + iDestruct (big_sepL_elem_of _ _ x with "Hhi") as (p Hflows) "[Hcond Hpure]".
+      + iDestruct (big_sepL_elem_of _ _ x with "Hhi") as "[Hcond Hpure]".
         { apply elem_of_region_addrs. solve_addr. }
         iDestruct "Hpure" as %Hcond. auto.
     - assert (addr_reg.min astk estk = estk) as ->;[solve_addr|].
-      iDestruct (big_sepL_elem_of _ _ x with "Hlo") as (p Hflows) "[Hcond Hpure]".
+      iDestruct (big_sepL_elem_of _ _ x with "Hlo") as "[Hcond Hpure]".
       { apply elem_of_region_addrs. solve_addr. }
       iDestruct "Hpure" as %Hcond. auto.
   Qed.
 
   (* lemma for opening a stack object from region, which may be either a heap object or an uninitialized stack object *)
-  Lemma open_stack_object_pre_mid l l' W p :
+  Lemma open_stack_object_pre_mid l l' W :
     NoDup l → l ## l' → (∀ a', a' ∈ l → (W.1 !! a' = Some Permanent ∨ (∃ w, W.1 !! a' = Some (Uninitialized w)))) →
-    sts_full_world W ∗ open_region_many l' W ∗ ([∗ list] a' ∈ l, ∃ p' : Perm, ⌜PermFlows p p'⌝ ∗ read_write_cond a' p' interp) -∗
-    sts_full_world W ∗ ∃ wps, ([∗ list] a;wp ∈ l;wps, a ↦ₐ[wp.2] wp.1) ∗ ▷ (([∗ list] a;wp ∈ l;wps, a ↦ₐ[wp.2] wp.1) -∗ open_region_many l' W)
-                                                                       ∗ ([∗ list] a;wp ∈ l;wps, ⌜W.1 !! a = Some Permanent ∨ W.1 !! a = Some (Uninitialized wp.1)⌝)
-                                                                       ∗ ⌜Forall (λ w, PermFlows p w.2) wps⌝.
+    sts_full_world W ∗ open_region_many l' W ∗ ([∗ list] a' ∈ l, ∃ (P:D), ⌜(∀ Wv, Persistent (P Wv.1 Wv.2))⌝ ∗ read_write_cond a' P ∗ rcond P interp) -∗
+    sts_full_world W ∗ ∃ wps, ([∗ list] a;wp ∈ l;wps, a ↦ₐ wp)
+                         ∗ ▷ (([∗ list] a;wp ∈ l;wps, a ↦ₐ wp) -∗ open_region_many l' W)
+                    ∗ ([∗ list] a;wp ∈ l;wps, ⌜W.1 !! a = Some Permanent ∨ W.1 !! a = Some (Uninitialized wp)⌝).
   Proof.
     iIntros (Hdup Hdisj Hcond) "[Hsts [Hr #Hrels] ]".
     iInduction l as [|x l] "IH" forall (l' Hdisj).
@@ -183,32 +185,33 @@ Section stack_object.
       apply disjoint_cons in Hdisj as Hnin'.
       apply disjoint_swap in Hdisj;auto.
       iSimpl in "Hrels". iDestruct "Hrels" as "[Hx Hrels]".
-      iDestruct "Hx" as (p' Hflows) "Hrel".
+      iDestruct "Hx" as "Hrel".
       destruct Hcond with x as [Hperm | [w Huninit] ];[constructor|..].
-      + iDestruct (region_open_next_perm with "[$Hrel $Hsts $Hr]") as (v) "(Hsts & Hstate & Hr & Hx & % & #Hmono & #Hvalid)";auto.
+      + iDestruct "Hrel" as (P Hpers) "[Hrel Hrcond]".
+        iDestruct (region_open_next_perm with "[$Hrel $Hsts $Hr]") as (v) "(Hsts & Hstate & Hr & Hx & #Hmono & #Hvalid)";auto.
         iDestruct ("IH" with "[] [] [] Hrels Hsts Hr") as "[Hsts Hws]";auto.
         { iPureIntro. intros a Ha. apply Hcond. constructor. auto. }
-        iFrame. iDestruct "Hws" as (wps) "(Hws & Hcls & Hcond & %)". iExists ((v,p') :: wps).
+        iFrame. iDestruct "Hws" as (wps) "(Hws & Hcls & Hcond)". iExists (v :: wps).
         iFrame. iSplit;auto. iNext.
         iIntros "[Hx Hxs]". simpl.
         iDestruct ("Hcls" with "Hxs") as "Hr".
         iDestruct (region_close_next_perm with "[$Hstate $Hr $Hx]") as "Hr";auto. apply _.
-      + iDestruct (region_open_next_monouninit_w with "[$Hrel $Hsts $Hr]") as "(Hr & Hsts & Hstate & Hx & %)";eauto.
+      + iDestruct "Hrel" as (P Hpers) "[Hrel Hrcond]".
+        iDestruct (region_open_next_monouninit_w with "[$Hrel $Hsts $Hr]") as "(Hr & Hsts & Hstate & Hx)";eauto.
         iDestruct ("IH" with "[] [] [] Hrels Hsts Hr") as "[Hsts Hws]";auto.
         { iPureIntro. intros a Ha. apply Hcond. constructor. auto. }
-        iFrame. iDestruct "Hws" as (wps) "(Hws & Hcls & Hcond & %)". iExists ((w,p') :: wps).
+        iFrame. iDestruct "Hws" as (wps) "(Hws & Hcls & Hcond)". iExists (w :: wps).
         iFrame. iSplit;auto. iNext.
         iIntros "[Hx Hxs]". simpl.
         iDestruct ("Hcls" with "Hxs") as "Hr".
         iDestruct (region_close_next_uninit with "[$Hstate $Hr $Hx]") as "Hr";auto. apply _.
   Qed.
 
-  Lemma open_stack_object_pre l W p :
+  Lemma open_stack_object_pre l W :
     NoDup l → (∀ a', a' ∈ l → (W.1 !! a' = Some Permanent ∨ (∃ w, W.1 !! a' = Some (Uninitialized w)))) →
-    sts_full_world W ∗ region W ∗ ([∗ list] a' ∈ l, ∃ p' : Perm, ⌜PermFlows p p'⌝ ∗ read_write_cond a' p' interp) -∗
-    sts_full_world W ∗ ∃ wps, ([∗ list] a;wp ∈ l;wps, a ↦ₐ[wp.2] wp.1) ∗ ▷ (([∗ list] a;wp ∈ l;wps, a ↦ₐ[wp.2] wp.1) -∗ region W)
-                                                                       ∗ ([∗ list] a;wp ∈ l;wps, ⌜W.1 !! a = Some Permanent ∨ W.1 !! a = Some (Uninitialized wp.1)⌝)
-                                                                       ∗ ⌜Forall (λ w, PermFlows p w.2) wps⌝.
+    sts_full_world W ∗ region W ∗ ([∗ list] a' ∈ l, ∃ (P:D), ⌜(∀ Wv, Persistent (P Wv.1 Wv.2))⌝ ∗ read_write_cond a' P ∗ rcond P interp) -∗
+    sts_full_world W ∗ ∃ wps, ([∗ list] a;wp ∈ l;wps, a ↦ₐ wp) ∗ ▷ (([∗ list] a;wp ∈ l;wps, a ↦ₐ wp) -∗ region W)
+                                                                       ∗ ([∗ list] a;wp ∈ l;wps, ⌜W.1 !! a = Some Permanent ∨ W.1 !! a = Some (Uninitialized wp)⌝).
   Proof.
     iIntros (Hdup Hcond) "[Hsts [Hr #Hrels] ]".
     iDestruct (region_open_nil with "Hr") as "Hr".
@@ -217,18 +220,17 @@ Section stack_object.
     iApply region_open_nil. iApply "HH". iFrame.
   Qed.
 
-  Lemma open_stack_object W p b e :
+  Lemma open_stack_object W b e :
     (∀ a', (b <= a' < e)%a → (W.1 !! a' = Some Permanent ∨ (∃ w, W.1 !! a' = Some (Uninitialized w)))) →
-    sts_full_world W ∗ region W ∗ ([∗ list] a' ∈ (region_addrs b e), ∃ p' : Perm, ⌜PermFlows p p'⌝ ∗ read_write_cond a' p' interp) -∗
-    sts_full_world W ∗ ∃ wps, ([∗ list] a;wp ∈ (region_addrs b e);wps, a ↦ₐ[wp.2] wp.1) ∗ ▷ (([∗ list] a;wp ∈ (region_addrs b e);wps, a ↦ₐ[wp.2] wp.1) -∗ region W)
-                                 ∗ ⌜Forall (λ awp, W.1 !! awp.1 = Some Permanent ∨ W.1 !! awp.1 = Some (Uninitialized awp.2.1)) (zip (region_addrs b e) wps)⌝
-                                 ∗ ⌜Forall (λ w, PermFlows p w.2) wps⌝.
+    sts_full_world W ∗ region W ∗ ([∗ list] a' ∈ (region_addrs b e), ∃ (P:D), ⌜(∀ Wv, Persistent (P Wv.1 Wv.2))⌝ ∗ read_write_cond a' P ∗ rcond P interp) -∗
+    sts_full_world W ∗ ∃ wps, ([∗ list] a;wp ∈ (region_addrs b e);wps, a ↦ₐ wp) ∗ ▷ (([∗ list] a;wp ∈ (region_addrs b e);wps, a ↦ₐ wp) -∗ region W)
+                                 ∗ ⌜Forall (λ awp, W.1 !! awp.1 = Some Permanent ∨ W.1 !! awp.1 = Some (Uninitialized awp.2)) (zip (region_addrs b e) wps)⌝.
   Proof.
     iIntros (Hcond) "[Hsts [Hr #Hrels] ]".
     iDestruct (open_stack_object_pre with "[$Hsts $Hr $Hrels]") as "[Hsts Hws]".
     apply region_addrs_NoDup.
     intros a' Hin. apply Hcond. apply elem_of_region_addrs. auto.
-    iFrame. iDestruct "Hws" as (wps) "(Hws & Hcls & Hcond & %)". iExists _. iFrame. iSplit;auto.
+    iFrame. iDestruct "Hws" as (wps) "(Hws & Hcls & Hcond)". iExists _. iFrame.
     iDestruct (big_sepL2_alt with "Hcond") as "[% Hcond]".
     iDestruct (big_sepL_forall with "Hcond") as %Hforall. iPureIntro.
     apply Forall_forall. intros x [k Hx]%elem_of_list_lookup. eapply Hforall. eauto.
@@ -355,12 +357,12 @@ Section stack_object.
 
     interp W (inr (URWLX, Monotone, bstk, estk, astk)) -∗
 
-    □ ([∗ map] a16↦w7 ∈ m, □ ∃ (p0 : Perm) (φ0 : WORLD * Word → iPropI Σ),
+    □ ([∗ map] a16↦w7 ∈ m, □ ∃ (φ0 : WORLD * Word → iPropI Σ),
         ⌜∀ Wv : WORLD * Word, Persistent (φ0 Wv)⌝
-        ∗ monotemp_pers_resources W φ0 a16 p0 w7 ∗ rel a16 p0 φ0) -∗
-    □ ([∗ map] a16↦w7 ∈ m', □ ∃ (p0 : Perm) (φ0 : WORLD * Word → iPropI Σ),
+        ∗ monotemp_pers_resources W φ0 a16 w7 ∗ rel a16 φ0) -∗
+    □ ([∗ map] a16↦w7 ∈ m', □ ∃ (φ0 : WORLD * Word → iPropI Σ),
         ⌜∀ Wv : WORLD * Word, Persistent (φ0 Wv)⌝
-        ∗ monotemp_pers_resources W' φ0 a16 p0 w7 ∗ rel a16 p0 φ0) -∗
+        ∗ monotemp_pers_resources W' φ0 a16 w7 ∗ rel a16 φ0) -∗
     ∃ w, ⌜(override_uninitialize lframe (uninitialize W' m')).1 !! bstk = Some (Uninitialized w)⌝
        ∗ ▷ ((∀ Wfinal, ⌜related_sts_a_world W Wfinal bstk⌝ -∗ interp Wfinal w)
          ∨ (∀ Wfinal, ⌜related_sts_a_world W' Wfinal bstk⌝ -∗ interp Wfinal w)).
@@ -370,9 +372,8 @@ Section stack_object.
     iDestruct (writeLocalAllowedU_valid_cap_below_implies _ _ _ _ _ _ bstk with "Hval") as %Hmono;auto.
     { apply le_addr_withinBounds. all: solve_addr. }
     { solve_addr. }
-    iDestruct (read_allowedU_inv _ bstk with "Hval") as (p' Hflows) "Hrel";[|auto|].
+    iDestruct (read_allowedU_inv _ bstk with "Hval") as "Hrel";[|auto|].
     { solve_addr. }
-    destruct p';inversion Hflows.
     assert (is_Some (m !! bstk)) as [w Hw].
     { apply Hmcond. split;auto. solve_addr. }
     assert (W1.1 !! bstk = Some (Uninitialized w) ∨ W1.1 !! bstk = Some Monotemporary) as Hbstk.
@@ -400,8 +401,8 @@ Section stack_object.
         clear -Ha_param Haf3 Haf2 Hb_r_adv. solve_addr. }
     destruct Hbstk' as [ [Hbstk' Hbstk''] | Hbstk'].
     - iDestruct (big_sepM_delete with "Hmcond") as "[Hbstk Hmcond_del]";[apply Hw|].
-      iDestruct "Hbstk" as (p' φ' Hpers) "[Hres #Hrel']".
-      iDestruct (rel_agree _ RWLX p' with "[$Hrel' $Hrel]") as "[% Heq]".
+      iDestruct "Hbstk" as (φ' Hpers) "[Hres #Hrel']".
+      iDestruct (rel_agree _ (λ Wv, interp Wv.1 Wv.2) with "[$Hrel' $Hrel]") as "Heq".
       iExists w. iSplit.
       + rewrite override_uninitialize_std_sta_lookup_none.
         iPureIntro. rewrite uninitialize_std_sta_not_elem_of_lookup//.
@@ -410,46 +411,140 @@ Section stack_object.
         apply not_elem_of_cons;split;[clear -Ha_param;solve_addr|].
         rewrite elem_of_region_addrs. clear -Ha_param Haf3 Haf2 Hb_r_adv. solve_addr.
       + iNext. iLeft. iIntros (Wfinal Hrelateda). iSpecialize ("Heq" $! (Wfinal,w)).
-        iDestruct "Hres" as (Hne) "[Hmono Hres]". subst p'. iSimpl in "Hmono".
+        iDestruct "Hres" as "[Hmono Hres]". iSimpl in "Hmono".
         iSimpl in "Heq". rewrite /interp. iSimpl. iRewrite ("Heq").
         iApply "Hmono";eauto.
     - assert (is_Some (m' !! bstk)) as [w' Hw'].
       { apply Hmcond'. split;auto. clear;solve_addr. }
       iExists w'.
       iDestruct (big_sepM_delete with "Hmcond'") as "[Hbstk Hmcond_del]";[apply Hw'|].
-      iDestruct "Hbstk" as (p' φ' Hpers) "[Hres #Hrel']".
-      iDestruct (rel_agree _ RWLX p' with "[$Hrel' $Hrel]") as "[% Heq]". iSplit.
+      iDestruct "Hbstk" as (φ' Hpers) "[Hres #Hrel']".
+      iDestruct (rel_agree _ (λ Wv, interp Wv.1 Wv.2) with "[$Hrel' $Hrel]") as "Heq". iSplit.
       + rewrite override_uninitialize_std_sta_lookup_none.
         iPureIntro. apply uninitialize_std_sta_lookup_in;auto.
         rewrite Heq1. apply not_elem_of_list_to_map. rewrite fst_zip//.
         apply not_elem_of_cons;split;[clear -Ha_param;solve_addr|].
         rewrite elem_of_region_addrs. clear -Ha_param Haf3 Haf2 Hb_r_adv. solve_addr.
       + iNext. iRight. iIntros (Wfinal Hrelateda). iSpecialize ("Heq" $! (Wfinal,w')).
-        iDestruct "Hres" as (Hne) "[Hmono Hres]". subst p'. iSimpl in "Hmono".
+        iDestruct "Hres" as "[Hmono Hres]". iSimpl in "Hmono".
         iSimpl in "Heq". rewrite /interp. iSimpl. iRewrite ("Heq").
         iApply "Hmono";eauto.
   Qed.
 
+  Lemma uninitialize_std_sta_lookup_perm :
+    ∀ (i : Addr) (m : Mem) (fs : STS_STD), fs !! i = Some Permanent <-> uninitialize_std_sta m fs !! i = Some Permanent.
+  Proof.
+    intros i m fs. split;intros Hperm.
+    - rewrite uninitialize_std_sta_spec Hperm.
+      destruct (m !! i);auto.
+    - rewrite uninitialize_std_sta_spec in Hperm.
+      destruct (fs !! i);auto. destruct (m !! i); auto.
+      inversion Hperm. destruct r;inversion H1. auto.
+  Qed.
+
+  Definition sec_res W m bsec esec : iProp Σ :=
+    ([∗ list] asec ∈ region_addrs bsec esec, ∃ (P:D), ⌜(∀ Wv, Persistent (P Wv.1 Wv.2))⌝
+                                              ∗ read_write_cond asec P
+                                              ∗ (□ (∀ W (w : Word), P W w -∗ interp W w))
+                                              ∗ (□ (∀ W1 W2 (z : Z), P W1 (inl z) -∗ P W2 (inl z)))
+                                              ∗ (□ (∀ w', ⌜(uninitialize W m).1 !! asec = Some (Uninitialized w')⌝
+                                                   -∗ monotemp_pers_resources W (λ Wv, P Wv.1 Wv.2) asec w')))%I.
+
+  Lemma pers_res_to_sec_res W m bsec esec l p :
+    (∀ a' : Addr,
+        is_Some (m !! a')
+                ↔ std W !! a' = Some Monotemporary ∧ (0 <= a')%a) →
+     (▷ □ ([∗ map] a16↦w7 ∈ m, □ ∃ (φ0 : WORLD * Word → iPropI Σ),
+        ⌜∀ Wv : WORLD * Word, Persistent (φ0 Wv)⌝
+                                         ∗ monotemp_pers_resources W φ0 a16 w7 ∗ rel a16 φ0)) -∗
+    region_conditions W l p bsec esec -∗
+    (▷ ▷ sec_res W m bsec esec).
+  Proof.
+    iIntros (Hmcond) "#Hm #Hcond".
+    rewrite /sec_res.
+    iApply big_sepL_later. iApply big_sepL_forall. iIntros (k x Hin).
+    assert (x ∈ region_addrs bsec esec) as Hin';[apply elem_of_list_lookup;eauto|].
+    iDestruct (big_sepL_elem_of with "Hcond") as "[Hrel Hpwl]";[eauto|].
+    iDestruct "Hpwl" as %Hpwl.
+    assert (W.1 !! x = Some Monotemporary ∨ W.1 !! x = Some Permanent) as Hp.
+    { destruct (pwl l); auto. destruct p;auto. }
+    destruct Hp as [Hmono | Hperm].
+    - assert (is_Some (m !! x)) as [w Hw].
+      { apply Hmcond. split;auto. solve_addr. }
+      destruct (writeAllowed l) eqn:Hwa.
+      + iDestruct (big_sepM_lookup with "Hm") as "H";[eauto|].
+        rewrite (bi.later_intuitionistically (∃ _, _)%I).
+        iRevert "H". rewrite bi.later_exist. iIntros "#H".
+        iDestruct "H" as (P) "(>Hpers & [Hφ Hmonoa] & Hrela)".
+        iDestruct "Hpers" as %Hpers.
+        iNext.
+        iDestruct (rel_agree _ (λ Wv, interp Wv.1 Wv.2)  with "[Hrel Hrela]") as "Heq".
+        rewrite /read_write_cond.
+        iSplit;[iFrame "Hrel"|iExact "Hrela"].
+        simpl. iNext.
+        iExists interp. iSplit;[iPureIntro;apply _|].
+        iFrame "Hrel". iSplit;[auto|]. iSplit.
+        * iModIntro. iIntros (W1 W2 z) "_". rewrite !fixpoint_interp1_eq. done.
+        * iModIntro. iIntros (w'). rewrite (uninitialize_std_sta_lookup_in _ _ _ w);auto.
+          iIntros (Heq). inversion Heq;subst w'. rewrite /monotemp_pers_resources /=.
+          iSplit.
+          { iModIntro. iIntros (W1 W2 Hrelated). simpl.
+            iDestruct ("Heq" $! (W1,w)) as "Heq1".
+            iDestruct ("Heq" $! (W2,w)) as "Heq2".
+            simpl. iRewrite "Heq1". iRewrite "Heq2". iIntros "Ha". iApply "Hφ";eauto. }
+          { iSpecialize ("Heq" $! (W,w)). simpl. iRewrite "Heq". iExact "Hmonoa". }
+      + iDestruct "Hrel" as (P) "(Hpers & (Hrcond & Hints) & Hrel)".
+        iDestruct (big_sepM_lookup with "Hm") as (φ) "[Hpers' [[Hφ Hmonoa] Hrela]]";[eauto|].
+        iNext.
+        iDestruct (rel_agree _ (λ Wv, P Wv.1 Wv.2)  with "[Hrel Hrela]") as "Heq".
+        iSplit;[iExact "Hrel"|iExact "Hrela"].
+        iNext. iExists P. iSplit;[auto|]. iFrame "Hrel". iFrame "Hrcond". iFrame "Hints".
+        iModIntro. iIntros (w'). rewrite (uninitialize_std_sta_lookup_in _ _ _ w);auto.
+        iIntros (Heq). inversion Heq;subst w'. rewrite /monotemp_pers_resources /=. iSplit.
+        * iModIntro. iIntros (W1 W2 z). simpl.
+          iDestruct ("Heq" $! (W1,w)) as "Heq1".
+          iDestruct ("Heq" $! (W2,w)) as "Heq2".
+          simpl. iRewrite "Heq1"; iRewrite "Heq2". iIntros "Ha". iApply "Hφ";eauto.
+        * iDestruct ("Heq" $! (W,w)) as "Heq1". simpl. iRewrite "Heq1". iExact "Hmonoa".
+    - assert (m !! x = None) as Hnon.
+      { apply eq_None_not_Some. intros [Hcontr _]%Hmcond. rewrite Hperm in Hcontr. done. }
+      destruct (writeAllowed l) eqn:Hwa.
+      + iNext. iNext. iExists interp. iSplit;[iPureIntro;apply _|].
+        iFrame "Hrel". iSplit;[auto|].
+        iSplit.
+        { iModIntro. iIntros (W1 W2 z) "_". rewrite fixpoint_interp1_eq. done. }
+        iModIntro. iIntros (w'). rewrite uninitialize_std_sta_None_lookup;auto.
+        rewrite Hperm. iIntros (Hcontr);inversion Hcontr.
+      + iDestruct "Hrel" as (P Hpers) "[(Hrcond & Hints) Hrel]".
+        iNext. iNext. iExists P. iFrame "# %".
+        iModIntro. iIntros (w'). rewrite uninitialize_std_sta_None_lookup;auto.
+        rewrite Hperm. iIntros (Hcontr);inversion Hcontr.
+  Qed.
 
   Lemma close_stack_object_mid W E m la1 la2 ρ wps l p bsec esec asec lsec :
     (bsec <= asec)%a →
     lsec = region_addrs asec esec →
     length (region_addrs bsec esec) = length wps →
-    Forall (λ w : (Z + Cap) * Perm, ∃ z : Z, w.1 = inl z) wps →
-    Forall (λ awp : Addr * (Word * Perm),
-                    (uninitialize W m).1 !! awp.1 = Some Permanent ∨ (uninitialize W m).1 !! awp.1 = Some (Uninitialized awp.2.1))
+    Forall (λ w : (Z + Cap), ∃ z : Z, w = inl z) wps →
+    Forall (λ awp : Addr * Word,
+                    (uninitialize W m).1 !! awp.1 = Some Permanent ∨ (uninitialize W m).1 !! awp.1 = Some (Uninitialized awp.2))
            (zip (region_addrs bsec esec) wps) →
+    (∀ a' : Addr,
+        is_Some (m !! a')
+                ↔ std W !! a' = Some Monotemporary ∧ (0 <= a')%a) →
 
     region_addrs bsec esec ## (la1 ++ la2) →
 
     region_conditions W l p bsec esec -∗
+
+    sec_res W m bsec esec -∗
     sts_full_world (std_update_multiple (std_update_multiple (uninitialize W m) la1 ρ) la2 Revoked) -∗
     region (std_update_multiple (std_update_multiple (uninitialize W m) la1 ρ) la2 Revoked) ={E}=∗
 
-    sts_full_world (initialize_list lsec (std_update_multiple (std_update_multiple (uninitialize W m) la1 ρ) la2 Revoked)) ∗
-    region (initialize_list lsec (std_update_multiple (std_update_multiple (uninitialize W m) la1 ρ) la2 Revoked)).
+    (sts_full_world (initialize_list lsec (std_update_multiple (std_update_multiple (uninitialize W m) la1 ρ) la2 Revoked)) ∗
+    region (initialize_list lsec (std_update_multiple (std_update_multiple (uninitialize W m) la1 ρ) la2 Revoked))).
   Proof.
-    iIntros (Hle Heq Hlen Hints Hwps Hdisj) "#Hcond Hsts Hr".
+    iIntros (Hle Heq Hlen Hints Hwps Hmcond Hdisj) "#Hcond #Hmono Hsts Hr".
     iInduction (lsec) as [|a lsec] "IH" forall (asec Heq Hle).
     - iModIntro. iSimpl. iFrame.
     - assert (asec < esec)%a as Hlt.
@@ -475,51 +570,56 @@ Section stack_object.
       + (* If the address is uninitialized, we need to reinitialise it using the ints assumption *)
         rewrite Huninit. iMod ("IH" $! a0 with "[] [] Hsts Hr") as "[Hsts Hr]". inversion Heq;auto. iPureIntro;solve_addr.
         (* get the read_write condition for asec *)
-        iDestruct (big_sepL_elem_of with "Hcond") as (p' Hflows) "[Hrel Hasec]";[apply Hin|].
+        iDestruct (big_sepL_elem_of with "Hcond") as "[_ Hasec]";[apply Hin|].
         assert (asec ∉ lsec) as Hnin.
         { inversion Heq. intros Hcontr%elem_of_region_addrs. solve_addr. }
         (* open the world to get the resource *)
-        iDestruct (region_open_uninitialized with "[$Hr $Hsts $Hrel]") as "(Hr & Hsts & Hstate & Hl & %)".
+        iDestruct "Hasec" as %Hasec'.
+
+        iDestruct (big_sepL_elem_of with "Hmono") as (P Hpers) "(Hrel & Hrcond & Hints & Hif)";[eauto|].
+        iSpecialize ("Hif" $! _ Huninit). iDestruct "Hif" as "[ Hmonoa HP]". simpl.
+
+        assert (W.1 !! asec = Some Monotemporary) as Hmono.
+        { destruct (pwl l);auto. rewrite /region_state_nwl in Hasec'.
+          destruct p;auto.
+          all: revert Hasec'; rewrite (uninitialize_std_sta_lookup_perm _ m) =>Hasec'.
+          all: rewrite Huninit in Hasec';inversion Hasec';auto. done. }
+        assert (is_Some(m !! asec)) as [w' Hw'].
+        { apply Hmcond. split;auto. clear; solve_addr. }
+        eapply uninitialize_std_sta_lookup_in in Hmono;eauto.
+        rewrite Hmono in Huninit. inversion Huninit;subst wp.
+
+        iDestruct (region_open_uninitialized with "[$Hr $Hsts $Hrel]") as "(Hr & Hsts & Hstate & Hl)".
         { rewrite initialize_list_nin// std_sta_update_multiple_lookup_same_i// std_sta_update_multiple_lookup_same_i//. }
         (* assert that wp.1 is an int *)
         apply elem_of_zip_r in Hinwp.
-        revert Hints;rewrite Forall_forall =>Hints. apply Hints in Hinwp as [z Hz].
-        destruct wp as [w p0]. simpl in Hz. subst w. simpl.
-        (* we can now close the world again and update its state to temp *)
-        destruct (pwl p') eqn:Hpwl.
-        * iMod (region_close_mono_uninit_w_pwl with "[$Hr $Hsts $Hstate $Hl $Hrel]") as "[$ $]";auto.
-          iSplit;auto. iSimpl. iSplit.
-          iModIntro. iIntros (W0 W' Hrelated) "_ /=". rewrite fixpoint_interp1_eq. eauto.
-          iNext. rewrite fixpoint_interp1_eq;eauto.
-        * iMod (region_close_mono_uninit_w_nwl with "[$Hr $Hsts $Hstate $Hl $Hrel]") as "[$ $]";auto.
-          iSplit;auto. iSimpl. iSplit.
-          iModIntro. iIntros (W0 W' Hrelated) "_ /=". rewrite fixpoint_interp1_eq. eauto.
-          iNext. rewrite fixpoint_interp1_eq;eauto.
-  Qed.
 
-  Lemma uninitialize_std_sta_lookup_perm :
-    ∀ (i : Addr) (m : Mem) (fs : STS_STD), fs !! i = Some Permanent <-> uninitialize_std_sta m fs !! i = Some Permanent.
-  Proof.
-    intros i m fs. split;intros Hperm.
-    - rewrite uninitialize_std_sta_spec Hperm.
-      destruct (m !! i);auto.
-    - rewrite uninitialize_std_sta_spec in Hperm.
-      destruct (fs !! i);auto. destruct (m !! i); auto.
-      inversion Hperm. destruct r;inversion H1. auto.
+        revert Hints;rewrite Forall_forall =>Hints. apply Hints in Hinwp as [z Hz].
+        simpl in Hz. subst w'.
+        (* we can now close the world again and update its state to temp *)
+        iMod (region_close_mono_uninit_w with "[$Hr $Hsts $Hstate $Hl $Hrel]") as "[$ $]";auto.
+        iSplitR.
+        * iModIntro. iIntros (W0 W' Hrelated) "_ /=". iApply "Hmonoa". eauto.
+          iApply "Hints". eauto.
+        * iModIntro. simpl. iApply "Hints". eauto.
   Qed.
 
   Lemma close_stack_object W E m la1 la2 ρ wps l p bsec esec asec :
     (if pwl l then p = Monotone else True) →
     readAllowed l →
     length (region_addrs bsec esec) = length wps →
-    Forall (λ w : (Z + Cap) * Perm, ∃ z : Z, w.1 = inl z) wps →
-    Forall (λ awp : Addr * (Word * Perm),
-                    (uninitialize W m).1 !! awp.1 = Some Permanent ∨ (uninitialize W m).1 !! awp.1 = Some (Uninitialized awp.2.1))
+    Forall (λ w : (Z + Cap), ∃ z : Z, w = inl z) wps →
+    Forall (λ awp : Addr * Word,
+                    (uninitialize W m).1 !! awp.1 = Some Permanent ∨ (uninitialize W m).1 !! awp.1 = Some (Uninitialized awp.2))
            (zip (region_addrs bsec esec) wps) →
+    (∀ a' : Addr,
+        is_Some (m !! a')
+                ↔ std W !! a' = Some Monotemporary ∧ (0 <= a')%a) →
 
     region_addrs bsec esec ## (la1 ++ la2) →
 
     region_conditions W l p bsec esec -∗
+    sec_res W m bsec esec -∗
     sts_full_world (std_update_multiple (std_update_multiple (uninitialize W m) la1 ρ) la2 Revoked) -∗
     region (std_update_multiple (std_update_multiple (uninitialize W m) la1 ρ) la2 Revoked) ={E}=∗
 
@@ -527,8 +627,8 @@ Section stack_object.
     region (initialize_list (region_addrs bsec esec) (std_update_multiple (std_update_multiple (uninitialize W m) la1 ρ) la2 Revoked)) ∗
     interp (initialize_list (region_addrs bsec esec) (std_update_multiple (std_update_multiple (uninitialize W m) la1 ρ) la2 Revoked)) (inr (l, p, bsec, esec, asec)).
   Proof.
-    iIntros (Hmono Hra Hlen Hints Hwps Hdisj) "#Hcond Hsts Hr".
-    iMod (close_stack_object_mid with "Hcond Hsts Hr") as "[$ $]";eauto. solve_addr.
+    iIntros (Hmono Hra Hlen Hints Hwps Hmcond Hdisj) "#Hcond #Hmono Hsts Hr".
+    iMod (close_stack_object_mid with "Hcond Hmono Hsts Hr") as "[$ $]";eauto. solve_addr.
     iModIntro. rewrite fixpoint_interp1_eq /=.
     assert (forall k y, region_addrs bsec esec !! k = Some y → ∃ wp, (y,wp) ∈ zip (region_addrs bsec esec) wps) as Hinwp.
     { intros k y Hlook.
@@ -540,16 +640,18 @@ Section stack_object.
     3,6: destruct p;inversion Hmono.
     all: try iApply (big_sepL_mono with "Hcond").
     all: iIntros (k y Hk) "Hres /=".
-    all: iDestruct "Hres" as (p' Hflows) "(Hrel & %)".
-    all: iExists p';iFrame;iSplit;auto.
+    all: iDestruct "Hres" as "(Hrel & %)".
+    all: try (iDestruct "Hrel" as (P) "[? ?]").
+    1,5: iExists P;iFrame.
+    all: try (iFrame).
     all: revert Hwps;rewrite Forall_forall =>Hwps.
     all: assert (y ∈ region_addrs bsec esec) as Hy;[apply elem_of_list_lookup;eauto|].
-    all: apply Hinwp in Hk as [ [w p0] Hiny].
+    all: apply Hinwp in Hk as [ w Hiny].
     all: apply Hwps in Hiny; simpl in Hiny.
     all: apply elem_of_disjoint in Hdisj.
     all: apply Hdisj in Hy as Hny;apply not_elem_of_app in Hny as [Hy1 Hy2].
     all: rewrite /region_state_nwl /region_state_pwl_mono.
-    1,2,5,6: destruct p;simpl in *.
+    1,2,3,6: destruct p;simpl in *.
     all: try (apply uninitialize_std_sta_lookup_perm with (m:=m) in H0).
     all: try (rewrite initialize_list_perm;by rewrite std_sta_update_multiple_lookup_same_i// std_sta_update_multiple_lookup_same_i//).
     5,6: destruct Hiny as [Hiny | Hiny];
@@ -576,7 +678,7 @@ Section stack_object.
   Lemma read_allowedU_inv_range W p g b e a b' e' :
     (b <= b' ∧ e' < e)%a → readAllowedU p = true →
     interp W (inr (p,g,b,e,a)) -∗
-    [∗ list] a ∈ region_addrs b' e', ∃ p', ⌜PermFlows (promote_perm p) p'⌝ ∗ read_write_cond a p' interp.
+    [∗ list] a ∈ region_addrs b' e', read_write_cond a interp.
   Proof.
     iIntros ([Hle Hlt] HraU) "Hv".
     iApply big_sepL_forall. iIntros (k x Hin).
@@ -1301,14 +1403,14 @@ Section stack_object.
   Qed.
 
   (* TODO: move this to region_invariants.v *)
-  Lemma region_close_uninit W l φ p w `{forall Wv, Persistent (φ Wv)}:
+  Lemma region_close_uninit W l φ w `{forall Wv, Persistent (φ Wv)}:
     ⊢ sts_state_std l (Uninitialized w)
-      ∗ open_region l W ∗ l ↦ₐ[p] w ∗ ⌜p ≠ O⌝ ∗ rel l p φ
+      ∗ open_region l W ∗ l ↦ₐ w ∗ rel l φ
       -∗ region W.
   Proof.
     rewrite open_region_eq rel_eq region_eq /open_region_def /rel_def /region_def
             REL_eq RELS_eq /RELS_def /REL_def.
-    iIntros "(Hstate & Hreg_open & Hl & % & #Hrel)".
+    iIntros "(Hstate & Hreg_open & Hl & #Hrel)".
     iDestruct "Hrel" as (γpred) "#[Hγpred Hφ_saved]".
     iDestruct "Hreg_open" as (M Mρ) "(HM & % & Hdomρ & Hpreds)". iDestruct "Hdomρ" as %Hdomρ.
 
@@ -1316,7 +1418,7 @@ Section stack_object.
     iDestruct (big_sepM_insert _ (delete l M) l with "[-HM]") as "test";
       first by rewrite lookup_delete.
     { iFrame. iExists _. iFrame. iSplitR; [by simplify_map_eq|].
-      iExists _,_,_. iFrame "∗ #". repeat (iSplitR;[eauto|]). auto. }
+      iExists _. iFrame "∗ #". repeat (iSplitR;[eauto|]). auto. }
     iExists _,_. iFrame "∗ #".
     iDestruct (reg_in γrel M with "[$HM $Hγpred]") as %HMeq.
     rewrite -HMeq. iFrame. iSplitR; eauto. iPureIntro.
@@ -1327,9 +1429,9 @@ Section stack_object.
   Lemma initialize_list_consolidate W' (l' l : list Addr) :
     ⊢ ⌜l' ⊆+ l⌝ →
     (region (initialize_list l W') ∗ sts_full_world W'
-            ∗ ([∗ list] a ∈ l', □ ∃ p φ w, ⌜W'.1 !! a = Some (Uninitialized w) ∨ W'.1 !! a = Some Monotemporary⌝
+            ∗ ([∗ list] a ∈ l', □ ∃ φ w, ⌜W'.1 !! a = Some (Uninitialized w) ∨ W'.1 !! a = Some Monotemporary⌝
                             ∗ ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
-                            ∗ monotemp_pers_resources (initialize_list l W') φ a p w ∗ rel a p φ))
+                            ∗ monotemp_pers_resources (initialize_list l W') φ a w ∗ rel a φ))
       ==∗ (sts_full_world (initialize_list l' W') ∗ region (initialize_list l W')).
   Proof.
     iIntros (Hsub) "(Hr & Hsts & Htemps)".
@@ -1341,7 +1443,7 @@ Section stack_object.
         apply submseteq_cons_r. left. auto. }
       iMod ("IH" $! Hsub' with "Hr Hsts Htemps") as "[Hsts Hr]".
       iClear "IH".
-      iDestruct "Hx" as (p φ w Huninit Hpers) "((% & Hmono & Hφ) & Hrel)".
+      iDestruct "Hx" as (φ w Huninit Hpers) "((Hmono & Hφ) & Hrel)".
       simpl. destruct Huninit as [Huninit | Hmono].
       2: { rewrite Hmono. iFrame. done. }
       rewrite Huninit.
@@ -1366,8 +1468,8 @@ Section stack_object.
         iDestruct (region_map_delete_nonstatic with "Hr") as "Hr";[intros m;by rewrite Hx|].
         iDestruct (region_map_insert_nonmonostatic Monotemporary with "Hr") as "Hr"; auto.
         iDestruct (big_sepM_delete _ _ x with "[Hx Hmono Hφ Hstate $Hr]") as "Hr";[apply lookup_insert|..].
-        { iExists Monotemporary. iFrame. rewrite lookup_insert. iSplit;auto. iExists γpred,p,φ. repeat (iSplit;auto).
-          iDestruct "Hx" as (γpred' p' φ' Heq Hpers') "(#Hsaved' & % & Hx)". inversion Heq;subst.
+        { iExists Monotemporary. iFrame. rewrite lookup_insert. iSplit;auto. iExists φ. repeat (iSplit;auto).
+          iDestruct "Hx" as (φ' Hpers') "(#Hsaved' & Hx)".
           iExists w. iFrame. auto. }
         iFrame. iExists M,_. rewrite -HMeq. iFrame. rewrite -HMeq. iFrame. iModIntro. iSplit; auto.
         iPureIntro. rewrite dom_insert_L. rewrite -Hdom'.
@@ -1376,9 +1478,9 @@ Section stack_object.
 
   Lemma initialize_list_region W (l : list Addr) :
     (region W ∗ sts_full_world W
-    ∗ ([∗ list] a ∈ l, □ ∃ p φ w, ⌜W.1 !! a = Some (Uninitialized w) ∨ W.1 !! a = Some Monotemporary⌝
+    ∗ ([∗ list] a ∈ l, □ ∃ φ w, ⌜W.1 !! a = Some (Uninitialized w) ∨ W.1 !! a = Some Monotemporary⌝
                                ∗ ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
-                               ∗ monotemp_pers_resources (initialize_list l W) φ a p w ∗ rel a p φ))
+                               ∗ monotemp_pers_resources (initialize_list l W) φ a w ∗ rel a φ))
       ==∗ (sts_full_world (initialize_list l W) ∗ region (initialize_list l W)).
   Proof.
     iIntros "(Hr & Hsts & Htemp)".

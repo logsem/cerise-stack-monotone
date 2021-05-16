@@ -8,7 +8,6 @@ Import uPred.
 Section transitions.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ} 
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} 
           `{MachineParameters}.
 
   Implicit Types fsd gsd hsd : STS_std_states Addr region_type.

@@ -6,7 +6,7 @@ From iris.algebra Require Import frac.
 From cap_machine.rules Require Import rules_LoadU.
 
 Section cap_lang_rules.
-  Context `{memG Σ, regG Σ, MonRef: MonRefG (leibnizO _) CapR_rtc Σ}.
+  Context `{memG Σ, regG Σ}.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
@@ -42,11 +42,8 @@ Section cap_lang_rules.
   Qed.
 
   (* loading from any offset *)
-  Lemma wp_loadU_success_any E r1 r2 zoff pc_p pc_g pc_b pc_e pc_a w w' w'' p g b e a a' pc_a'
-        pc_p' p' :
+  Lemma wp_loadU_success_any E r1 r2 zoff pc_p pc_g pc_b pc_e pc_a w w' w'' p g b e a a' pc_a' :
     decodeInstrW w = LoadU r1 r2 (inl zoff) →
-    PermFlows pc_p pc_p' →
-    PermFlows p p' →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
     isU p = true -> (a' <= e)%a →
     withinBounds ((p, g), b, a', a) = true →
@@ -55,25 +52,23 @@ Section cap_lang_rules.
     (zoff < 0)%Z ->
 
     {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-          ∗ ▷ pc_a ↦ₐ[pc_p'] w
+          ∗ ▷ pc_a ↦ₐ w
           ∗ ▷ r1 ↦ᵣ w''
           ∗ ▷ r2 ↦ᵣ inr ((p,g),b,e,a')
-          ∗ ▷ a ↦ₐ[p'] w' }}}
+          ∗ ▷ a ↦ₐ w' }}}
       Instr Executable @ E
       {{{ RET NextIV;
           PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
              ∗ r1 ↦ᵣ w'
-             ∗ pc_a ↦ₐ[pc_p'] w
+             ∗ pc_a ↦ₐ w
              ∗ r2 ↦ᵣ inr ((p,g),b,e,a')
-             ∗ a ↦ₐ[p'] w' }}}.
+             ∗ a ↦ₐ w' }}}.
   Proof.
-    iIntros (Hinstr Hfl Hfl' Hvpc HU Hwb Hwb2 Hpca' Hincr Hlt φ)
+    iIntros (Hinstr Hvpc HU Hwb Hwb2 Hpca' Hincr Hlt φ)
             "(>HPC & >Hi & >Hr1 & >Hr2 & >Ha) Hφ".
-    pose proof (correctPC_nonO _ _ _ _ _ _ Hfl Hvpc) as Hpc_p'.
-    pose proof (isU_nonO _ _ Hfl' HU) as Hp'.
     iDestruct (map_of_regs_3 with "HPC Hr1 Hr2") as "[Hmap (%&%&%) ]".
     iDestruct (memMap_resource_2ne_apply with "Hi Ha") as "[Hmem %]"; auto.
-    iApply (wp_loadU with "[$Hmap $Hmem]");[apply Hinstr|apply Hpc_p'|apply Hvpc|eauto..];simplify_map_eq; eauto.
+    iApply (wp_loadU with "[$Hmap $Hmem]");[apply Hinstr|apply Hvpc|eauto..];simplify_map_eq; eauto.
     { by rewrite !dom_insert; set_solver+. }
     { rewrite HU. simplify_map_eq.
       erewrite wb_implies_verify_access;eauto.
@@ -101,30 +96,27 @@ Section cap_lang_rules.
   Qed.
 
   (* load from the top *)
-  Lemma wp_loadU_success E r1 r2 pc_p pc_g pc_b pc_e pc_a w w' w'' p g b e a a' pc_a'
-        pc_p' p' :
+  Lemma wp_loadU_success E r1 r2 pc_p pc_g pc_b pc_e pc_a w w' w'' p g b e a a' pc_a' :
     decodeInstrW w = LoadU r1 r2 (inl (-1)%Z) →
-    PermFlows pc_p pc_p' →
-    PermFlows p p' →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
     isU p = true -> withinBounds ((p, g), b, e, a) = true →
     (pc_a + 1)%a = Some pc_a' →
     (a + 1)%a = Some a' ->
 
     {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-          ∗ ▷ pc_a ↦ₐ[pc_p'] w
+          ∗ ▷ pc_a ↦ₐ w
           ∗ ▷ r1 ↦ᵣ w''
           ∗ ▷ r2 ↦ᵣ inr ((p,g),b,e,a')
-          ∗ ▷ a ↦ₐ[p'] w' }}}
+          ∗ ▷ a ↦ₐ w' }}}
       Instr Executable @ E
       {{{ RET NextIV;
           PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a')
              ∗ r1 ↦ᵣ w'
-             ∗ pc_a ↦ₐ[pc_p'] w
+             ∗ pc_a ↦ₐ w
              ∗ r2 ↦ᵣ inr ((p,g),b,e,a')
-             ∗ a ↦ₐ[p'] w' }}}.
+             ∗ a ↦ₐ w' }}}.
   Proof.
-    iIntros (Hinstr Hfl Hfl' Hvpc HU Hwb Hpca' Hincr φ)
+    iIntros (Hinstr Hvpc HU Hwb Hpca' Hincr φ)
             "(>HPC & >Hi & >Hr1 & >Hr2 & >Ha) Hφ".
     iApply (wp_loadU_success_any with "[$Hr1 $HPC $Hr2 $Hi $Ha]");[..|iFrame];eauto.
     - apply withinBounds_le_addr in Hwb as [Hle Hlt]. solve_addr.
@@ -134,10 +126,8 @@ Section cap_lang_rules.
   Qed.
 
   (* load into PC from reg *)
-  Lemma wp_loadU_success_reg_to_PC_any E r1 r2 zoff pc_p pc_g pc_b pc_e pc_a w p g b e a a1 p' g' b' e' a' a'' pc_p' p'':
+  Lemma wp_loadU_success_reg_to_PC_any E r1 r2 zoff pc_p pc_g pc_b pc_e pc_a w p g b e a a1 p' g' b' e' a' a'' :
     decodeInstrW w = LoadU PC r1 (inr r2)  →
-    PermFlows pc_p pc_p' →
-    PermFlows p p'' →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
     isU p = true -> (a1 <= e)%a →
     withinBounds ((p, g), b, a1, a) = true →
@@ -146,25 +136,23 @@ Section cap_lang_rules.
     (zoff < 0)%Z ->
 
     {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-          ∗ ▷ pc_a ↦ₐ[pc_p'] w
+          ∗ ▷ pc_a ↦ₐ w
           ∗ ▷ r1 ↦ᵣ inr ((p,g),b,e,a1)
           ∗ ▷ r2 ↦ᵣ inl zoff
-          ∗ ▷ a ↦ₐ[p''] inr ((p',g'),b',e',a') }}}
+          ∗ ▷ a ↦ₐ inr ((p',g'),b',e',a') }}}
       Instr Executable @ E
       {{{ RET NextIV;
           PC ↦ᵣ inr ((p',g'),b',e',a'')
-             ∗ pc_a ↦ₐ[pc_p'] w
+             ∗ pc_a ↦ₐ w
              ∗ r1 ↦ᵣ inr ((p,g),b,e,a1)
              ∗ r2 ↦ᵣ inl zoff
-             ∗ a ↦ₐ[p''] inr ((p',g'),b',e',a') }}}.
+             ∗ a ↦ₐ inr ((p',g'),b',e',a') }}}.
   Proof.
-    iIntros (Hinstr Hfl Hfl' Hvpc HU Hwb Hwb2 Hpca' Hincr Hlt φ)
+    iIntros (Hinstr Hvpc HU Hwb Hwb2 Hpca' Hincr Hlt φ)
             "(>HPC & >Hi & >Hr1 & >Hr2 & >Ha) Hφ".
-    pose proof (correctPC_nonO _ _ _ _ _ _ Hfl Hvpc) as Hpc_p'.
-    pose proof (isU_nonO _ _ Hfl' HU) as Hp'.
     iDestruct (map_of_regs_3 with "HPC Hr1 Hr2") as "[Hmap (%&%&%) ]".
     iDestruct (memMap_resource_2ne_apply with "Hi Ha") as "[Hmem %]"; auto.
-    iApply (wp_loadU with "[$Hmap $Hmem]");[apply Hinstr |apply Hpc_p'|apply Hvpc|..];simplify_map_eq; eauto.
+    iApply (wp_loadU with "[$Hmap $Hmem]");[apply Hinstr |apply Hvpc|..];simplify_map_eq; eauto.
     { by rewrite !dom_insert; set_solver+. }
     { rewrite HU. simplify_map_eq.
       erewrite wb_implies_verify_access;eauto.
@@ -193,29 +181,27 @@ Section cap_lang_rules.
   Qed.
 
   (* load into PC from reg *)
-  Lemma wp_loadU_success_reg_to_PC E r1 r2 pc_p pc_g pc_b pc_e pc_a w p g b e a a1 p' g' b' e' a' a'' pc_p' p'':
+  Lemma wp_loadU_success_reg_to_PC E r1 r2 pc_p pc_g pc_b pc_e pc_a w p g b e a a1 p' g' b' e' a' a'' :
     decodeInstrW w = LoadU PC r1 (inr r2)  →
-    PermFlows pc_p pc_p' →
-    PermFlows p p'' →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
     isU p = true -> withinBounds ((p, g), b, e, a) = true →
     (a' + 1)%a = Some a'' →
     (a + 1)%a = Some a1 ->
 
     {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
-          ∗ ▷ pc_a ↦ₐ[pc_p'] w
+          ∗ ▷ pc_a ↦ₐ w
           ∗ ▷ r1 ↦ᵣ inr ((p,g),b,e,a1)
           ∗ ▷ r2 ↦ᵣ inl (-1)%Z
-          ∗ ▷ a ↦ₐ[p''] inr ((p',g'),b',e',a') }}}
+          ∗ ▷ a ↦ₐ inr ((p',g'),b',e',a') }}}
       Instr Executable @ E
       {{{ RET NextIV;
           PC ↦ᵣ inr ((p',g'),b',e',a'')
-             ∗ pc_a ↦ₐ[pc_p'] w
+             ∗ pc_a ↦ₐ w
              ∗ r1 ↦ᵣ inr ((p,g),b,e,a1)
              ∗ r2 ↦ᵣ inl (-1)%Z
-             ∗ a ↦ₐ[p''] inr ((p',g'),b',e',a') }}}.
+             ∗ a ↦ₐ inr ((p',g'),b',e',a') }}}.
   Proof.
-    iIntros (Hinstr Hfl Hfl' Hvpc HU Hwb Hpca' Hincr φ)
+    iIntros (Hinstr Hvpc HU Hwb Hpca' Hincr φ)
             "(>HPC & >Hi & >Hr1 & >Hr2 & >Ha) Hφ".
     iApply (wp_loadU_success_reg_to_PC_any with "[$Hr1 $HPC $Hr2 $Hi $Ha]");[..|iFrame];eauto.
     - apply withinBounds_le_addr in Hwb as [Hle Hlt]. solve_addr.

@@ -7,7 +7,6 @@ From cap_machine.rules Require Import rules_StoreU_derived rules_LoadU_derived r
 Section scall.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ}
           `{MP: MachineParameters}.
 
   (* Macro for stack calling when the stack capability is uninitialized.
@@ -45,15 +44,15 @@ Section scall.
     (* don't clear the unused part of the stack - just clear the registers *)
     rclear_instrs (list_difference all_registers (params ++ [PC;r_stk;r_t0;r1])).
 
-  Definition scallU_prologue (a : list Addr) p r1 params :=
-    ([∗ list] a_i;w_i ∈ a;(scallU_prologue_instrs r1 params), a_i ↦ₐ[p] w_i)%I.
+  Definition scallU_prologue (a : list Addr) r1 params :=
+    ([∗ list] a_i;w_i ∈ a;(scallU_prologue_instrs r1 params), a_i ↦ₐ w_i)%I.
 
-  Lemma single_instr_extract a i j instr prog p' :
+  Lemma single_instr_extract a i j instr prog :
     contiguous_between a i j →
-    ([∗ list] a_i;w_i ∈ a; (instr :: prog), a_i ↦ₐ[p'] w_i) -∗
+    ([∗ list] a_i;w_i ∈ a; (instr :: prog), a_i ↦ₐ w_i) -∗
     ∃ a' a_rest,
-      (( i ↦ₐ[p'] instr) ∗
-       [∗ list] a_i;w_i ∈ a'; prog, a_i ↦ₐ[p'] w_i) ∗
+      (( i ↦ₐ instr) ∗
+       [∗ list] a_i;w_i ∈ a'; prog, a_i ↦ₐ w_i) ∗
        ⌜ a = i :: a'
          ∧ (i + 1 = Some a_rest)%a
          ∧ contiguous_between a' a_rest j ⌝.
@@ -94,7 +93,7 @@ Section scall.
 
   Lemma scallU_prologue_spec
         (* adress arithmetic *) a_r_adv b_r_adv a_cont a_next
-        (* scall parameters *) a a_first p' r1
+        (* scall parameters *) a a_first r1
         (* program counter *) p g b e
         (* stack capability *) b_r e_r a_r
         (* continuation *) φ
@@ -106,7 +105,6 @@ Section scall.
     withinBounds ((URWLX, Local), b_r, e_r, a_r) = true ->
     withinBounds ((URWLX, Local), b_r, e_r, b_r_adv) = true →
     contiguous_between a a_first a_cont →
-    PermFlows p p' →
     isMonotone g = false →
     r1 ∉ [PC;r_stk;r_t0;r_t1;r_t2;r_t3;r_t4;r_t5;r_t6] → (* the jump destination will not be overwritten/cleared *)
     params ## [PC;r_stk;r_t0;r_t1; r_t2; r_t3; r_t4; r_t5; r_t6] → (* the parameters will not be overwritten/cleared *)
@@ -116,12 +114,12 @@ Section scall.
     (a_r + 7)%a = Some b_r_adv →
     (a_cont + (2 + (2 * length (params))))%a = Some a_next →
 
-    (▷ scallU_prologue a p' r1 params
+    (▷ scallU_prologue a r1 params
    ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a_first)
    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Monotone),b_r,e_r,a_r)
    ∗ ▷ (∃ w, r_t0 ↦ᵣ w)
    ∗ ▷ ([∗ map] r_i↦w_i ∈ rmap, r_i ↦ᵣ w_i)
-   ∗ ▷ ([[a_r, b_r_adv]]↦ₐ[RWLX][[ws_own]]) (* local stack - note that the perm here is NOT unitialized,
+   ∗ ▷ ([[a_r, b_r_adv]]↦ₐ[[ws_own]]) (* local stack - note that the perm here is NOT unitialized,
                                                as the definition of interp1 has a promote_permission in there *)
    (* No ownership of adversarial stack here; no clearing required *)
    ∗ ▷ (PC ↦ᵣ inr (p,g,b,e,a_cont)
@@ -129,18 +127,18 @@ Section scall.
             ∗ r_t0 ↦ᵣ inr ((E,Monotone),b_r,b_r_adv,a_r) (* Note that this capbility does not grant permissions up to the end of the stack anymore *)
             ∗ (∃ rmap', ⌜dom (gset RegName) rmap = dom (gset RegName) rmap' ∧ ∀ r w, rmap' !! r = Some w → w = inl 0%Z⌝
                                                     ∗ [∗ map] r_i↦w_i ∈ rmap', r_i ↦ᵣ w_i)
-            ∗ [[ a_r, b_r_adv ]]↦ₐ[RWLX][[ [inl w_1;
+            ∗ [[ a_r, b_r_adv ]]↦ₐ[[ [inl w_1;
                                              inl w_2_U;
                                              inl w_3;
                                              inl w_4a;
                                              inl w_4b_U;
                                              inr (p,g,b,e,a_next);
                                              inr (URWLX,Monotone,b_r,e_r,a_r_adv)] ]] (* local stack *)
-            ∗ scallU_prologue a p' r1 params -∗
+            ∗ scallU_prologue a r1 params -∗
             WP Seq (Instr Executable) {{ φ }})
    ⊢ WP Seq (Instr Executable) {{ φ }})%I.
   Proof.
-    iIntros (Hvpc1 Hwb1 Hwb2 Ha Hfl Hmono Hne Hdisj Hrmap Hadva Hadvb Hcont)
+    iIntros (Hvpc1 Hwb1 Hwb2 Ha Hmono Hne Hdisj Hrmap Hadva Hadvb Hcont)
             "(>Hprog & >HPC & >Hr_stk & >Hr_t0 & >Hregs & >Hgen_reg & Hφ)".
     assert (withinBounds ((RWLX, Local), b_r, e_r, a_r_adv) = true) as Hwb3.
     { apply andb_true_iff.
@@ -169,7 +167,6 @@ Section scall.
     (* The following length assumptions will let us destruct the stack/program *)
     iDestruct (big_sepL2_length with "Hprog") as %Hlength.
     apply contiguous_between_cons_inv_first in Hcontiguous as Heq. subst l.
-    assert(PermFlows URWLX RWLX) as Hfl'. by rewrite /PermFlows.
     (* PUSH ACTIVATION RECORD *)
     (* push w_1 *)
     destruct ws_own as [|w ws_own];[inversion Hlength'|]; iDestruct "Hgen_reg" as "[Ha Hstack_own]".
@@ -218,7 +215,7 @@ Section scall.
     iDestruct "Hprog" as "[Hinstr Hprog]".
     iApply (wp_bind (fill [SeqCtx])).
     iApply (wp_move_success_reg_fromPC with "[$Hinstr $Hrt1 $HPC]");
-      [apply decode_encode_instrW_inv|apply Hfl| |iContiguous_next Ha 5|].
+      [apply decode_encode_instrW_inv| |iContiguous_next Ha 5|].
     { iCorrectPC a_first a_cont. }
     iEpilogue_combine "(HPC & Hinstr & Hr_t1)" "Hinstr" "Hi".
     (* lea r_t1 epilogue_off *)
@@ -239,7 +236,7 @@ Section scall.
       intros Hl. pose proof (incr_addr_trans a a_cont a_next l (2 + 2 * length params)%Z Hl Hcont).
       rewrite -H. f_equiv. lia. }
     iApply (wp_lea_success_z with "[$Hi $Hr_t1 $HPC]");
-      [apply decode_encode_instrW_inv|apply Hfl| |iContiguous_next Ha 6|apply Hepilogue'|auto|..].
+      [apply decode_encode_instrW_inv| |iContiguous_next Ha 6|apply Hepilogue'|auto|..].
     { iCorrectPC a_first a_cont. }
     { eapply isCorrectPC_range_npE; eauto. iContiguous_bounds a_first a_cont. }
     { apply contiguous_between_length in Ha.
@@ -278,14 +275,14 @@ Section scall.
     destruct a_rest; [inversion Hlength|].
     iPrologue "Hprog".
     iApply (wp_move_success_reg with "[$HPC $Hi $Hr_t0 $Hr_stk]");
-      [apply decode_encode_instrW_inv|apply Hfl| |iContiguous_next Ha 9|].
+      [apply decode_encode_instrW_inv| |iContiguous_next Ha 9|].
     { iCorrectPC a_first a_cont. }
     iEpilogue_combine "(HPC & Hinstr & Hr_t0 & Hr_stk)" "Hinstr" "Hprog_done".
     (* promoteU r_t0 *)
     destruct a_rest; [inversion Hlength|].
     iPrologue "Hprog".
     iApply (wp_promoteU_success with "[$HPC $Hi $Hr_t0]");
-      [apply decode_encode_instrW_inv|apply Hfl| |auto |iContiguous_next Ha 10|].
+      [apply decode_encode_instrW_inv| |auto |iContiguous_next Ha 10|].
     { iCorrectPC a_first a_cont. }
     iEpilogue_combine "(HPC & Hinstr & Hr_t0)" "Hinstr" "Hprog_done".
     assert ((addr_reg.min b_r_adv e_r) = b_r_adv) as ->.
@@ -302,7 +299,7 @@ Section scall.
       intro HH; assert (a = a_r_adv); [ revert HH Hadva Hadvb; clear; solve_addr |];
       subst a end.
     iApply (wp_lea_success_z with "[$HPC $Hi $Hr_t0]");
-      [apply decode_encode_instrW_inv|apply Hfl| |iContiguous_next Ha 11| |auto..].
+      [apply decode_encode_instrW_inv| |iContiguous_next Ha 11| |auto..].
     { iCorrectPC a_first a_cont. }
     { eapply invert_incr_addr in Hadvb. done.  }
     { by cbn. }
@@ -311,7 +308,7 @@ Section scall.
     destruct a_rest; [inversion Hlength|].
     iPrologue "Hprog".
     iApply (wp_restrict_success_z with "[$HPC $Hi $Hr_t0]");
-      [apply decode_encode_instrW_inv|apply Hfl| |iContiguous_next Ha 12| |auto|auto|].
+      [apply decode_encode_instrW_inv| |iContiguous_next Ha 12| |auto|auto|].
     { iCorrectPC a_first a_cont. }
     { rewrite decode_encode_permPair_inv. auto. }
     iEpilogue_combine "(HPC & Hinstr & Hr_t0)" "Hinstr" "Hprog_done".
@@ -320,7 +317,7 @@ Section scall.
     destruct a_rest; [inversion Hlength|].
     iPrologue "Hprog".
     iApply (wp_Get_success with "[$HPC $Hi Hr_t1 Hr_stk]");
-      [apply decode_encode_instrW_inv|eauto|apply Hfl| |iContiguous_next Ha 13|auto| |iSimpl|]; eauto.
+      [apply decode_encode_instrW_inv|eauto| |iContiguous_next Ha 13|iSimpl|]; eauto.
     { iCorrectPC a_first a_cont. } { iFrame. }
     iEpilogue_combine "(HPC & Hinstr & Hr_stk & Hr_t1)" "Hinstr" "Hprog_done".
     (* gete r_t2 r_stk *)
@@ -330,7 +327,7 @@ Section scall.
     destruct a_rest; [inversion Hlength|].
     iPrologue "Hprog".
     iApply (wp_Get_success with "[$HPC $Hi Hr_t2 Hr_stk]");
-      [apply decode_encode_instrW_inv| eauto | apply Hfl| |iContiguous_next Ha 14|auto| |iSimpl|]; eauto.
+      [apply decode_encode_instrW_inv| eauto |  |iContiguous_next Ha 14|iSimpl|]; eauto.
     { iCorrectPC a_first a_cont. } { iFrame. }
     iEpilogue_combine "(HPC & Hinstr & Hr_stk & Hr_t2)" "Hinstr" "Hprog_done".
     (* subseg r_stk r_t1 r_t2 *)
@@ -366,7 +363,7 @@ Section scall.
     iDestruct "Hmclear" as "[Hinstr _]".
     iApply (wp_bind (fill [SeqCtx])).
     iApply (wp_subseg_success with "[$HPC $Hinstr $Hr_stk $Hr_t1 $Hr_t2]");
-      [apply decode_encode_instrW_inv|apply Hfl| |eauto|auto|auto|..].
+      [apply decode_encode_instrW_inv| |eauto|auto|auto|..].
     { iCorrectPC a_first a_cont. }
     { rewrite !andb_true_iff !Z.leb_le. repeat split; try lia.
       eapply withinBounds_le_addr; eauto. }
@@ -397,7 +394,6 @@ Section scall.
       have: (a_first <= a14)%a by iContiguous_bounds a_first a_cont.
       have: (a14 <= rclear_first)%a by auto.
       revert Ha'1; clear; solve_addr. }
-    { apply Hfl. }
     { rewrite !dom_insert_L !list_to_set_difference -/all_registers_s.
       rewrite Hrmap !difference_difference_L !singleton_union_difference_L
               !all_registers_union_l.
@@ -419,15 +415,15 @@ Section scall.
     }
     iSplitL "Hact_frame".
     { iDestruct "Hact_frame" as "(?&?&?&?&?&?&?)". by iFrame. }
-    { rewrite Happeq'. repeat (iDestruct "Hprog_done" as "(?&Hprog_done)").
-      repeat (iDestruct "Hpushes" as "(?&Hpushes)").
+    { rewrite Happeq'. iDestruct "Hprog_done" as "($&$&$&$&$&$&$&$&$&?)".
+      iDestruct "Hpushes" as "($&$&$&$&$&$)".
       iFrame. rewrite -list_difference_app. iFrame. }
     Unshelve. apply _.
   Qed.
 
   Lemma scallU_epilogue_spec stack_own_b stack_own_e s_last rt1w rstkw
         (* reinstated PC *) pc_p pc_g pc_b pc_e pc_cont pc_next
-        (* reinstated stack *) p_r g_r b_r e_r p_r'
+        (* reinstated stack *) p_r g_r b_r e_r
         (* current PC *) p g φ :
 
     isCorrectPC_range p g b_r stack_own_e stack_own_b stack_own_e →
@@ -436,15 +432,13 @@ Section scall.
                                                             TODO: this could be avoided by loading through the PC instead,
                                                             but I reused the legacy code for now *)
     isU p_r = true → (* Stack capability is uninitialized *)
-    PermFlows p p_r' ->
-    PermFlows p_r p_r' ->
     (pc_cont + 1)%a = Some pc_next ->
     (s_last + 1)%a = Some stack_own_e ->
 
     (▷ PC ↦ᵣ inr (p, g, b_r, stack_own_e, stack_own_b) (* only permission up to adv frame, i.e. stack_own_e *)
        ∗ ▷ r_t1 ↦ᵣ rt1w
        ∗ ▷ r_stk ↦ᵣ rstkw
-       ∗ ▷ ([[stack_own_b,stack_own_e]]↦ₐ[p_r'][[
+       ∗ ▷ ([[stack_own_b,stack_own_e]]↦ₐ[[
                 [inl w_1; inl w_2_U; inl w_3; inl w_4a; inl w_4b_U;
                  inr (pc_p, pc_g, pc_b, pc_e, pc_cont);
                  inr (p_r, g_r, b_r, e_r, s_last)]
@@ -452,7 +446,7 @@ Section scall.
        ∗ ▷ (PC ↦ᵣ inr (pc_p, pc_g, pc_b, pc_e, pc_next)
                ∗ r_stk ↦ᵣ inr (p_r, g_r, b_r, e_r, s_last)
                ∗ (∃ rt1w, r_t1 ↦ᵣ rt1w)
-               ∗ [[stack_own_b,stack_own_e]]↦ₐ[p_r'][[
+               ∗ [[stack_own_b,stack_own_e]]↦ₐ[[
                     [inl w_1; inl w_2_U; inl w_3; inl w_4a; inl w_4b_U;
                      inr (pc_p, pc_g, pc_b, pc_e, pc_cont);
                      inr (p_r, g_r, b_r, e_r, s_last)]
@@ -460,7 +454,7 @@ Section scall.
                WP Seq (Instr Executable) {{ φ }})
        ⊢ WP Seq (Instr Executable) {{ φ }})%I.
   Proof.
-    iIntros (Hvpc Hwb HUstk Hfl Hfl' Hstack1 Hstack2) "(>HPC & >Hr_t1 & >Hr_stk & >Hframe & Hφ)".
+    iIntros (Hvpc Hwb HUstk Hstack1 Hstack2) "(>HPC & >Hr_t1 & >Hr_stk & >Hframe & Hφ)".
     rewrite /region_mapsto.
     iDestruct (big_sepL2_length with "Hframe") as %Hframe_length.
     set (l := region_addrs stack_own_b stack_own_e) in *.
@@ -476,7 +470,7 @@ Section scall.
     (* move r_t1 PC *)
     iPrologue "Hframe".
     iApply (wp_move_success_reg_fromPC with "[$HPC $Hi $Hr_t1]");
-      [apply decode_encode_instrW_inv|apply Hfl| |iContiguous_next Hcont 0|].
+      [apply decode_encode_instrW_inv| |iContiguous_next Hcont 0|].
     { iCorrectPC stack_own_b stack_own_e. }
     iAssert (emp)%I as "-#Hframe_past";[done|].
     iEpilogue_combine "(HPC & Hi & Hr_t1)" "Hi" "Hframe_past".
@@ -485,7 +479,7 @@ Section scall.
     assert ((stack_own_b + 6)%a = Some s_last) as Hincr.
     { revert Hstack_bounds Hframe_length Hstack2; clear; solve_addr. }
     iApply (wp_lea_success_z with "[$HPC $Hi $Hr_t1]");
-      [apply decode_encode_instrW_inv|apply Hfl| |iContiguous_next Hcont 1|apply Hincr|auto|..].
+      [apply decode_encode_instrW_inv| |iContiguous_next Hcont 1|apply Hincr|auto|..].
     { iCorrectPC stack_own_b stack_own_e. }
     { eapply isCorrectPC_range_npE; eauto. iContiguous_bounds stack_own_b stack_own_e. }
     { apply contiguous_between_length in Hcont.
@@ -509,7 +503,7 @@ Section scall.
         eapply (contiguous_between_incr_addr_middle _ _ _ 2 4 _ _ Hcont); auto. }
       apply Z.eqb_neq. revert Hincr'; clear; solve_addr. }
     iApply (wp_load_success with "[$HPC $Hi $Hr_stk $Hr_t1 Hlast]").
-    apply decode_encode_instrW_inv. apply Hfl.
+    apply decode_encode_instrW_inv.
     iCorrectPC stack_own_b stack_own_e.
     { split.
       - unshelve epose proof (isCorrectPC_range_perm _ _ _ _ _ _ Hvpc _)
@@ -518,12 +512,12 @@ Section scall.
       - eapply isCorrectPC_withinBounds. apply Hvpc.
         iContiguous_bounds stack_own_b stack_own_e. }
     { iContiguous_next Hcont 2. }
-    rewrite Hne; iFrame. iPureIntro; apply Hfl.
+    rewrite Hne; iFrame.
     iEpilogue_combine "(HPC & Hr_stk & Hinstr & Hr_t1 & Hlast)" "Hinstr" "Hframe_past".
     (* sub r_t1 0 (2 + i) *)
     iApply (wp_bind (fill [SeqCtx])).
     iApply (wp_add_sub_lt_success_z_z with "[$HPC Hr_t1 $Hinstr1]");
-      [apply decode_encode_instrW_inv| | | apply Hfl | | iFrame;eauto|..]; eauto.
+      [apply decode_encode_instrW_inv| | | | iFrame;eauto|..]; eauto.
     assert ((a1 + 1)%a = Some a2) as ->;[iContiguous_next Hcont 3|]. eauto.
     { iCorrectPC stack_own_b stack_own_e. }
     iEpilogue_combine "(HPC & Hinstr & Hr_t1)" "Hinstr" "Hframe_past".
@@ -531,7 +525,7 @@ Section scall.
     iApply (wp_bind (fill [SeqCtx])).
       rewrite Hne. simpl.
     iApply ( wp_loadU_success_reg_to_PC with "[$HPC $Hr_t1 $Hr_stk $Hinstr2 $Hinstr3]");
-      [apply decode_encode_instrW_inv|apply Hfl| apply Hfl'| | apply HUstk | | ..];eauto.
+      [apply decode_encode_instrW_inv| | apply HUstk | | ..];eauto.
     { iCorrectPC stack_own_b stack_own_e. }
     { rewrite /withinBounds. rewrite /withinBounds in Hwb. rewrite andb_true_iff. apply andb_true_iff in Hwb as [Hle Hlt]. split.
       * assert ((stack_own_b + 5)%a = Some a3) as Hso.
