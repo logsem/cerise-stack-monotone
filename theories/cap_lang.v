@@ -674,6 +674,11 @@ Section opsem.
            fill_item_val, fill_item_no_val_inj, head_ctx_step_val.
   Qed.
 
+  Lemma cap_lang_mixin' : LanguageMixin of_val to_val prim_step.
+  Proof.
+    constructor; eauto using to_of_val, of_to_val, val_stuck.
+  Qed.
+
   Definition is_atomic (e : expr) : Prop :=
     match e with
     | Instr _ => True
@@ -699,6 +704,8 @@ End opsem.
 Canonical Structure cap_ectxi_lang `{MachineParameters} := EctxiLanguage cap_lang_mixin.
 Canonical Structure cap_ectx_lang `{MachineParameters} := EctxLanguageOfEctxi cap_ectxi_lang.
 Canonical Structure cap_lang `{MachineParameters} := LanguageOfEctx cap_ectx_lang.
+
+Canonical Structure cap_lang' `{MachineParameters} := Language cap_lang_mixin'.
 
 Hint Extern 20 (PureExec _ _ _) => progress simpl : typeclass_instances.
 
@@ -765,8 +772,34 @@ From cap_machine Require Import linking.
 
 Definition machine_component: Type := component nat _ _ Word.
 
-Definition initial_state `{MachineParameters} (r_stk: RegName) (b_stk e_stk: Addr) (c: machine_component): cfg cap_lang :=
+Definition initial_state `{MachineParameters} (r_stk: RegName) (b_stk e_stk: Addr) (c: machine_component): cfg cap_lang' :=
   match c with
   | Lib _ _ _ _ pre_comp => ([Seq (Instr Executable)], (∅, ∅)) (* dummy value *)
   | Main _ _ _ _ (ms, _, _) c_main => ([Seq (Instr Executable)], (<[r_stk := inr (URWLX, Monotone, b_stk, e_stk, b_stk)]> (<[PC := c_main]> (gset_to_gmap (inl 0%Z) (list_to_set all_registers))), ms))
+  end.
+
+Definition can_address_only (w: Word) (addrs: gset Addr): Prop :=
+  match w with
+  | inl _ => True
+  | inr (p, _, b, e, _) =>
+    match p with
+    | O | E => True
+    | _ => forall a, (b <= a < e)%a -> a ∈ addrs
+    end
+  end.
+
+Definition pwl (w: Word): bool :=
+  match w with
+  | inl _ => false
+  | inr (p, _, _, _, _) => pwlU p
+  end.
+
+Definition is_global (w: Word): bool :=
+  match w with
+  | inl _ => true
+  | inr (_, l, _, _, _) =>
+    match l with
+    | Global => true
+    | _ => false
+    end
   end.
