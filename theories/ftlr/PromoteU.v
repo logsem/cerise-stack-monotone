@@ -9,7 +9,7 @@ From cap_machine Require Import stdpp_extra.
 Section fundamental.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MP: MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
@@ -39,6 +39,7 @@ Section fundamental.
           { rewrite region_addrs_empty; [|solve_addr].
             eapply submseteq_nil_l. }
         * iDestruct "A" as "[A B]". auto.
+        * iDestruct "A" as "[A B]". auto.
       + destruct g; auto. iDestruct "A" as "[A B]". auto.
       + destruct g.
         * iDestruct "A" as "#A".
@@ -49,6 +50,7 @@ Section fundamental.
           { rewrite region_addrs_empty; [|solve_addr].
             eapply submseteq_nil_l. }
         * iDestruct "A" as "[#A #B]". auto.
+        * iDestruct "A" as "[#A #B]". auto.
       + destruct g; auto. iDestruct "A" as "[A B]". auto.
     - iApply (interp_weakening with "IH"); eauto; try solve_addr.
       + rewrite HisU; auto.
@@ -56,12 +58,12 @@ Section fundamental.
       + destruct g; auto.
   Qed.
 
-  Lemma promoteU_case (W : WORLD) (r : leibnizO Reg) (p p' : Perm)
-        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst : RegName):
-    ftlr_instr W r p p' g b e a w (PromoteU dst) ρ.
+  Lemma promoteU_case (W : WORLD) (r : leibnizO Reg) (p : Perm)
+        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst : RegName) (P:D) :
+    ftlr_instr W r p g b e a w (PromoteU dst) ρ P.
   Proof.
-    intros Hp Hsome i Hbae Hfp Hpwl Hregion [Hnotrevoked Hnotstatic] HO Hi.
-    iIntros "#IH #Hinv #Hreg #Hinva Hmono #Hw Hsts Hown".
+    intros Hp Hsome i Hbae Hpers Hpwl Hregion Hnotrevoked Hnotmonostatic Hnotuninitialized Hi.
+    iIntros "#IH #Hinv #Hreg #Hinva #Hrcond #Hwcond Hmono Hw Hsts Hown".
     iIntros "Hr Hstate Ha HPC Hmap".
     rewrite delete_insert_delete.
     iDestruct ((big_sepM_delete _ _ PC) with "[HPC Hmap]") as "Hmap /=";
@@ -77,7 +79,7 @@ Section fundamental.
       iApply wp_value; auto. iIntros; discriminate. }
     { incrementPC_inv; simplify_map_eq.
       iApply wp_pure_step_later; auto. iNext.
-      iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
+      iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono Hw]") as "Hr"; eauto.
       { destruct ρ;auto;congruence. }
       iApply ("IH" $! _ (<[dst:=inr (promote_perm p0, g0, b0, addr_reg.min a0 e0, a0)]> (<[PC:=_]> r)) with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); eauto.
       { intro. cbn. by repeat (rewrite lookup_insert_is_Some'; right). }
@@ -100,7 +102,7 @@ Section fundamental.
       { iModIntro. destruct (reg_eq_dec PC dst).
         - subst dst. rewrite !lookup_insert in H0 H1. inv H1. inv H0.
           assert (promote_perm p0 = p0) as -> by (destruct Hp as [-> | [-> | [-> ->] ] ]; auto).
-          rewrite (isWithin_region_addrs_decomposition x1 (addr_reg.min x3 e0) x1 e0); try solve_addr.
+          rewrite /region_conditions (isWithin_region_addrs_decomposition x1 (addr_reg.min x3 e0) x1 e0); try solve_addr.
           rewrite !big_sepL_app. iDestruct "Hinv" as "[A1 [A2 A3]]". auto.
         - rewrite lookup_insert_ne in H1; auto. rewrite lookup_insert in H1.
           inv H1. auto. } }

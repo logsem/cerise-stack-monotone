@@ -2,7 +2,7 @@ From stdpp Require Import base.
 From iris.proofmode Require Import tactics.
 From iris.program_logic Require Import weakestpre adequacy lifting.
 From cap_machine Require Export logrel monotone.
-From cap_machine Require Import ftlr_base.
+From cap_machine Require Import ftlr_base interp_weakening.
 From cap_machine.rules Require Import rules_StoreU.
 From cap_machine Require Import stdpp_extra.
 Import uPred.
@@ -322,7 +322,7 @@ Section fundamental.
         iDestruct "HStoreRes" as (w0 ->) "_".
         iSplitR. rewrite lookup_insert_ne; auto. by rewrite lookup_insert.
         iExists p1,g1,b1,e1,a1,storev.
-        iPureIntro. repeat split; auto. rewrite Hnext. 
+        iPureIntro. repeat split; auto. rewrite Hnext.
         case_decide; last by exfalso.
         exists w0. simplify_map_eq. split;auto.
       + subst a. iDestruct "HStoreRes" as "[-> HStoreRes ]".
@@ -339,16 +339,15 @@ Section fundamental.
 
   (* TODO: prove this using interp_weakening *)
   Lemma isU_weak_addrs W p g b e a a' :
-    isU p -> (a' <= a)%a →
+    isU p = true -> (a' <= a)%a →
     interp W (inr (p,g,b,e,a)) -∗ interp W (inr (p,g,b,e,a')).
   Proof.
     iIntros (Hu Hle) "#Hv".
-    rewrite !fixpoint_interp1_eq.
-  Admitted.
-    (* destruct p;inversion Hu. *)
-    (* - destruct g;try done. *)
-    (*   + simpl. admit. *)
-    (*     admit.  *)
+    iApply interp_weakeningEO;eauto.
+    rewrite Hu;auto. 1,2,3,4: destruct p;auto;inversion Hu.
+    solve_addr. solve_addr. apply Is_true_eq_left. apply PermFlows_refl.
+    apply Is_true_eq_left. destruct g;auto.
+  Qed.
 
   Lemma storev_interp_mono W (r : Reg) (r1 : RegName) (r2 : Z + RegName) p g b e a a' ρ storev:
     word_of_argument r r2 = Some storev
@@ -397,8 +396,8 @@ Section fundamental.
      destruct (a0 + z)%a eqn:Hnext;[|apply related_sts_pub_refl_world].
      destruct (a =? a0)%Z;[|apply related_sts_pub_refl_world].
      destruct (std W !! a) eqn:Hsome;[|apply related_sts_pub_refl_world].
-     destruct r0;try apply related_sts_pub_refl_world. 
-     apply uninitialized_w_mono_related_sts_pub_world in Hsome;auto. 
+     destruct r0;try apply related_sts_pub_refl_world.
+     apply uninitialized_w_mono_related_sts_pub_world in Hsome;auto.
    Qed.
 
    Definition new_state ρ :=

@@ -8,7 +8,7 @@ From cap_machine.rules Require Import rules_base rules_Mov.
 Section fundamental.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
@@ -21,12 +21,12 @@ Section fundamental.
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
-  Lemma mov_case (W : WORLD) (r : leibnizO Reg) (p p' : Perm)
-        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst : RegName) (src : Z + RegName):
-    ftlr_instr W r p p' g b e a w (Mov dst src) ρ.
+  Lemma mov_case (W : WORLD) (r : leibnizO Reg) (p : Perm)
+        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst : RegName) (src : Z + RegName) (P:D):
+    ftlr_instr W r p g b e a w (Mov dst src) ρ P.
   Proof.
-    intros Hp Hsome i Hbae Hfp Hpwl Hregion [Hnotrevoked Hnotstatic] HO Hi.
-    iIntros "#IH #Hinv #Hreg #Hinva Hmono #Hw Hsts Hown".
+    intros Hp Hsome i Hbae Hpers Hpwl Hregion Hnotrevoked Hnotmonostatic Hnotuninitialized Hi.
+    iIntros "#IH #Hinv #Hreg #Hinva #Hrcond #Hwcond Hmono Hw Hsts Hown".
     iIntros "Hr Hstate Ha HPC Hmap".
     rewrite delete_insert_delete.
     iDestruct ((big_sepM_delete _ _ PC) with "[HPC Hmap]") as "Hmap /=";
@@ -50,8 +50,8 @@ Section fundamental.
       { subst dst. rewrite lookup_insert in HPC. inv HPC.
         repeat rewrite insert_insert.
         destruct src; simpl in *; try discriminate.
-        iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
-        { destruct ρ;auto;[..|specialize (Hnotstatic g0)];contradiction. }
+        iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono Hw]") as "Hr"; eauto.
+        { destruct ρ;auto;[|specialize (Hnotmonostatic g0)|specialize (Hnotuninitialized w0)];contradiction. }
         destruct (reg_eq_dec PC r0).
         { subst r0. simplify_map_eq.
           iApply ("IH" $! _ r with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); try iClear "IH"; eauto. }
@@ -62,8 +62,11 @@ Section fundamental.
             + destruct p''; simpl in Hpft; auto.
               repeat rewrite fixpoint_interp1_eq. simpl.
               destruct g''; auto.
-            + iModIntro.
+            + iModIntro. rewrite /region_conditions.
               destruct p''; simpl in Hpft; try discriminate; repeat (rewrite fixpoint_interp1_eq); simpl; auto.
+              iApply (big_sepL_mono with "Hr0").
+              intros. iIntros "H". iDestruct "H" as (P') "(?&?&?)".
+              iApply bi.and_exist_r. iExists _. iFrame.
               destruct g''; auto.
           - iApply (wp_bind (fill [SeqCtx])).
             iDestruct ((big_sepM_delete _ _ PC) with "Hmap") as "[HPC Hmap]"; [apply lookup_insert|].
@@ -74,8 +77,8 @@ Section fundamental.
             iNext. iIntros. discriminate. } }
       { rewrite lookup_insert_ne in HPC; auto.
         rewrite lookup_insert in HPC. inv HPC.
-        iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
-        { destruct ρ;auto;[..|specialize (Hnotstatic g)];contradiction. }
+        iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono Hw]") as "Hr"; eauto.
+        { destruct ρ;auto;[|specialize (Hnotmonostatic g)|specialize (Hnotuninitialized w1)];contradiction. }
         iApply ("IH" $! _ (<[dst:=w0]> _) with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); eauto.
         - intros; simpl.
           rewrite lookup_insert_is_Some.
@@ -92,7 +95,12 @@ Section fundamental.
                 - simplify_map_eq.
                   rewrite (fixpoint_interp1_eq _ (inr (_, g'', b'', e'', a''))) /=.
                 destruct Hp as [Hp | [Hp | [Hp Hg] ] ]; subst p''; try subst g'';
-                  (iFrame "Hinv Hexec"). }
+                  try (iFrame "Hexec"); try (iFrame "Hinv").
+                iApply (big_sepL_mono with "Hinv").
+                intros. iIntros "(H & ?)".
+                simpl. iDestruct "H" as (P') "(?&?&?)".
+                iExists _. iFrame.
+              }
               simplify_map_eq.
               iDestruct ("Hreg" $! r0 ltac:(auto)) as "Hr0". rewrite H0. auto.
           + repeat rewrite /RegLocate lookup_insert_ne; auto.

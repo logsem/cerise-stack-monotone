@@ -8,7 +8,7 @@ From cap_machine.rules Require Export rules_Get.
 Section fundamental.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
@@ -21,13 +21,13 @@ Section fundamental.
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
-  Lemma get_case (W : WORLD) (r : leibnizO Reg) (p p' : Perm)
-        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst r0 : RegName) (ins: instr) :
+  Lemma get_case (W : WORLD) (r : leibnizO Reg) (p : Perm)
+        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst r0 : RegName) (ins: instr) (P:D) :
     is_Get ins dst r0 →
-    ftlr_instr W r p p' g b e a w ins ρ.
+    ftlr_instr W r p g b e a w ins ρ P.
   Proof.
-    intros Hinstr Hp Hsome i Hbae Hfp Hpwl Hregion [Hnotrevoked Hnotstatic] HO Hi.
-    iIntros "#IH #Hinv #Hreg #Hinva Hmono #Hw Hsts Hown".
+    intros Hinstr Hp Hsome i Hbae Hpers Hpwl Hregion Hnotrevoked Hnotmonostatic Hnotuninitialized Hi.
+    iIntros "#IH #Hinv #Hreg #Hinva #Hrcond #Hwcond Hmono Hw Hsts Hown".
     iIntros "Hr Hstate Ha HPC Hmap".
     rewrite delete_insert_delete.
     rewrite <- Hi in Hinstr. clear Hi.
@@ -47,8 +47,8 @@ Section fundamental.
       destruct c as ((((p1 & g1) & b1) & e1) & a1).
       assert (dst <> PC) as HdstPC by (intros ->; simplify_map_eq).
       simplify_map_eq.
-      iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
-      { destruct ρ;auto;[..|specialize (Hnotstatic g)];contradiction. }
+      iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono Hw]") as "Hr"; eauto.
+      { destruct ρ;auto;[|specialize (Hnotmonostatic g)|specialize (Hnotuninitialized w0)];contradiction. }
       iApply ("IH" $! _ (<[dst := _]> (<[PC := _]> r)) with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]");
         try iClear "IH"; eauto.
       { intro. cbn. by repeat (rewrite lookup_insert_is_Some'; right). }
