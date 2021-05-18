@@ -8,7 +8,7 @@ From cap_machine.rules Require Import rules_base rules_Restrict.
 Section fundamental.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
@@ -30,37 +30,15 @@ Section fundamental.
   Lemma PermPairFlows_interp_preserved W p p' l l' b e a :
     p <> E ->
     PermPairFlowsTo (p', l') (p, l) = true →
-    □ ▷ (∀ (a7 : WORLD) (a8 : Reg) (a9 : Perm) (a10 : Locality)
-           (a11 a12 a13 : Addr),
-            full_map a8
-            -∗ (∀ r1 : RegName,
-                   ⌜r1 ≠ PC⌝
-                   → ((fixpoint interp1) a7)
-                       match a8 !! r1 with
-                       | Some w0 => w0
-                       | None => inl 0%Z
-                       end)
-            -∗ registers_mapsto (<[PC:=inr (a9, a10, a11, a12, a13)]> a8)
-            -∗ region a7
-            -∗ sts_full_world a7
-            -∗ na_own logrel_nais ⊤
-            -∗ ⌜a9 = RX ∨ a9 = RWX ∨ a9 = RWLX ∧ a10 = Local⌝
-            → □ ([∗ list] a14 ∈ region_addrs a11 a12,
-                 ∃ p'0 : Perm,
-                    ⌜PermFlows a9 p'0⌝ ∗
-                       read_write_cond a14 p'0 interp
-                       ∧ ⌜if pwl a9
-                          then region_state_pwl a7 a14
-                          else region_state_nwl a7 a14 a10⌝) -∗
-                interp_conf a7) -∗
+    IH -∗
     (fixpoint interp1) W (inr (p, l, b, e, a)) -∗
     (fixpoint interp1) W (inr (p', l', b, e, a)).
   Proof.
     intros HpnotE Hp. iIntros "#IH HA".
     destruct (andb_true_eq _ _ ltac:(symmetry in Hp; exact Hp)) as [HH1 HH2].
-    simpl in HH1, HH2. iApply (interp_weakening with "IH HA"); eauto; try solve_addr.
+    simpl in HH1, HH2. iApply (interp_weakening with "IH HA");eauto;try solve_addr.
     - destruct (isU p); solve_addr.
-    -  rewrite <- HH1. auto.
+    - rewrite <- HH1. auto.
     - rewrite <- HH2. auto.
   Qed.
 
@@ -74,12 +52,12 @@ Section fundamental.
     intros. destruct (perm_eq_dec p E); destruct p; auto; congruence.
   Qed.
 
-  Lemma restrict_case (W : WORLD) (r : leibnizO Reg) (p p' : Perm)
-        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst : RegName) (r0 : Z + RegName):
-    ftlr_instr W r p p' g b e a w (Restrict dst r0) ρ.
+  Lemma restrict_case (W : WORLD) (r : leibnizO Reg) (p : Perm)
+        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst : RegName) (r0 : Z + RegName) (P:D):
+    ftlr_instr W r p g b e a w (Restrict dst r0) ρ P.
   Proof.
-    intros Hp Hsome i Hbae Hfp Hpwl Hregion [Hnotrevoked Hnotstatic] HO Hi.
-    iIntros "#IH #Hinv #Hreg #Hinva Hmono #Hw Hsts Hown".
+    intros Hp Hsome i Hbae Hpers Hpwl Hregion Hnotrevoked Hnotmonostatic Hnotuninitialized Hi.
+    iIntros "#IH #Hinv #Hreg #Hinva #Hrcond #Hwcond Hmono Hw Hsts Hown".
     iIntros "Hr Hstate Ha HPC Hmap".
     rewrite delete_insert_delete.
     iDestruct ((big_sepM_delete _ _ PC) with "[HPC Hmap]") as "Hmap /=";
@@ -107,10 +85,10 @@ Section fundamental.
         repeat rewrite insert_insert in HPC.
         rewrite lookup_insert in HPC. inv HPC.
         rewrite lookup_insert in H0. inv H0.
-        rewrite H5 in H3. iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
-        { destruct ρ;auto;[..|specialize (Hnotstatic g)];contradiction. }
+        rewrite H5 in H3. iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono Hw]") as "Hr"; eauto.
+        { destruct ρ;auto;[|specialize (Hnotmonostatic g)|specialize (Hnotuninitialized w0)];contradiction. }
         destruct (PermFlowsTo RX p'') eqn:Hpft.
-        { assert (Hpg: p'' = RX ∨ p'' = RWX ∨ p'' = RWLX ∧ g'' = Local).
+        { assert (Hpg: p'' = RX ∨ p'' = RWX ∨ p'' = RWLX ∧ g'' = Monotone).
           { destruct p''; simpl in Hpft; eauto; try discriminate.
             destruct (andb_true_eq _ _ ltac:(naive_solver)).
             simpl in H3, H4. destruct p0; simpl in H3; try discriminate.
@@ -118,16 +96,25 @@ Section fundamental.
             subst g0; destruct g''; simpl in H4; auto; discriminate. }
           rewrite H5. iApply ("IH" $! _ r with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); try iClear "IH"; eauto.
           iModIntro. iApply (big_sepL_mono with "Hinv"); simpl; intros.
-          iIntros "H". iDestruct "H" as (? ?) "[H %]". iExists H4. iSplitR; auto.
-          { destruct (andb_true_eq _ _ ltac:(naive_solver)).
-            iPureIntro. eapply PermFlows_trans with p0; auto. naive_solver. }
-          iSplitL;auto.
+          iIntros "H". simpl.
+          iDestruct "H" as "[H1 H2]".
+          iSplitL "H1".
+          { destruct (writeAllowed p'') eqn:Hwa.
+            - assert (writeAllowed p0 = true) as ->;auto.
+              destruct p0;auto;destruct p'';inversion Hwa;inversion H3.
+            - destruct (writeAllowed p0).
+              + iExists interp. iFrame. iSplit;[iPureIntro;apply _|].
+                iSplit;[auto|]. iNext. iModIntro. iIntros (W1 W2 z) "_".
+                rewrite fixpoint_interp1_eq. done.
+              + iDestruct "H1" as (P') "(?&?&?)".
+                iExists _;iFrame. }
+          iDestruct "H2" as %?.
           iPureIntro.
           destruct (andb_true_eq _ _ ltac:(naive_solver)); simpl in *.
           destruct (locality_eq_dec g'' g0).
           * subst g0. destruct Hp as [Hp | [ Hp | [Hp Hl] ] ]; destruct Hpg as [Hp' | [ Hp' | [Hp' Hg' ] ] ]; subst; simpl in *; simpl; try congruence; auto.
           * destruct g''; destruct g0; simpl in *; try congruence.
-            destruct Hp as [Hp | [ Hp | [Hp Hl] ] ]; destruct Hpg as [Hp' | [ Hp' | [Hp' Hg' ] ] ]; subst; simpl in *; simpl; try congruence; auto. }
+            all: destruct Hp as [Hp | [ Hp | [Hp Hl] ] ]; destruct Hpg as [Hp' | [ Hp' | [Hp' Hg' ] ] ]; subst; simpl in *; simpl; try congruence; auto. }
         { iApply (wp_bind (fill [SeqCtx])).
           iDestruct ((big_sepM_delete _ _ PC) with "Hmap") as "[HPC Hmap]"; [apply lookup_insert|].
          rewrite H5.
@@ -138,8 +125,8 @@ Section fundamental.
           iNext. iIntros. discriminate. } }
 
       simplify_map_eq.
-      iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
-      { destruct ρ;auto;[..|specialize (Hnotstatic g)];contradiction. }
+      iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono Hw]") as "Hr"; eauto.
+      { destruct ρ;auto;[|specialize (Hnotmonostatic g)|specialize (Hnotuninitialized w0)];contradiction. }
       iApply ("IH" $! _ (<[dst:=_]> _) with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]"); eauto.
       - intros; simpl. repeat (rewrite lookup_insert_is_Some'; right); eauto.
       - iIntros (ri Hri). rewrite /RegLocate.

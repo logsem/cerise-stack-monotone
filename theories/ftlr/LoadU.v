@@ -10,7 +10,7 @@ Import uPred.
 Section fundamental.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MP: MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
@@ -29,50 +29,58 @@ Section fundamental.
       (b ≤ a' < addr_reg.min a e)%Z
       → isU p = true
       → ⊢ (interp W) (inr (p, g, b, e, a))
-      → ∃ p' : Perm, ⌜PermFlows (promote_perm p) p'⌝ ∗ read_write_cond a' p' interp
+      → read_write_cond a' interp
                      ∧ ⌜(∃ ρ : region_type, std W !! a' = Some ρ
-                                            ∧ ρ ≠ Revoked /\ (∀ g, ρ ≠ Static g))⌝.
+                                            ∧ ρ ≠ Revoked ∧ (∀ g, ρ ≠ Monostatic g) ∧ (∀ w, ρ ≠ Uninitialized w))⌝.
   Proof.
     intros. rewrite /interp fixpoint_interp1_eq /=. iIntros "H".
     assert (p = URW \/ p = URWL \/ p = URWX \/ p = URWLX) as [-> | [-> | [-> | ->] ] ] by (destruct p; simpl in H0; auto; congruence); simpl.
     - destruct g.
-      + iDestruct (extract_from_region_inv with "H") as (p' ?) "[C %]";try (iExists p'; iFrame; auto);[solve_addr|].
-        iSplit;auto. iPureIntro; auto. eauto.
+      + iDestruct (extract_from_region_inv with "H") as "[C %]";[|iFrame]. solve_addr.
+        iPureIntro; auto. rewrite H1. eexists;eauto.
       + iDestruct "H" as "[B C]".
-        iDestruct (extract_from_region_inv with "B") as (p' ?) "[D %]"; try (iExists p'; iFrame); auto.
-        iSplit;auto. iPureIntro; auto. destruct H2; eauto.
+        iDestruct (extract_from_region_inv with "B") as "[D %]"; try (iFrame); auto.
+        iPureIntro; eauto.
+      + iDestruct "H" as "[B C]".
+        iDestruct (extract_from_region_inv with "B") as "[D %]"; try (iFrame); auto.
+        iPureIntro; auto. destruct H1 as [? | ?]; eexists;eauto.
     - destruct g; auto.
       iDestruct "H" as "[B C]".
-      iDestruct (extract_from_region_inv with "B") as (p' ?) "[D %]"; try (iExists p'; iFrame); auto.
-      iPureIntro; eauto.
+      iDestruct (extract_from_region_inv with "B") as "[D %]"; try (iFrame); auto.
+      iPureIntro. eexists;split;eauto.
     - destruct g.
-      + iDestruct (extract_from_region_inv with "H") as (p' Hfl) "[D %]"; try (iExists p'; iFrame); auto; [solve_addr|].
-        iSplit;auto. iPureIntro; auto. eauto.
+      + iDestruct (extract_from_region_inv with "H") as "[D %]"; try (iFrame); auto; [solve_addr|].
+        iPureIntro; auto. eexists; eauto.
       + iDestruct "H" as "[B C]".
-        iDestruct (extract_from_region_inv with "B") as (p' Hfl) "[E %]"; try (iExists p'; iFrame); auto.
-        iSplit;auto. iPureIntro; auto. destruct H1; eauto.
+        iDestruct (extract_from_region_inv with "B") as "[E %]"; try (iFrame); auto.
+        iPureIntro; eauto.
+      + iDestruct "H" as "[B C]".
+        iDestruct (extract_from_region_inv with "B") as  "[E %]"; try (iFrame); auto.
+        iPureIntro; auto. destruct H1 as [? | ?]; eexists;eauto.
     - destruct g; auto.
       iDestruct "H" as "[B C]".
-      iDestruct (extract_from_region_inv with "B") as (p' Hfl) "[D %]"; try (iExists p'; iFrame); auto.
-      iSplit;auto. iPureIntro; simpl in H1; eauto.
+      iDestruct (extract_from_region_inv with "B") as "[D %]"; try (iFrame); auto.
+      iPureIntro; simpl in H1; eexists;eauto.
   Qed.
 
-  Definition region_open_resources W l ls p φ v (bl : bool): iProp Σ :=
+  Definition region_open_resources W l ls φ v (bl : bool): iProp Σ :=
     (∃ ρ,
      sts_state_std l ρ
-    ∗ ⌜ρ ≠ Revoked ∧ (forall m, ρ ≠ Static m)⌝
+    ∗ ⌜ρ ≠ Revoked ∧ (forall m, ρ ≠ Monostatic m) ∧ (∀ w, ρ ≠ Uninitialized w)⌝
     ∗ open_region_many (l :: ls) W
-    ∗ ⌜p ≠ O⌝
-    ∗ (if bl then monotonicity_guarantees_region ρ v p φ ∗ φ (W, v)
-       else ▷ monotonicity_guarantees_region ρ v p φ ∗  ▷ φ (W, v) )
-    ∗ rel l p φ)%I.
+    ∗ (if bl then monotonicity_guarantees_region ρ l v φ ∗ φ (W, v)
+       else ▷ monotonicity_guarantees_region ρ l v φ ∗  ▷ φ (W, v) )
+    ∗ rel l φ)%I.
 
-  Lemma loadU_case (W : WORLD) (r : leibnizO Reg) (p p' : Perm) (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (rdst rsrc : RegName) (offs : Z + RegName):
-    ftlr_instr W r p p' g b e a w (LoadU rdst rsrc offs) ρ.
+  Lemma loadU_case (W : WORLD) (r : leibnizO Reg) (p : Perm) (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (rdst rsrc : RegName) (offs : Z + RegName) (P:D):
+    ftlr_instr W r p g b e a w (LoadU rdst rsrc offs) ρ P.
   Proof.
-    intros Hp Hsome i Hbae Hfp Hpwl Hregion [Hnotrevoked Hnotstatic] HO Hi.
-    iIntros "#IH #Hinv #Hreg #Hinva Hmono #Hw Hsts Hown".
+    intros Hp Hsome i Hbae Hpers Hpwl Hregion Hnotrevoked Hnotmonostatic Hnotuninitialized Hi.
+    iIntros "#IH #Hinv #Hreg #Hinva #Hrcond #Hwcond Hmono Hw Hsts Hown".
     iIntros "Hr Hstate Ha HPC Hmap".
+    assert (Persistent (P W w)).
+    { specialize (Hpers (W,w)). auto. }
+    iDestruct "Hw" as "#Hw".
     rewrite delete_insert_delete.
     iDestruct ((big_sepM_delete _ _ PC) with "[HPC Hmap]") as "Hmap /=";
       [apply lookup_insert|rewrite delete_insert_delete;iFrame|]. simpl.
@@ -84,7 +92,7 @@ Section fundamental.
     destruct (Hsome' rsrc) as [wsrc Hrsrc].
     iDestruct (region_open_prepare with "Hr") as "Hr".
     (* Need to write using lets, otherwise Coq/Iris complains for no reason *)
-    iAssert (∃ (mem: gmap Addr (Perm * Word)),
+    iAssert (∃ (mem: gmap Addr Word),
                 ⌜let wx := <[PC:=inr (p, g, b, e, a)]> r !! rsrc in
                 match wx with
                 | Some (inr (px, gx, bx, ex, ax)) =>
@@ -97,8 +105,7 @@ Section fundamental.
                          | Some a' =>
                            let mpw := mem !! a' in
                            match mpw with
-                           | Some (p'', w') =>
-                             p'' ≠ O
+                           | Some w' => True
                            | None => False
                            end
                          | None => True
@@ -120,8 +127,8 @@ Section fundamental.
                          | Some a' =>
                            let mpw := mem !! a' in
                            match mpw with
-                           | Some (p'', w') =>
-                              ⌜mem = if addr_eq_dec a a' then (<[a:=(p',w)]> ∅) else <[a:=(p',w)]> (<[a':=(p'',w')]> ∅)⌝ ∗ sts_full_world W ∗ if addr_eq_dec a a' then open_region_many [a] W else region_open_resources W a' [a] p'' interpC w' true
+                           | Some  w' =>
+                              ⌜mem = if addr_eq_dec a a' then (<[a:=w]> ∅) else <[a:=w]> (<[a':=w']> ∅)⌝ ∗ sts_full_world W ∗ if addr_eq_dec a a' then open_region_many [a] W else region_open_resources W a' [a] interpC w' true
                            | None => ⌜False⌝
                            end
                          | None => True
@@ -130,7 +137,7 @@ Section fundamental.
                        end
                   else True
                 | _ => True
-                end) ∗ ([∗ map] a↦pw ∈ mem, ∃ p w, ⌜pw = (p,w)⌝ ∗ a ↦ₐ[p] w) ∗ ⌜mem !! a = Some (p', w)⌝)%I
+                end) ∗ ([∗ map] a↦w ∈ mem, a ↦ₐ w) ∗ ⌜mem !! a = Some w⌝)%I
         with "[Ha Hsts Hr]" as "H".
     { rewrite Hrsrc. destruct wsrc; auto.
       - iDestruct (memMap_resource_1 with "Ha") as "H".
@@ -147,23 +154,24 @@ Section fundamental.
                   eapply verify_access_spec in Hver.
                   destruct Hver as [HA [HB [HC HD] ] ].
                   iDestruct (isU_inv _ a0 with "Hinvsrc") as "H"; auto. solve_addr.
-                  iDestruct "H" as (p'') "[% [X %]]".
+                  iDestruct "H" as "[X %]".
                   destruct (addr_eq_dec a a0).
                   ** subst a0. iDestruct (memMap_resource_1 with "Ha") as "H".
                      iExists _; iFrame; auto.
                      rewrite lookup_insert; auto.
                      iFrame. auto.
-                  ** destruct H0 as [ρ' [X [Y Z] ] ].
+                  ** destruct H0 as [ρ' [X [Y [Z S] ] ] ].
                      iDestruct (region_open_next with "[$Hsts $Hr]") as "HH";eauto.
                      { intros [g1 Hcontr]. specialize (Z g1); contradiction. }
+                     { intros [g1 Hcontr]. specialize (S g1); contradiction. }
                      { apply not_elem_of_cons. split; auto.
                        apply not_elem_of_nil. }
-                     iDestruct "HH" as (w') "(Hsts & Hstate & Hr & Ha' & % & Hmono & HX)".
+                     iDestruct "HH" as (v) "(Hsts & Hstate & Hr & Ha' & Hmono & HX)".
                      iDestruct (memMap_resource_2ne with "[$Ha $Ha']") as "H"; auto.
-                     iExists (<[a:=(p', w)]> (<[a0:=(p'', w')]> ∅)).
+                     iExists (<[a:=w]> (<[a0:= v]> ∅)).
                      rewrite lookup_insert_ne; auto. rewrite lookup_insert.
-                     iFrame. iSplitR; auto. iSplitL; auto. iNext. iSplitR; auto.
-                     iExists ρ'. iFrame; auto. rewrite lookup_insert; auto.
+                     iFrame. iSplitL; auto. iSplitR; auto. iNext.
+                     iExists _. iFrame "% # ∗". auto. rewrite lookup_insert; auto.
             -- iDestruct (memMap_resource_1 with "Ha") as "H".
                iExists _; iFrame; auto. rewrite lookup_insert; auto.
           * iDestruct (memMap_resource_1 with "Ha") as "H".
@@ -178,8 +186,8 @@ Section fundamental.
       apply elem_of_gmap_dom. rewrite lookup_insert_is_Some'; eauto. }
     { iFrame. }
     iNext. iIntros (r' v) "[% [B C]]".
-    inv H1.
-    { rewrite Hrsrc in H2. inv H2. rewrite Hrsrc H3 H4 H5 H6.
+    inv H2.
+    { rewrite Hrsrc in H3. inv H3. rewrite Hrsrc H4 H5 H6 H7.
       iDestruct "A" as "[% [Hsts A]]".
       assert (Persistent (if addr_eq_dec a a' then emp%I else interp W w0)).
       { destruct (addr_eq_dec a a'). apply emp_persistent. apply interp_persistent. }
@@ -189,30 +197,33 @@ Section fundamental.
           iDestruct (region_open_prepare with "A") as "A".
           iDestruct (memMap_resource_1 with "B") as "B".
           iDestruct (region_close with "[A B $Hmono $Hstate]") as "B";eauto.
-          { destruct ρ;auto;[|specialize (Hnotstatic g1)];contradiction. }
+          { destruct ρ;auto;[|specialize (Hnotmonostatic g1)|specialize (Hnotuninitialized w1)];contradiction. }
           iFrame. iSplitR; auto.
         - subst mem. iDestruct (memMap_resource_2ne with "B") as "[B C]"; auto.
-          rewrite /region_open_resources. iDestruct "A" as (ρ') "[A1 [% [A2 [% [[A3 #Hw'] A4]]]]]".
-          destruct H1 as [Hnotrevoked' Hnotstatic'].
+          rewrite /region_open_resources. iDestruct "A" as (ρ') "[A1 [% [A2 [[A3 #Hw'] A4]]]]".
+          destruct H2 as [Hnotrevoked' [Hnotstatic' Hnotuninitialized'] ].
           iDestruct (region_close_next with "[$A1 $A2 $A3 $A4 $C]") as "A"; auto.
           { intros [g' Hcontr]. destruct ρ';auto;inversion Hcontr;try contradiction.
             specialize (Hnotstatic' g'). contradiction.
+          }
+          { intros [g' Hcontr]. destruct ρ';auto;inversion Hcontr;try contradiction.
+            specialize (Hnotuninitialized' g'). contradiction.
           }
           { eapply not_elem_of_cons; split; auto. eapply not_elem_of_nil. }
           iFrame "#".
           iDestruct (region_open_prepare with "A") as "A".
           iDestruct (region_close with "[A B $Hmono $Hstate]") as "B"; try iFrame; auto.
-          destruct ρ;auto;[..|specialize (Hnotstatic g1)];contradiction.
+          destruct ρ;auto;[|specialize (Hnotmonostatic g1)|specialize (Hnotuninitialized w1)];contradiction.
       }
 
-      apply incrementPC_Some_inv in H7.
-      destruct H7 as (?&?&?&?&?&?&?&?&?).
+      apply incrementPC_Some_inv in H8.
+      destruct H8 as (?&?&?&?&?&?&?&?&?).
       iApply wp_pure_step_later; auto. iNext.
       destruct (decide (x = RX ∨ x = RWX ∨ x = RWLX)).
       2 : {
         assert (x ≠ RX ∧ x ≠ RWX ∧ x ≠ RWLX). split; last split; by auto.
         iDestruct ((big_sepM_delete _ _ PC) with "C") as "[HPC Hmap]".
-        { rewrite H9. by rewrite lookup_insert. }
+        { rewrite H10. by rewrite lookup_insert. }
         iApply (wp_bind (fill [SeqCtx])).
         iApply (wp_notCorrectPC_perm with "[HPC]"); eauto. iIntros "!> _".
         iApply wp_pure_step_later; auto. iNext. iApply wp_value.
@@ -227,31 +238,32 @@ Section fundamental.
         destruct (reg_eq_dec rx rdst).
         + subst rx. rewrite lookup_insert.
           destruct (addr_eq_dec a a').
-          * subst mem; subst a'. rewrite lookup_insert in H6.
-            inv H6; auto.
+          * subst mem; subst a'. rewrite lookup_insert in H7.
+            inv H7; auto. iDestruct "Hrcond" as "[Hrcond _]". iApply "Hrcond". auto.
           * auto.
         + rewrite !lookup_insert_ne; auto.
           iApply "Hreg"; auto.
       - subst r'. rewrite insert_insert. iApply "C".
       - destruct (reg_eq_dec PC rdst).
-        + subst rdst. rewrite lookup_insert in H7.
-          inv H7. destruct (addr_eq_dec a a').
-          * subst a'. rewrite lookup_insert in H6. inv H6.
+        + subst rdst. rewrite lookup_insert in H8.
+          inv H8. destruct (addr_eq_dec a a').
+          * subst a'. rewrite lookup_insert in H7. inv H7.
             destruct o as [-> | [-> | ->] ]; auto.
           * destruct o as [-> | [-> | ->] ]; auto.
             rewrite !fixpoint_interp1_eq /=. destruct x0; auto.
-        + rewrite lookup_insert_ne in H7; auto.
-          rewrite lookup_insert in H7. inv H7. auto.
+        + rewrite lookup_insert_ne in H8; auto.
+          rewrite lookup_insert in H8. inv H8. auto.
       - iModIntro. destruct (reg_eq_dec PC rdst).
-        + subst rdst. rewrite lookup_insert in H7.
-          inv H7. destruct (addr_eq_dec a a').
-          * subst a'. rewrite lookup_insert in H6. inv H6.
+        + subst rdst. rewrite lookup_insert in H8.
+          inv H8. destruct (addr_eq_dec a a').
+          * subst a'. rewrite lookup_insert in H7. inv H7.
             iApply readAllowed_implies_region_conditions; auto.
             destruct o as [-> | [-> | ->] ]; auto.
+            iDestruct "Hrcond" as "[Hrcond _]". iApply "Hrcond". auto.
           * iApply readAllowed_implies_region_conditions; auto.
             destruct o as [-> | [-> | ->] ]; auto.
-        + rewrite lookup_insert_ne in H7; auto.
-          rewrite lookup_insert in H7. inv H7. eauto. }
+        + rewrite lookup_insert_ne in H8; auto.
+          rewrite lookup_insert in H8. inv H8. eauto. }
 
     { iApply wp_pure_step_later; auto. iNext. iApply wp_value; auto. iIntros; discriminate. }
   Qed.

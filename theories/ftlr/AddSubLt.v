@@ -9,7 +9,7 @@ From cap_machine Require Import machine_base.
 Section fundamental.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
@@ -22,51 +22,44 @@ Section fundamental.
   Implicit Types w : (leibnizO Word).
   Implicit Types interp : (D).
 
-  Lemma add_sub_lt_case (W : WORLD) (r : leibnizO Reg) (p p' : Perm)
-        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst : RegName) (r1 r2: Z + RegName):
-      p = RX ∨ p = RWX ∨ (p = RWLX /\ g = Local)
+  Lemma add_sub_lt_case (W : WORLD) (r : leibnizO Reg) (p : Perm)
+        (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst : RegName) (r1 r2: Z + RegName) (P:D):
+      p = RX ∨ p = RWX ∨ (p = RWLX /\ g = Monotone)
     → (∀ x : RegName, is_Some (r !! x))
     → isCorrectPC (inr (p, g, b, e, a))
     → (b <= a)%a ∧ (a < e)%a
-    → PermFlows p p'
-    → (if pwl p then region_state_pwl W a else region_state_nwl W a g)
+    → (∀ Wv : WORLD * leibnizO Word, Persistent (P Wv.1 Wv.2))
+    → (if pwl p then region_state_pwl_mono W a else region_state_nwl W a g)
     → std W !! a = Some ρ
-    → (ρ ≠ Revoked ∧ (∀ g, ρ ≠ Static g))
-    → p' ≠ O
+    → ρ ≠ Revoked
+    → (∀ g : Mem, ρ ≠ Monostatic g)
+    → (∀ w, ρ ≠ Uninitialized w)
     → (decodeInstrW w = Add dst r1 r2 \/
        decodeInstrW w = Sub dst r1 r2 \/
        decodeInstrW w = Lt dst r1 r2)
-    -> □ ▷ (∀ a0 a1 a2 a3 a4 a5 a6,
-             full_map a1
-          -∗ (∀ r1 : RegName, ⌜r1 ≠ PC⌝ → ((fixpoint interp1) a0) (a1 !r! r1))
-          -∗ registers_mapsto (<[PC:=inr (a2, a3, a4, a5, a6)]> a1)
-          -∗ region a0
-          -∗ sts_full_world a0
-          -∗ na_own logrel_nais ⊤
-          -∗ ⌜a2 = RX ∨ a2 = RWX ∨ (a2 = RWLX /\ a3 = Local)⌝
-             → □ ([∗ list] a7 ∈ region_addrs a4 a5, ∃ p'0 : Perm, ⌜PermFlows a2 p'0⌝ ∗
-                                                                   read_write_cond a7 p'0 interp
-                                                                     ∧ ⌜if pwl a2
-                                                                        then region_state_pwl a0 a7
-                                                                        else region_state_nwl a0 a7 a3⌝)
-                 -∗ interp_conf a0)
-    -∗ ([∗ list] a0 ∈ region_addrs b e, ∃ p'0 : Perm,
-                                           ⌜PermFlows p p'0⌝
-                                        ∗ read_write_cond a0 p'0 interp
-                                        ∧ ⌜if pwl p
-                                           then region_state_pwl W a0
-                                           else region_state_nwl W a0 g⌝)
+    -> □ ▷ (∀ (a0 : WORLD) (a1 : leibnizO Reg) (a2 : Perm) (a3 : Locality) (a4 a5 a6 : Addr),
+              full_map a1
+              -∗ (∀ r0 : RegName, ⌜r0 ≠ PC⌝ → fixpoint interp1 a0 (a1 !r! r0))
+                 -∗ registers_mapsto (<[PC:=inr (a2, a3, a4, a5, a6)]> a1)
+                    -∗ region a0
+                       -∗ sts_full_world a0
+                          -∗ na_own logrel_nais ⊤
+                             -∗ ⌜a2 = RX ∨ a2 = RWX ∨ a2 = RWLX ∧ a3 = Monotone⌝
+                                → □ region_conditions a0 a2 a3 a4 a5 -∗ interp_conf a0)
+    -∗ region_conditions W p g b e
     -∗ (∀ r1 : RegName, ⌜r1 ≠ PC⌝ → ((fixpoint interp1) W) (r !r! r1))
-    -∗ read_write_cond a p' interp
-    -∗ (▷ if decide (ρ = Temporary ∧ pwl p' = true)
-        then future_pub_mono (λ Wv : WORLD * (leibnizO Word), ((fixpoint interp1) Wv.1) Wv.2) w
-        else future_priv_mono (λ Wv : WORLD * (leibnizO Word), ((fixpoint interp1) Wv.1) Wv.2) w)
-    -∗ ▷ ((fixpoint interp1) W) w
+    -∗ rel a (λ Wv, P Wv.1 Wv.2)
+    -∗ rcond P interp
+    -∗ □ (if decide (writeAllowed_in_r_a (<[PC:=inr (p, g, b, e, a)]> r) a) then wcond P interp else emp)
+    -∗ (▷ (if decide (ρ = Monotemporary)
+           then future_pub_a_mono a (λ Wv, P Wv.1 Wv.2) w
+           else future_priv_mono (λ Wv, P Wv.1 Wv.2) w))
+    -∗ ▷ P W w
     -∗ sts_full_world W
     -∗ na_own logrel_nais ⊤
     -∗ open_region a W
     -∗ sts_state_std a ρ
-    -∗ a ↦ₐ[p'] w
+    -∗ a ↦ₐ w
     -∗ PC ↦ᵣ inr (p, g, b, e, a)
     -∗ ([∗ map] k↦y ∈ delete PC (<[PC:=inr (p, g, b, e, a)]> r), k ↦ᵣ y)
     -∗
@@ -80,8 +73,8 @@ Section fundamental.
                                            ∗ na_own logrel_nais ⊤
                                            ∗ sts_full_world W' ∗ region W' }} }}.
   Proof.
-    intros Hp Hsome i Hbae Hfp Hpwl Hregion [Hnotrevoked Hnotstatic] HO Hi.
-    iIntros "#IH #Hinv #Hreg #Hinva Hmono #Hw Hsts Hown".
+    intros Hp Hsome i Hbae Hpers Hpwl Hregion Hnotrevoked Hnotmonostatic Hnotuninitialized Hi.
+    iIntros "#IH #Hinv #Hreg #Hinva #Hrcond #Hwcond Hmono Hw Hsts Hown".
     iIntros "Hr Hstate Ha HPC Hmap".
     rewrite delete_insert_delete.
     iDestruct ((big_sepM_delete _ _ PC) with "[HPC Hmap]") as "Hmap /=";
@@ -99,8 +92,8 @@ Section fundamental.
       iApply wp_pure_step_later; auto. iNext.
       assert (dst <> PC) as HdstPC by (intros ->; simplify_map_eq).
       simplify_map_eq.
-      iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono]") as "Hr"; eauto.
-      { destruct ρ;auto;[..|specialize (Hnotstatic g)];contradiction. }
+      iDestruct (region_close with "[$Hstate $Hr $Ha $Hmono Hw]") as "Hr"; eauto.
+      { destruct ρ;auto;[|specialize (Hnotmonostatic g)|specialize (Hnotuninitialized w0)];contradiction. }
       iApply ("IH" $! _ (<[dst:=_]> (<[PC:=_]> r)) with "[%] [] [Hmap] [$Hr] [$Hsts] [$Hown]");
         try iClear "IH"; eauto.
       { intro. cbn. by repeat (rewrite lookup_insert_is_Some'; right). }
