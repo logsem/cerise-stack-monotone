@@ -45,7 +45,7 @@ Section Linking.
   | wf_main:
       forall comp w_main
         (Hwf_pre: well_formed_pre_comp comp)
-        (Hw_main: can_address_only w_main (dom _ (comp.1.1))),
+        (Hw_main: can_address_only w_main (dom _ (comp.1.1)) /\ is_global w_main = true),
         well_formed_comp (Main comp w_main).
 
   Inductive is_program: component -> Prop :=
