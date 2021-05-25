@@ -9,10 +9,10 @@ Section cap_lang_rules.
   Context `{MachineParameters}.
   Implicit Types P Q : iProp Σ.
   Implicit Types σ : ExecConf.
-  Implicit Types c : cap_lang.expr. 
+  Implicit Types c : cap_lang.expr.
   Implicit Types a b : Addr.
   Implicit Types r : RegName.
-  Implicit Types v : cap_lang.val. 
+  Implicit Types v : cap_lang.val.
   Implicit Types w : Word.
   Implicit Types reg : gmap RegName Word.
   Implicit Types ms : gmap Addr Word.
@@ -250,7 +250,7 @@ Section cap_lang_rules.
      (*  iFailWP "Hφ" Store_fail_invalid_locality. *)
      (* } *)
 
-     assert (isLocalWord storev = false ∨ pwl p = true) as HLocal.
+     assert (isLocalWord storev = false ∨ machine_base.pwl p = true) as HLocal.
      { rewrite /canStore in HcanStore. destruct storev; simpl; auto.
        destruct_cap c0. destruct c4; auto.
        eapply andb_true_iff in HcanStore. destruct HcanStore; auto. }
