@@ -17,13 +17,19 @@ Definition updatePC (φ: ExecConf): Conf :=
   | inr (Regular ((p, g), b, e, a)) =>
     match (a + 1)%a with
     | Some a' => let φ' := (update_reg φ PC (inr (Regular ((p, g), b, e, a')))) in
-                 (NextI, φ')
+                (NextI, φ')
     | None => (Failed, φ)
     end
   | inr (Stk d p b e a) =>
     match (a + 1)%a with
     | Some a' => let φ' := (update_reg φ PC (inr (Stk d p b e a'))) in
-                 (NextI, φ')
+                (NextI, φ')
+    | None => (Failed, φ)
+    end
+  | inr (Ret b e a) =>
+    match (a + 1)%a with
+    | Some a' => let φ' := (update_reg φ PC (inr (Ret b e a'))) in
+                (NextI, φ')
     | None => (Failed, φ)
     end
   | _ => (Failed, φ)
@@ -36,11 +42,11 @@ Definition updatePcPerm (w: base.Word): base.Word :=
   | _ => w
   end.
 
-Fixpoint jmp_ret (d: nat) (cs: list Stackframe) :=
+(*Fixpoint jmp_ret (d: nat) (cs: list Stackframe) :=
   match cs with
   | sf::cs => if nat_eq_dec d (length cs) then Some (sf, cs) else jmp_ret d cs
   | [] => None
-  end.
+  end.*)
 
 Fixpoint stack (d: nat) (cs: list Stackframe) :=
   match cs with
@@ -67,7 +73,7 @@ Definition canReadUpTo (w: base.Word): Addr :=
                           | RO | RW | RWL | RX | RWX | RWLX | E => e
                           | URW | URWL | URWX | URWLX => a
                           end
-  | inr (Ret d b e a) => e
+  | inr (Ret b e a) => e
   end.
 
 Definition canStore (p: Perm) (a: Addr) (w: base.Word): bool :=
@@ -78,7 +84,7 @@ Definition canStore (p: Perm) (a: Addr) (w: base.Word): bool :=
                                       | Local => pwl p
                                       | Monotone => pwl p && leb_addr (canReadUpTo w) a
                                       end
-  | inr (Stk _ _ _ _ _) | inr (Ret _ _ _ _) => pwl p && leb_addr (canReadUpTo w) a
+  | inr (Stk _ _ _ _ _) | inr (Ret _ _ _) => pwl p && leb_addr (canReadUpTo w) a
   end.
 
 Definition canStoreU (p: Perm) (a: Addr) (w: base.Word): bool :=
@@ -89,7 +95,7 @@ Definition canStoreU (p: Perm) (a: Addr) (w: base.Word): bool :=
                                       | Local => pwlU p
                                       | Monotone => pwlU p && leb_addr (canReadUpTo w) a
                                       end
-  | inr (Stk _ _ _ _ _) | inr (Ret _ _ _ _) => pwlU p && leb_addr (canReadUpTo w) a
+  | inr (Stk _ _ _ _ _) | inr (Ret _ _ _) => pwlU p && leb_addr (canReadUpTo w) a
   end.
 
 Definition isWithin (n1 n2 b e: Addr) : bool :=
@@ -167,6 +173,20 @@ Proof.
     + right. red; intros H. inversion H.
 Qed.
 
+(* TODO: move into stdpp_extra, already upstreamed to stdpp *)
+Section surjective_finite.
+  Context {A} `{Finite A, EqDecision B} (f : A → B).
+  Context `{!Surj (=) f}.
+
+  Program Instance surjective_finite: Finite B :=
+    {| enum := remove_dups (f <$> enum A) |}.
+  Next Obligation. apply NoDup_remove_dups. Qed.
+  Next Obligation.
+    intros y. rewrite elem_of_remove_dups elem_of_list_fmap.
+    destruct (surj f y). eauto using elem_of_enum.
+  Qed.
+End surjective_finite.
+
 Section opsem.
   Context `{MachineParameters}.
 
@@ -176,19 +196,19 @@ Section opsem.
     | Halt => (Halted, φ)
     | Jmp r =>
       match (RegLocate (reg φ) r) with
-      | inr (Ret d b e a) => match jmp_ret d (callstack φ) with
-                            | None => (Failed, φ)
-                            | Some ((reg', m'), cs) => (NextI, (reg', mem φ, m', cs))
-                            end
+      | inr (Ret b e a) => match (callstack φ) with
+                           | [] => (Failed, φ)
+                           | ((reg', m') :: cs) => (NextI, (reg', mem φ, m', cs))
+                           end
       | _ => let φ' :=  (update_reg φ PC (updatePcPerm (RegLocate (reg φ) r))) in (NextI, φ')
       end
     | Jnz r1 r2 =>
       if nonZero (RegLocate (reg φ) r2) then
         match (RegLocate (reg φ) r1) with
-        | inr (Ret d b e a) => match jmp_ret d (callstack φ) with
-                              | None => (Failed, φ)
-                              | Some ((reg', m'), cs) => (NextI, (reg', mem φ, m', cs))
-                              end
+        | inr (Ret b e a) => match (callstack φ) with
+                             | [] => (Failed, φ)
+                             | ((reg', m') :: cs) => (NextI, (reg', mem φ, m', cs))
+                             end
         | _ => let φ' := (update_reg φ PC (updatePcPerm (RegLocate (reg φ) r1))) in (NextI, φ')
         end
       else updatePC φ
@@ -199,7 +219,7 @@ Section opsem.
         (* Fails for U cap *)
         if readAllowed p && withinBounds ((p, g), b, e, a) then updatePC (update_reg φ dst (MemLocate (mem φ) a))
         else (Failed, φ)
-      | inr (Ret d b e a) => (Failed, φ)
+      | inr (Ret b e a) => (Failed, φ)
       | inr (Stk d p b e a) =>
         if readAllowed p && withinBounds ((p, Monotone), b, e, a) then
           match stack d ((reg φ, stk φ)::(callstack φ)) with
@@ -216,7 +236,7 @@ Section opsem.
         if writeAllowed p && withinBounds ((p, g), b, e, a) && canStore p a (RegLocate (reg φ) src) then
           updatePC (update_mem φ a (RegLocate (reg φ) src))
         else (Failed, φ)
-      | inr (Ret d b e a) => (Failed, φ)
+      | inr (Ret b e a) => (Failed, φ)
       | inr (Stk d p b e a) =>
         if nat_eq_dec d (length (callstack φ)) then
           updatePC (update_stk φ a (RegLocate (reg φ) src))
@@ -231,7 +251,7 @@ Section opsem.
       | inr (Regular ((p, g), b, e, a)) =>
         (* Fails for U cap *)
         if writeAllowed p && withinBounds ((p, g), b, e, a) then updatePC (update_mem φ a (inl n)) else (Failed, φ)
-      | inr (Ret d b e a) => (Failed, φ)
+      | inr (Ret b e a) => (Failed, φ)
       | inr (Stk d p b e a) =>
         if nat_eq_dec d (length (callstack φ)) then
           updatePC (update_stk φ a (inl n))
@@ -262,7 +282,7 @@ Section opsem.
                | None => (Failed, φ)
                end
         end
-      | inr (Ret d b e a) => (Failed, φ)
+      | inr (Ret b e a) => (Failed, φ)
       | inr (Stk d p b e a) =>
         match p with
         | E => (Failed, φ)
@@ -307,7 +327,7 @@ Section opsem.
                         end
               end
         end
-      | inr (Ret d b e a) => (Failed, φ)
+      | inr (Ret b e a) => (Failed, φ)
       | inr (Stk d p b e a) =>
         match p with
         | E => (Failed, φ)
@@ -342,7 +362,7 @@ Section opsem.
                 updatePC (update_reg φ dst (inr (Regular (decodePermPair n, b, e, a))))
               else (Failed, φ)
         end
-      | inr (Ret _ _ _ _) => (Failed, φ)
+      | inr (Ret _ _ _) => (Failed, φ)
       | inr (Stk d p b e a) =>
         match p with
         | E => (Failed, φ)
@@ -365,7 +385,7 @@ Section opsem.
                 else (Failed, φ)
           end
         end
-      | inr (Ret _ _ _ _) => (Failed, φ)
+      | inr (Ret _ _ _) => (Failed, φ)
       | inr (Stk d p b e a) =>
         match RegLocate (reg φ) r with
         | inr _ => (Failed, φ)
@@ -461,7 +481,7 @@ Section opsem.
             end
           end
         end
-      | inr (Ret _ _ _ _) => (Failed, φ)
+      | inr (Ret _ _ _) => (Failed, φ)
       | inr (Stk d p b e a) =>
         match p with
         | E => (Failed, φ)
@@ -502,7 +522,7 @@ Section opsem.
             end
           end
         end
-      | inr (Ret _ _ _ _) => (Failed, φ)
+      | inr (Ret _ _ _) => (Failed, φ)
       | inr (Stk d p b e a) =>
         match p with
         | E => (Failed, φ)
@@ -539,7 +559,7 @@ Section opsem.
             end
           end
         end
-      | inr (Ret _ _ _ _) => (Failed, φ)
+      | inr (Ret _ _ _) => (Failed, φ)
       | inr (Stk d p b e a) =>
         match p with
         | E => (Failed, φ)
@@ -572,7 +592,7 @@ Section opsem.
           | _,_ => (Failed, φ)
           end
         end
-      | inr (Ret _ _ _ _) => (Failed, φ)
+      | inr (Ret _ _ _) => (Failed, φ)
       | inr (Stk d p b e a) =>
         match p with
         | E => (Failed, φ)
@@ -589,7 +609,7 @@ Section opsem.
     | GetA dst r =>
       match RegLocate (reg φ) r with
       | inl _ => (Failed, φ)
-      | inr (Regular (_, _, _, a)) | inr (Ret _ _ _ a) | inr (Stk _ _ _ _ a) =>
+      | inr (Regular (_, _, _, a)) | inr (Ret _ _ a) | inr (Stk _ _ _ _ a) =>
         match a with
         | A a' _ _ => updatePC (update_reg φ dst (inl a'))
         end
@@ -597,7 +617,7 @@ Section opsem.
     | GetB dst r =>
       match RegLocate (reg φ) r with
       | inl _ => (Failed, φ)
-      | inr (Regular (_, b, _, _)) | inr (Ret _ b _ _) | inr (Stk _ _ b _ _) =>
+      | inr (Regular (_, b, _, _)) | inr (Ret b _ _) | inr (Stk _ _ b _ _) =>
         match b with
         | A b' _ _ => updatePC (update_reg φ dst (inl b'))
         end
@@ -605,7 +625,7 @@ Section opsem.
     | GetE dst r =>
       match RegLocate (reg φ) r with
       | inl _ => (Failed, φ)
-      | inr (Regular (_, _, e, _)) | inr (Ret _ _ e _) | inr (Stk _ _ _ e _) =>
+      | inr (Regular (_, _, e, _)) | inr (Ret _ e _) | inr (Stk _ _ _ e _) =>
         match e with
         | A e' _ _ => updatePC (update_reg φ dst (inl e'))
         end
@@ -616,7 +636,7 @@ Section opsem.
       | inr (Regular ((p, _), _, _, _))
       | inr (Stk _ p _ _ _) =>
         updatePC (update_reg φ dst (inl (encodePerm p)))
-      | inr (Ret _ _ _ _) =>
+      | inr (Ret _ _ _) =>
         updatePC (update_reg φ dst (inl (encodePerm E)))
       end
     | GetL dst r =>
@@ -624,7 +644,7 @@ Section opsem.
       | inl _ => (Failed, φ)
       | inr (Regular ((_, g), _, _, _)) => updatePC (update_reg φ dst (inl (encodeLoc g)))
       | inr (Stk _ _ _ _ _)
-      | inr (Ret _ _ _ _) =>
+      | inr (Ret _ _ _) =>
         updatePC (update_reg φ dst (inl (encodeLoc Monotone)))
       end
     | IsPtr dst r =>
@@ -645,7 +665,7 @@ Section opsem.
                          end
           end
         else (Failed, φ)
-      | inr (Ret _ _ _ _) => (Failed, φ)
+      | inr (Ret _ _ _) => (Failed, φ)
       | inr (Stk d p b e a) =>
         if isU p then
           match z_of_argument (reg φ) offs with
@@ -682,7 +702,7 @@ Section opsem.
                                    else (Failed, φ)
                        end
         end
-      | inr (Ret _ _ _ _) => (Failed, φ)
+      | inr (Ret _ _ _) => (Failed, φ)
       | inr (Stk d p b e a) =>
         match z_of_argument (reg φ) offs with
         | None => (Failed, φ)
@@ -710,7 +730,7 @@ Section opsem.
       | inr (Regular ((p, g), b, e, a)) =>
         if perm_eq_dec p E then (Failed, φ)
         else updatePC (update_reg φ dst (inr (Regular ((promote_perm p, g), b, min a e, a))))
-      | inr (Ret _ _ _ _) => (Failed, φ)
+      | inr (Ret _ _ _) => (Failed, φ)
       | inr (Stk d p b e a) =>
         if perm_eq_dec p E then (Failed, φ)
         else updatePC (update_reg φ dst (inr (Stk d (promote_perm p) b e a)))
@@ -722,9 +742,93 @@ Section opsem.
   Definition clear_regs (reg: base.Reg) (l: list RegName) :=
     foldr (fun r reg => <[r := inl 0%Z]> reg) reg l.
 
-  Definition exec_call (φ: ExecConf) (rf: RegName) (rargs: list RegName): Conf :=
-    let regs' := <[PC := (updatePcPerm (RegLocate (reg φ) rf))]> (clear_regs (reg φ) (list_difference all_registers [PC; rf; r_stk])) in
-    (Failed, φ).
+  Fixpoint exec_instrs (l: list instr) (φ: ExecConf): option ExecConf :=
+    match l with
+    | [] => Some φ
+    | i::l => match exec i φ with
+              | (NextI, φ) => exec_instrs l φ
+              | _ => None
+              end
+    end.
+
+  Definition addPC (w: base.Word) (n: nat) :=
+    match w with
+    | inr (Regular (p, l, b, e, a)) =>
+      match (a + n)%a with
+      | Some a' => inr (Regular (p, l, b, e, a'))
+      | None => w
+      end
+    | inr (Stk d p b e a) =>
+      match (a + n)%a with
+      | Some a' => inr (Stk d p b e a')
+      | None => w
+      end
+    | _ => w
+    end.
+
+  (* Remove all words over some bounds *)
+  Fixpoint clear_stk_aux (m: base.Mem) (a: Addr) (n: nat) :=
+    match n with
+    | 0 => delete a m
+    | S n => match (a + 1)%a with
+             | None => delete a m
+             | Some a' => clear_stk_aux (delete a m) a' n
+             end
+    end.
+
+  Lemma clear_stk_aux_spec:
+    forall n m a,
+      (forall a' k, k <= n -> (a + k)%a = Some a' -> (clear_stk_aux m a n) !! a' = None) /\
+      (forall a', (a' < a)%a -> (clear_stk_aux m a n) !! a' = m !! a').
+  Proof.
+    induction n; intros.
+    - split; intros.
+      + assert (k = 0) as -> by lia.
+        rewrite addr_add_0 in H1.
+        inversion H1. simpl. rewrite lookup_delete //.
+      + simpl. rewrite lookup_delete_ne //. solve_addr.
+    - split; intros.
+      + destruct (nat_eq_dec k (S n)).
+        * subst k. simpl. generalize (incr_addr_spec a 1).
+          intros [[a'' [HA [HB [HC HD]]]] | [HA HB]].
+          { rewrite HA. assert ((a'' + n)%a = Some a') by solve_addr.
+            destruct (IHn (delete a m) a'') as [X Y].
+            eapply (X a' n ltac:(lia) H2). }
+          { exfalso. solve_addr. }
+        * simpl. destruct (a + 1)%a as [a''|] eqn:Ha''.
+          { destruct (nat_eq_dec k 0).
+            - subst k. rewrite addr_add_0 in H1. inversion H1.
+              subst a'. destruct (IHn (delete a m) a'') as [X Y].
+              rewrite (Y a ltac:(solve_addr)).
+              rewrite lookup_delete //.
+            - destruct (IHn (delete a m) a'') as [X Y].
+              rewrite (X a' (k - 1) ltac:(lia) ltac:(solve_addr)) //. }
+          { assert (k = 0) as -> by solve_addr.
+            rewrite addr_add_0 in H1; inversion H1; subst a'.
+            rewrite lookup_delete //. }
+      + simpl. destruct (a + 1)%a as [a''|] eqn:Ha''.
+        * destruct (IHn (delete a m) a'') as [X Y].
+          rewrite (Y a' ltac:(solve_addr)).
+          rewrite lookup_delete_ne //. solve_addr.
+        * rewrite lookup_delete_ne //. solve_addr.
+  Qed.
+
+  Definition clear_stk (m: base.Mem) (a: Addr) :=
+    clear_stk_aux m a (Z.to_nat MemNum).
+
+  Lemma clear_stk_spec:
+    forall m a, 
+      (forall a', (a <= a')%a -> (clear_stk m a) !! a' = None) /\ 
+      (forall a', (a' < a)%a -> (clear_stk m a) !! a' = m !! a').
+  Proof.
+    intros. 
+    generalize (clear_stk_aux_spec (Z.to_nat MemNum) m a). intros [A B].
+    split; intros.
+    - assert ((a + (a' - a)%Z)%a = Some a') by solve_addr.
+      assert (Z.to_nat (a' - a)%Z <= (Z.to_nat MemNum)) by solve_addr.
+      eapply A; eauto. solve_addr.
+    - eapply B; eauto.
+  Qed.
 
   Definition decodeInstrW' (w: base.Word) :=
     match w with
@@ -732,17 +836,153 @@ Section opsem.
     | inr _ => Fail
     end.
 
-  Definition is_call rf rargs m a e: Prop :=
+  Definition exec_call (φ: ExecConf) (rf: RegName) (rargs: list RegName): Conf :=
+    match (reg φ) !r! r_stk with
+    | inr (Stk d URWLX b e a) =>
+      match exec_instrs (List.map decodeInstrW' (call_instrs_prologue rargs)) φ with
+      | None => (Failed, φ)
+      | Some φ' =>
+        match (reg φ') !r! r_stk with
+        | inr (Stk d URWLX b e a') =>
+          let saved_regs := <[PC := addPC ((reg φ) !r! PC) (142 + length rargs)]> (reg φ) in
+          let saved_stk := clear_stk (stk φ') a' in
+          let new_stk_cap := Stk (d + 1) URWLX a' e ^(a' + 1)%a in
+          let new_stk := <[a' := inr (Ret b a' ^(a' + (-6)%Z)%a)]> (∅: base.Mem) in
+          let interm_state := (<[r_stk := inr new_stk_cap]> (reg φ'), mem φ', new_stk, (saved_regs, saved_stk)::callstack φ') in
+          match exec_instrs (List.map decodeInstrW' (push_instrs (map (fun r => inr r) rargs))) interm_state with
+          | None => (Failed, φ)
+          | Some φ'' =>
+            let new_regs := <[PC := (updatePcPerm (RegLocate (reg φ'') rf))]> (clear_regs (reg φ'') (list_difference all_registers [PC; rf; r_stk])) in
+            (NextI, (new_regs, mem φ'', stk φ'', callstack φ''))
+          end
+        | _ => (Failed, φ)
+        end
+      end
+    | _ => (Failed, φ)
+    end.
+
+  (* Simplification: do not allow passing stack derived capabilities *)
+  (* Definition is_reasonable (cs: list Stackframe) (a: Addr) (w: base.Word): Prop := *)
+  Definition is_reasonable (w: base.Word): Prop :=
+    match w with
+    | inl _ => True
+    | inr (Stk d p b e a) => False
+    | inr (Ret b e a) => False
+    | inr (Regular _) => True
+    end.
+
+  Lemma is_reasonable_dec:
+    forall w, Decision (is_reasonable w).
+  Proof.
+    destruct w.
+    - left; simpl; auto.
+    - destruct c.
+      + left; simpl; auto.
+      + right; simpl; auto.
+      + right; simpl; auto.
+  Qed.
+
+  Definition is_call (regs: base.Reg) rf rargs m a e: Prop :=
     exists a',
       rf <> PC /\
       rf <> r_stk /\
       (R 0 eq_refl) ∉ rf::rargs /\
       (R 1 eq_refl) ∉ rf::rargs /\
       (R 2 eq_refl) ∉ rf::rargs /\
-      (a + (141 + length rargs))%a = Some a' /\
+      (a + (142 + length rargs))%a = Some a' /\
       (a' < e)%a /\
       (forall i, (i <= (141 + length rargs))%nat ->
-            exists a_i, (a + i)%a = Some a_i /\ (call_instrs rf rargs) !! i = Some (m !m! a_i)).
+            exists a_i, (a + i)%a = Some a_i /\ (call_instrs rf rargs) !! i = Some (m !m! a_i)) /\
+      (forall r, r ∈ rargs -> is_reasonable (regs !r! r)).
+
+  Lemma is_call_determ:
+    forall regs rf1 rf2 rargs1 rargs2 m a e,
+    is_call regs rf1 rargs1 m a e ->
+    is_call regs rf2 rargs2 m a e ->
+    rf1 = rf2 /\ rargs1 = rargs2.
+  Proof.
+    intros. destruct H0 as [a' [HA1 [HA2 [HA3 [HA4 [HA5 [HA6 [HA7 [HA8 HA9]]]]]]]]].
+    destruct H1 as [a'' [HB1 [HB2 [HB3 [HB4 [HB5 [HB6 [HB7 [HB8 HB9]]]]]]]]].
+    assert (Hleneq: length rargs1 = length rargs2).
+    { destruct (HA8 36 ltac:(lia)) as [a_i [Ha_i Hinstr]].
+      destruct (HB8 36 ltac:(lia)) as [a_i' [Ha_i' Hinstr']].
+      rewrite Ha_i' in Ha_i; inversion Ha_i; subst.
+      unfold call_instrs in Hinstr, Hinstr'.
+      rewrite (lookup_app_l (call_instrs_prologue rargs1) _ 36) in Hinstr; [|rewrite call_instrs_prologue_length; lia].
+      rewrite lookup_app_l in Hinstr'; [|rewrite call_instrs_prologue_length; lia].
+      rewrite /call_instrs_prologue lookup_app_r in Hinstr; [|rewrite push_env_instrs_length; lia].
+      rewrite push_env_instrs_length /= in Hinstr.
+      rewrite /call_instrs_prologue lookup_app_r in Hinstr'; [|rewrite push_env_instrs_length; lia].
+      rewrite push_env_instrs_length /= in Hinstr'.
+      rewrite -Hinstr' in Hinstr. inversion Hinstr.
+      eapply encode_instr_inj in H1. inversion H1. lia. }
+    split.
+    { destruct (HA8 (77 + length rargs1) ltac:(lia)) as [a_i [Ha_i Hinstr]].
+      destruct (HB8 (77 + length rargs1) ltac:(lia)) as [a_i' [Ha_i' Hinstr']].
+      rewrite Ha_i' in Ha_i; inversion Ha_i; subst.
+      rewrite /call_instrs in Hinstr, Hinstr'.
+      rewrite lookup_app_r in Hinstr; [|rewrite call_instrs_prologue_length; lia].
+      rewrite lookup_app_r in Hinstr'; [|rewrite call_instrs_prologue_length; lia].
+      rewrite call_instrs_prologue_length in Hinstr.
+      rewrite call_instrs_prologue_length in Hinstr'.
+      rewrite lookup_app_r in Hinstr; [|simpl; lia].
+      rewrite lookup_app_r in Hinstr'; [|simpl; lia].
+      simpl length in Hinstr, Hinstr'.
+      rewrite lookup_app_r in Hinstr; [|simpl; lia].
+      rewrite lookup_app_r in Hinstr'; [|simpl; lia].
+      simpl length in Hinstr, Hinstr'.
+      rewrite lookup_app_r in Hinstr; [|simpl; lia].
+      rewrite lookup_app_r in Hinstr'; [|simpl; lia].
+      simpl length in Hinstr, Hinstr'.
+      rewrite lookup_app_r in Hinstr; [|rewrite push_instrs_length map_length; lia].
+      rewrite lookup_app_r in Hinstr'; [|rewrite push_instrs_length map_length; lia].
+      simpl length in Hinstr, Hinstr'.
+      rewrite push_instrs_length map_length in Hinstr.
+      rewrite push_instrs_length map_length in Hinstr'.
+      rewrite lookup_app_r in Hinstr; [|rewrite rclear_instrs_length all_registers_list_difference_length //; lia].
+      rewrite lookup_app_r in Hinstr'; [|rewrite rclear_instrs_length all_registers_list_difference_length //; lia].
+      rewrite rclear_instrs_length all_registers_list_difference_length // in Hinstr.
+      rewrite rclear_instrs_length all_registers_list_difference_length // in Hinstr'.
+      rewrite lookup_app_l in Hinstr; [|simpl length; lia].
+      rewrite lookup_app_l in Hinstr'; [|simpl length; lia].
+      replace (77 + length rargs1 - 39 - 4 - 3 - 1 - length rargs1 - 30) with 0 in Hinstr by lia.
+      replace (77 + length rargs1 - 39 - 4 - 3 - 1 - length rargs2 - 30) with 0 in Hinstr' by lia.
+      simpl in Hinstr, Hinstr'. rewrite -Hinstr' in Hinstr. inversion Hinstr.
+      eapply encode_instr_inj in H1. inversion H1; auto. }
+    destruct (nat_eq_dec (length rargs1) 0).
+    { eapply nil_length_inv in e0. subst rargs1.
+      destruct rargs2; auto. simpl in Hleneq. inversion Hleneq. }
+    assert (Hpush_regs_eq: forall i, i < length rargs1 -> (push_instrs (map (fun r => inr r) rargs1)) !! i = (push_instrs (map (fun r => inr r) rargs2)) !! i).
+    { intros. destruct (HA8 (47 + i) ltac:(lia)) as [a_i [Ha_i Hinstr]].
+      destruct (HB8 (47 + i) ltac:(lia)) as [a_i' [Ha_i' Hinstr']].
+      rewrite Ha_i' in Ha_i; inversion Ha_i; subst.
+      rewrite /call_instrs in Hinstr, Hinstr'.
+      rewrite lookup_app_r in Hinstr; [|rewrite call_instrs_prologue_length; lia].
+      rewrite lookup_app_r in Hinstr'; [|rewrite call_instrs_prologue_length; lia].
+      rewrite call_instrs_prologue_length in Hinstr.
+      rewrite call_instrs_prologue_length in Hinstr'.
+      rewrite lookup_app_r in Hinstr; [|simpl; lia].
+      rewrite lookup_app_r in Hinstr'; [|simpl; lia].
+      simpl length in Hinstr, Hinstr'.
+      rewrite lookup_app_r in Hinstr; [|simpl; lia].
+      rewrite lookup_app_r in Hinstr'; [|simpl; lia].
+      simpl length in Hinstr, Hinstr'.
+      rewrite lookup_app_r in Hinstr; [|simpl; lia].
+      rewrite lookup_app_r in Hinstr'; [|simpl; lia].
+      simpl length in Hinstr, Hinstr'.
+      rewrite lookup_app_l in Hinstr; [|rewrite push_instrs_length map_length; lia].
+      rewrite lookup_app_l in Hinstr'; [|rewrite push_instrs_length map_length; lia].
+      replace (47 + i - 39 - 4 - 3 - 1) with i in Hinstr by lia.
+      replace (47 + i - 39 - 4 - 3 - 1) with i in Hinstr' by lia.
+      rewrite -Hinstr' in Hinstr; inversion Hinstr. auto. }
+    assert (Hpush_regs_eq': push_instrs (map (λ r : RegName, inr r) rargs1) = push_instrs (map (λ r : RegName, inr r) rargs2)).
+    { eapply list_eq_same_length; [eauto|rewrite !push_instrs_length !map_length //|].
+      rewrite push_instrs_length map_length -Hleneq. intros.
+      rewrite (Hpush_regs_eq _ H0) in H1. rewrite H1 in H2; inversion H2; auto. }
+    clear Hpush_regs_eq. eapply push_instrs_inj in Hpush_regs_eq'.
+    eapply fmap_inj in Hpush_regs_eq'; auto.
+    inversion 1; auto.
+  Admitted. (* Infinite Qed ?*)
 
   Inductive step: Conf → Conf → Prop :=
   | step_exec_fail:
@@ -760,7 +1000,7 @@ Section opsem.
         isCorrectPC ((reg φ) !r! PC) →
         decodeInstrW' ((mem φ) !m! a) = i →
         exec i φ = c →
-        (~ exists rf rargs, is_call rf rargs (mem φ) a e) ->
+        (~ exists rf rargs, is_call (reg φ) rf rargs (mem φ) a e) ->
         step (Executable, φ) (c.1, c.2)
   | step_exec_instr':
       forall φ d p b e a i c m,
@@ -769,13 +1009,13 @@ Section opsem.
         stack d ((reg φ, stk φ)::(callstack φ)) = Some m ->
         decodeInstrW' (m !m! a) = i →
         exec i φ = c →
-        (~ exists rf rargs, is_call rf rargs m a e) ->
+        (~ exists rf rargs, is_call (reg φ) rf rargs m a e) ->
         step (Executable, φ) (c.1, c.2)
   | step_exec_call:
       forall φ p g b e a c rf rargs,
         RegLocate (reg φ) PC = inr (Regular ((p, g), b, e, a)) ->
         isCorrectPC ((reg φ) !r! PC) →
-        is_call rf rargs (mem φ) a e ->
+        is_call (reg φ) rf rargs (mem φ) a e ->
         c = exec_call φ rf rargs ->
         step (Executable, φ) (c.1, c.2)
   | step_exec_call':
@@ -783,23 +1023,9 @@ Section opsem.
         RegLocate (reg φ) PC = inr (Stk d p b e a) ->
         isCorrectPC ((reg φ) !r! PC) →
         stack d ((reg φ, stk φ)::(callstack φ)) = Some m ->
-        is_call rf rargs m a e ->
+        is_call (reg φ) rf rargs m a e ->
         c = exec_call φ rf rargs ->
         step (Executable, φ) (c.1, c.2).
-
-  (* TODO: move into stdpp_extra, already upstreamed to stdpp *)
-  Section surjective_finite.
-    Context {A} `{Finite A, EqDecision B} (f : A → B).
-    Context `{!Surj (=) f}.
-
-    Program Instance surjective_finite: Finite B :=
-      {| enum := remove_dups (f <$> enum A) |}.
-    Next Obligation. apply NoDup_remove_dups. Qed.
-    Next Obligation.
-      intros y. rewrite elem_of_remove_dups elem_of_list_fmap.
-      destruct (surj f y). eauto using elem_of_enum.
-    Qed.
-  End surjective_finite.
 
   (* TODO: move into stdpp_extra and maybe upstream *)
   Global Instance lists_finite {A} `{Finite A} n:
@@ -840,8 +1066,8 @@ Section opsem.
   Qed.
 
   Lemma is_call_dec:
-    forall m a e,
-      Decision (exists rf rargs, is_call rf rargs m a e).
+    forall regs m a e,
+      Decision (exists rf rargs, is_call regs rf rargs m a e).
   Proof.
     intros. eapply exists_dec. intros rf.
     eapply @sig_exists_dec with (Q := fun l => length l <=? Z.to_nat (e - a)%Z = true).
@@ -864,7 +1090,7 @@ Section opsem.
       destruct (elem_of_list_dec (R 2 eq_refl) (rf::rargs)).
       { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
         eapply HC; auto. }
-      destruct ((a + (141 + length rargs))%a) as [a'|] eqn:Ha'.
+      destruct ((a + (142 + length rargs))%a) as [a'|] eqn:Ha'.
       2: { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
            congruence. }
       destruct (Addr_lt_dec a' e).
@@ -883,13 +1109,27 @@ Section opsem.
             rewrite B in H0; inversion H0.
         - right; intros [a_i' [A B]].
           inversion A. }
+      assert (Decision (∀ r : RegName, r ∈ rargs → is_reasonable (regs !r! r))).
+      { clear. induction rargs.
+        - left. intros. inversion H.
+        - destruct (is_reasonable_dec (regs !r! a)).
+          + destruct IHrargs.
+            * left. intros. eapply elem_of_cons in H.
+              destruct H; [subst a|]; auto.
+            * right. red; intros. eapply n.
+              intros. eapply H. right. auto.
+          + right. red; intros. eapply n.
+            eapply H. left. }
       destruct H0.
+      2: { right. intro X. destruct X as [a'' [HPC [Hstk [HA [HB [HC [HD [HE [HF HG]]]]]]]]].
+           eapply n4. intros. eapply (HF (fin_to_nat i)).
+           generalize (fin_to_nat_lt i). lia. }
+      destruct H1.
       { left. exists a'. repeat split; eauto.
-        intros. assert (i < S (141 + length rargs)) by lia.
+        intros. assert (i0 < S (141 + length rargs)) by lia.
         generalize (e0 (nat_to_fin H1)). rewrite fin_to_nat_to_fin. auto. }
-      right. intro X. destruct X as [a'' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
-      eapply n4. intros. eapply (HF (fin_to_nat i)).
-      generalize (fin_to_nat_lt i). lia.
+      right. intro X. destruct X as [a'' [HPC [Hstk [HA [HB [HC [HD [HE [HF HG]]]]]]]]].
+      eapply n4; auto.
   Qed.
 
   Lemma normal_always_step:
@@ -897,12 +1137,12 @@ Section opsem.
   Proof.
     intros. destruct (isCorrectPC_dec (RegLocate (reg φ) PC)).
     - inversion i; subst.
-      + destruct (is_call_dec (mem φ) a e) as [Hiscall|Hiscall].
+      + destruct (is_call_dec (reg φ) (mem φ) a e) as [Hiscall|Hiscall].
         * destruct Hiscall as [rf [rargs Hiscall]].
           do 2 eexists. eapply step_exec_call; eauto.
         * do 2 eexists; eapply step_exec_instr; eauto.
       + destruct (stack d ((reg φ, stk φ)::(callstack φ))) as [m|] eqn:Hstk.
-        * destruct (is_call_dec m a e) as [Hiscall|Hiscall].
+        * destruct (is_call_dec (reg φ) m a e) as [Hiscall|Hiscall].
           { destruct Hiscall as [rf [rargs Hiscall]].
             do 2 eexists. eapply step_exec_call'; eauto. }
           { do 2 eexists; eapply step_exec_instr'; eauto. }
@@ -926,8 +1166,15 @@ Section opsem.
     - rewrite H4 in H6; inv H6.
       elim H11. eauto.
     - rewrite H4 in H6; inv H6.
+      destruct (is_call_determ _ _ _ _ _ _ _ _ H8 H9) as [<- <-].
+      reflexivity.
+    - rewrite H4 in H6; inv H6.
       rewrite H10 in H8; inv H8.
       elim H13. eauto.
+    - rewrite H4 in H6; inv H6.
+      rewrite H10 in H8; inv H8.
+      destruct (is_call_determ _ _ _ _ _ _ _ _ H11 H9) as [<- <-].
+      reflexivity.
     - rewrite H4 in H6; inv H6.
       elim H10. eauto.
     - rewrite H4 in H6; inv H6.
@@ -936,8 +1183,15 @@ Section opsem.
     - rewrite H4 in H6; inv H6.
       elim H11. eauto.
     - rewrite H4 in H6; inv H6.
+      destruct (is_call_determ _ _ _ _ _ _ _ _ H8 H9) as [<- <-].
+      reflexivity.
+    - rewrite H4 in H6; inv H6.
       rewrite H10 in H8; inv H8.
       elim H13. eauto.
+    - rewrite H4 in H6; inv H6.
+      rewrite H10 in H8; inv H8.
+      destruct (is_call_determ _ _ _ _ _ _ _ _ H11 H9) as [<- <-].
+      reflexivity.
   Qed.
 
   Inductive val: Type :=
@@ -1129,6 +1383,16 @@ Proof.
                    end; simpl; auto; apply updatePC_not_executable.
 Qed.
 
+Lemma exec_call_not_executable `{MachineParameters}:
+  forall σ rf rargs,
+    (exec_call σ rf rargs).1 <> Executable.
+Proof.
+  intros. rewrite /exec_call.
+  repeat match goal with
+           |- context [match ?X with | _ => _ end] => destruct X
+  end; simpl; auto.
+Qed.
+
 Global Instance is_atomic_correct `{MachineParameters} s (e : expr) : is_atomic e → Atomic s e.
 Proof.
   intros Ha; apply strongly_atomic_atomic, ectx_language_atomic.
@@ -1143,6 +1407,14 @@ Proof.
       * case_eq (exec (decodeInstrW' (m !m! a)) σ); intros.
         destruct c; eauto.
         generalize (exec_not_executable (decodeInstrW' (m !m! a)) σ).
+        rewrite H1. simpl; congruence.
+      * case_eq (exec_call σ rf rargs); intros.
+        destruct c; eauto.
+        generalize (exec_call_not_executable σ rf rargs).
+        rewrite H1. simpl; congruence.
+      * case_eq (exec_call σ rf rargs); intros.
+        destruct c; eauto.
+        generalize (exec_call_not_executable σ rf rargs).
         rewrite H1. simpl; congruence.
     + inversion Ha.
   - intros K e' -> Hval%eq_None_not_Some.
@@ -1194,7 +1466,7 @@ Definition can_address_only (w: base.Word) (addrs: gset Addr): Prop :=
     | O | E => True
     | _ => forall a, (b <= a < e)%a -> a ∈ addrs
     end
-  | inr (Ret _ _ _ _) => True
+  | inr (Ret _ _ _) => True
   end.
 
 Definition pwl (w: base.Word): bool :=
@@ -1202,7 +1474,7 @@ Definition pwl (w: base.Word): bool :=
   | inl _ => false
   | inr (Regular (p, _, _, _, _)) => pwlU p
   | inr (Stk _ p _ _ _) => pwlU p
-  | inr (Ret _ _ _ _) => false
+  | inr (Ret _ _ _) => false
   end.
 
 Definition is_global (w: base.Word): bool :=

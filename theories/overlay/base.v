@@ -6,7 +6,7 @@ From cap_machine Require Import addr_reg machine_base machine_parameters.
 Inductive Cap: Type :=
 | Regular: machine_base.Cap -> Cap (* Regular capabilities *)
 | Stk: nat -> Perm -> Addr -> Addr -> Addr -> Cap (* Stack derived capabilities *)
-| Ret: nat -> Addr -> Addr -> Addr -> Cap. (* Return capabilities *)
+| Ret: Addr -> Addr -> Addr -> Cap. (* Return capabilities *)
 
 Instance cap_eq_dec : EqDecision Cap.
 Proof. solve_decision. Defined.
