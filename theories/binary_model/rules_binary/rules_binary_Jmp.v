@@ -57,7 +57,7 @@ Section cap_lang_spec_rules.
     done. 
   Qed.
 
-  Lemma wp_jmp_successPC E K pc_p pc_g pc_b pc_e pc_a w :
+  Lemma step_jmp_successPC E K pc_p pc_g pc_b pc_e pc_a w :
     decodeInstrW w = Jmp PC →
     isCorrectPC (inr (pc_p,pc_g,pc_b,pc_e,pc_a)) →
     nclose specN ⊆ E →
