@@ -29,6 +29,14 @@ Section call.
   (* Push instruction *)
   Definition push_instrs ρs: list Word := map (fun ρ => inl (encodeInstr (StoreU r_stk (inl 0%Z) ρ))) ρs.
 
+  Global Instance push_instrs_inj: Inj (=) (=) push_instrs.
+  Proof.
+    intro l1. induction l1; intros.
+    - simpl in H0. destruct y; inversion H0; auto.
+    - simpl in H0. destruct y; [|simpl in H0]; inversion H0.
+      eapply (inj _) in H2. inversion H2; f_equal; auto.
+  Qed.
+
   Lemma push_instrs_length:
     forall ρs, length (push_instrs ρs) = length ρs.
   Proof. induction ρs; simpl; auto. Qed.
@@ -52,8 +60,7 @@ Section call.
     length (pop_env_instrs) = 62.
   Proof. reflexivity. Qed.
 
-  (* Code for call macro *)
-  Definition call_instrs r rargs: list Word :=
+  Definition call_instrs_prologue (rargs: list RegName): list Word :=
     (* Save environment *)
     push_env_instrs
     (* Prepare return capability *)
@@ -63,7 +70,17 @@ Section call.
                    ; inl (encodeInstr (LoadU PC r_stk (inl (-1)%Z)))]
     ++ [ inl (encodeInstr (Mov (R 1 eq_refl) (inr PC)))
        ; inl (encodeInstr (Lea (R 1 eq_refl) (inl (43 + length rargs)%Z))) (* offset to beginning of environment restoration *)]
-    ++ push_instrs [inr (R 1 eq_refl); inr r_stk]
+    ++ push_instrs [inr (R 1 eq_refl); inr r_stk].
+
+  Lemma call_instrs_prologue_length:
+    forall rargs, length (call_instrs_prologue rargs) = 39.
+  Proof.
+    intros. rewrite !app_length /=. reflexivity.
+  Qed.
+
+  (* Code for call macro *)
+  Definition call_instrs r rargs: list Word :=
+    call_instrs_prologue rargs
     ++ [ inl (encodeInstr (Mov (R 0 eq_refl) (inr r_stk)))
        ; inl (encodeInstr (PromoteU (R 0 eq_refl)))
        ; inl (encodeInstr (Lea (R 0 eq_refl) (inl (-6)%Z)))

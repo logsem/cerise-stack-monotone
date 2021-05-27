@@ -37,7 +37,7 @@ Section overlay_to_cap_lang.
     | inr c => match c with
               | Regular c => inr c
               | Stk d p b e a => inr (p, Monotone, b, e, a)
-              | Ret d b e a => inr (E, Monotone, b, e, a)
+              | Ret b e a => inr (E, Monotone, b, e, a)
               end
     end.
 
@@ -47,6 +47,14 @@ Section overlay_to_cap_lang.
       isCorrectPC (translate_word w).
   Proof.
     intros; inv H; simpl; econstructor; eauto.
+  Qed.
+
+  Lemma decodeInstrW_translate_word `{MachineParameters}:
+    forall w,
+      decodeInstrW' w = decodeInstrW (translate_word w).
+  Proof.
+    destruct w; simpl; auto.
+    destruct c; simpl; auto.
   Qed.
 
   Definition compile (c: overlay_component): machine_component :=
@@ -123,17 +131,626 @@ Section overlay_to_cap_lang.
       inv B. exists e3; split; auto.
   Qed.
 
+  Definition incrementPC (regs: base.Reg) : option base.Reg :=
+    match regs !! PC with
+    | Some (inr (Regular ((p, g), b, e, a))) =>
+      match (a + 1)%a with
+      | Some a' => Some (<[ PC := inr (Regular ((p, g), b, e, a')) ]> regs)
+      | None => None
+      end
+    | Some (inr (Stk d p b e a)) =>
+      match (a + 1)%a with
+      | Some a' => Some (<[ PC := inr (Stk d p b e a') ]> regs)
+      | None => None
+      end
+    | Some (inr (Ret b e a)) =>
+      match (a + 1)%a with
+      | Some a' => Some (<[ PC := inr (Ret b e a') ]> regs)
+      | None => None
+      end
+    | _ => None
+    end.
+
+  Lemma incrementPC_is_Some:
+    forall r1 r2,
+      incrementPC r1 = Some r2 ->
+      forall x, is_Some (r1 !! x) <-> is_Some (r2 !! x).
+  Proof.
+    rewrite /incrementPC. intros.
+    destruct (r1 !! PC) eqn:X; [|inv H0].
+    destruct s; inv H0.
+    destruct c; inv H2.
+    - destruct c as [[[[p' g'] b'] e'] a'].
+      destruct (a' + 1)%a; inv H1.
+      destruct (reg_eq_dec x PC).
+      + subst x. rewrite lookup_insert X; split; intro; eauto.
+      + rewrite lookup_insert_ne; auto.
+    - destruct (a1 + 1)%a; inv H1.
+      destruct (reg_eq_dec x PC).
+      + subst x. rewrite lookup_insert X; split; intro; eauto.
+      + rewrite lookup_insert_ne; auto.
+    - destruct (a1 + 1)%a; inv H1.
+      destruct (reg_eq_dec x PC).
+      + subst x. rewrite lookup_insert X; split; intro; eauto.
+      + rewrite lookup_insert_ne; auto.
+  Qed.
+
+  Definition incrementPC' (regs: Reg) : option Reg :=
+    match regs !! PC with
+    | Some (inr ((p, g), b, e, a)) =>
+      match (a + 1)%a with
+      | Some a' => Some (<[ PC := inr ((p, g), b, e, a') ]> regs)
+      | None => None
+      end
+    | _ => None
+    end.
+
+  Definition word_of_argument (regs: base.Reg) (a: Z + RegName): base.Word :=
+    match a with
+    | inl n => inl n
+    | inr r => base.RegLocate regs r
+    end.
+
+  Fixpoint flag_of_expr (e: lang.expr) :=
+    match e with
+    | lang.Instr f => f
+    | lang.Seq e => flag_of_expr e
+    end.
+
+  Inductive sim_cs: base.Mem -> list Stackframe -> machine_base.Mem -> Prop :=
+  | sim_cs_nil:
+      forall h m,
+        sim_cs h [] m
+  | sim_cs_cons:
+      forall reg stk cs h m
+        (Hregsdef: forall r, is_Some (reg !! r))
+        (Hregstk: forall r d p b e a, reg !! r = Some (inr (Stk d p b e a)) -> exists s, stack d ((reg, stk)::cs) = Some s /\ forall x, (b <= x < e)%a -> exists w, s !! x = Some w /\ m !! x = Some (translate_word w))
+        (Hregret: forall r d b e a, reg !! r = Some (inr (Ret d b e a)) -> exists s, stack d ((reg, stk)::cs) = Some s /\ forall x, (b <= x < e)%a -> exists w, s !! x = Some w /\ m !! x = Some (translate_word w))
+        (* TODO: need to describe return pointer code *)
+        (Hregh: forall r p g b e a, reg !! r = Some (inr (Regular (p, g, b, e, a))) -> forall x, (b <= x < e)%a -> exists w, h !! x = Some w /\ m !! x = Some (translate_word w))
+        (Hstkstk: forall y d p b e a, stk !! y = Some (inr (Stk d p b e a)) -> exists s, stack d ((reg, stk)::cs) = Some s /\ forall x, (b <= x < e)%a -> exists w, s !! x = Some w /\ m !! x = Some (translate_word w))
+        (Hstlret: forall y d b e a, stk !! y = Some (inr (Ret d b e a)) -> exists s, stack d ((reg, stk)::cs) = Some s /\ forall x, (b <= x < e)%a -> exists w, s !! x = Some w /\ m !! x = Some (translate_word w))
+        (* TODO: need to describe return pointer code *)
+        (Hstkh: forall y p g b e a, stk !! y = Some (inr (Regular (p, g, b, e, a))) -> forall x, (b <= x < e)%a -> exists w, h !! x = Some w /\ m !! x = Some (translate_word w))
+        (Hsstk: forall a w, stk !! a = Some w -> m !! a = Some (translate_word w))
+        (Hcs: sim_cs h cs m),
+        sim_cs h ((reg, stk)::cs) m.
+
   Inductive sim: language.cfg overlay_lang -> language.cfg cap_lang -> Prop :=
   | sim_intro:
       forall e1 e2 reg1 reg2 h stk cs mem2
         (Hsexpr: sim_expr e1 e2)
-        (Hregsdef: forall r, is_Some (reg1 !! r))
-        (Hregstk: forall r d p b e a, reg1 !! r = Some (inr (Stk d p b e a)) -> is_Some (stack d ((reg1,stk)::cs)))
+        (Hcswf: sim_cs h ((reg1, stk)::cs) mem2)
         (Hsregs: forall r w, reg1 !! r = Some w -> reg2 !! r = Some (translate_word w))
-        (Hsh: forall a w, h !! a = Some w -> mem2 !! a = Some (translate_word w))
-        (Hsstk: forall a w, stk !! a = Some w -> mem2 !! a = Some (translate_word w))
-        (Hdisj: h ##ₘ stk),
+        (Hsh: forall a w, h !! a = Some w -> mem2 !! a = Some (translate_word w) /\ lang.is_global w /\ lang.can_address_only w (dom _ h))
+        (*(Hdisj: forall a, a ∈ dom (gset _) h -> (e_stk <= a)%a)*),
         sim ([e1], (reg1, h, stk, cs)) ([e2], (reg2, mem2)).
+
+  Lemma exec_sim:
+    forall reg1 reg1' reg2 reg2' h h' stk stk' cs cs' mem2 mem2' p g b e a c1 c2
+      (Hregsdef: forall r, is_Some (reg1 !! r))
+      (Hregstk: forall r d p b e a, reg1 !! r = Some (inr (Stk d p b e a)) -> is_Some (stack d ((reg1,stk)::cs)))
+      (Hsregs: forall r w, reg1 !! r = Some w -> reg2 !! r = Some (translate_word w))
+      (Hsh: forall a w, h !! a = Some w -> mem2 !! a = Some (translate_word w) /\ lang.is_global w /\ lang.can_address_only w (dom _ h))
+      (Hsstk: forall a w, stk !! a = Some w -> mem2 !! a = Some (translate_word w))
+      (Hdisj: h ##ₘ stk),
+      is_Some (h !! a) ->
+      reg1 !! PC = Some (inr (Regular (p, g, b, e, a))) ->
+      lang.exec (decodeInstrW' (base.MemLocate h a)) (reg1, h, stk, cs) = (c1, (reg1', h', stk', cs')) ->
+      exec (decodeInstrW (mem2 !m! a)) (reg2, mem2) = (c2, (reg2', mem2')) ->
+      sim_flag c1 c2 /\
+      (forall r, is_Some (reg1' !! r)) /\
+      (forall r d p b e a, reg1' !! r = Some (inr (Stk d p b e a)) -> is_Some (stack d ((reg1',stk')::cs'))) /\
+      (forall r w, reg1' !! r = Some w -> reg2' !! r = Some (translate_word w)) /\
+      (forall a w, h' !! a = Some w -> (mem2' !! a = Some (translate_word w) /\ lang.is_global w /\ lang.can_address_only w (dom _ h'))) /\
+      (forall a w, stk' !! a = Some w -> mem2' !! a = Some (translate_word w)) /\
+      (h' ##ₘ stk').
+  Proof.
+    rewrite /MemLocate /base.MemLocate. intros.
+    destruct H0 as [w Hw].
+    rewrite Hw in H2. generalize (Hsh _ _ Hw). intros [Hw' [Hwisglobal Hwcanaddress]].
+    rewrite Hw' in H3. rewrite <- decodeInstrW_translate_word in H3.
+    destruct (decodeInstrW' w) eqn:Hinstr.
+    - (* Jmp *)
+      simpl in H2. destruct (Hregsdef r) as [wr Hwr].
+      rewrite /base.RegLocate Hwr in H2.
+      admit.
+    - (* Jnz *) admit.
+    - (* Mov *)
+      assert (c1 = match incrementPC (<[dst := word_of_argument reg1 src]> reg1) with Some _ => lang.NextI | _ => lang.Failed end /\ reg1' = match incrementPC (<[dst := word_of_argument reg1 src]> reg1) with Some r => r | _ => <[dst := word_of_argument reg1 src]> reg1 end /\ h' = h /\ stk' = stk /\ cs' = cs /\ c2 = match incrementPC (<[dst := word_of_argument reg1 src]> reg1) with Some _ => NextI | _ => Failed end /\ reg2' = match incrementPC' (<[dst := translate_word (word_of_argument reg1 src)]> reg2) with Some r => r | _ => <[dst := translate_word (word_of_argument reg1 src)]> reg2 end /\ mem2' = mem2).
+      { simpl in H2. destruct src; simpl.
+        - rewrite /base.update_reg /= /lang.updatePC /= /base.RegLocate in H2.
+          rewrite /incrementPC. destruct (reg_eq_dec dst PC).
+          + subst dst. rewrite !lookup_insert.
+            rewrite lookup_insert in H2. inv H2; repeat split; auto.
+            rewrite /= /update_reg /= /updatePC /= /RegLocate lookup_insert in H3; inv H3; auto.
+            rewrite /= /update_reg /= /updatePC /= /RegLocate lookup_insert in H3; inv H3; auto.
+            rewrite /incrementPC' /= lookup_insert //.
+            rewrite /= /update_reg /= /updatePC /= /RegLocate lookup_insert in H3; inv H3; auto.
+          + rewrite lookup_insert_ne in H2; auto.
+            rewrite lookup_insert_ne; auto. rewrite H1.
+            rewrite H1 in H2. rewrite /= /update_reg /= /updatePC /= /RegLocate lookup_insert_ne // in H3.
+            rewrite /incrementPC'. generalize (Hsregs _ _ H1). intro Y.
+            rewrite lookup_insert_ne // Y /=. rewrite Y /= in H3.
+            destruct (a + 1)%a.
+            * inv H2. inv H3. repeat split; auto.
+            * inv H2. inv H3. repeat split; auto.
+        - rewrite /base.update_reg /= /lang.updatePC /= in H2.
+          rewrite /update_reg /= /updatePC /= in H3.
+          rewrite /incrementPC /incrementPC'. destruct (reg_eq_dec dst PC).
+          + subst dst. rewrite !lookup_insert.
+            rewrite /base.RegLocate !lookup_insert in H2.
+            rewrite /RegLocate !lookup_insert in H3.
+            rewrite /base.RegLocate. destruct (reg1 !! r) eqn:X.
+            * generalize (Hsregs _ _ X). intro Y. rewrite Y in H3.
+              destruct s; [inv H2; inv H3; simpl; repeat split; auto|].
+              destruct c.
+              { destruct c as [[[[p' g'] b'] e'] a']. simpl in *.
+                destruct (a' + 1)%a; inv H2; inv H3; repeat split; auto. }
+              { simpl in *. destruct (a2 + 1)%a; inv H2; inv H3; repeat split; auto. }
+              { simpl in *. destruct (a2 + 1)%a; inv H2; inv H3; repeat split; auto. }
+            * destruct (Hregsdef r). rewrite H0 in X; inv X.
+          + rewrite !(lookup_insert_ne _ dst PC) //.
+            rewrite /base.RegLocate (lookup_insert_ne _ dst PC) // H1 in H2.
+            generalize (Hsregs _ _ H1). intro Y.
+            rewrite /RegLocate (lookup_insert_ne _ dst PC) // Y /= in H3.
+            rewrite Y H1 /=.
+            destruct (a + 1)%a; inv H2; inv H3; repeat split; auto.
+            destruct (Hregsdef r) as [wr Hwr].
+            generalize (Hsregs _ _ Hwr). intro Hwr'.
+            rewrite /base.RegLocate Hwr Hwr'; auto.
+            destruct (Hregsdef r) as [wr Hwr].
+            generalize (Hsregs _ _ Hwr). intro Hwr'.
+            rewrite /base.RegLocate Hwr Hwr'; auto. }
+      destruct H0 as [HA [HB [HC [HD [HE [HF [HG HH]]]]]]].
+      subst. split; [|split; [|split; [|split; [|split; [|split]]]]]; auto.
+      + destruct (incrementPC (<[dst:=word_of_argument reg1 src]> reg1)); econstructor.
+      + destruct (incrementPC (<[dst:=word_of_argument reg1 src]> reg1)) eqn:XX.
+        * intro. rewrite -incrementPC_is_Some; [|eapply XX].
+          destruct (reg_eq_dec dst r).
+          { subst dst; rewrite lookup_insert; eauto. }
+          { rewrite lookup_insert_ne; eauto. }
+        * intros. destruct (reg_eq_dec dst r).
+          { subst dst; rewrite lookup_insert; eauto. }
+          { rewrite lookup_insert_ne; eauto. }
+      + intros. rewrite /incrementPC in H0.
+        destruct (reg_eq_dec dst PC).
+        * subst dst; rewrite !lookup_insert in H0.
+          destruct (word_of_argument reg1 src) eqn:XX.
+          { destruct (reg_eq_dec r PC); [subst r; rewrite lookup_insert in H0; inv H0 |].
+            rewrite lookup_insert_ne in H0; auto. eapply Hregstk in H0.
+            rewrite /stack in H0. rewrite /stack.
+            destruct (nat_eq_dec d (length cs)); eauto. }
+          { destruct c.
+            - destruct c as [[[[p' g'] b'] e'] a'].
+              destruct (a' + 1)%a.
+              + destruct (reg_eq_dec r PC); [subst r; rewrite lookup_insert in H0; inv H0|].
+                rewrite !lookup_insert_ne in H0; auto. eapply Hregstk in H0.
+                rewrite /stack in H0. rewrite /stack.
+                destruct (nat_eq_dec d (length cs)); eauto.
+              + destruct (reg_eq_dec r PC); [subst r; rewrite lookup_insert in H0; inv H0|].
+                rewrite lookup_insert_ne in H0; auto. eapply Hregstk in H0.
+                rewrite /stack in H0. rewrite /stack.
+                destruct (nat_eq_dec d (length cs)); eauto.
+            - destruct (a3 + 1)%a.
+              + rewrite insert_insert in H0. destruct (reg_eq_dec r PC).
+                * subst r. rewrite lookup_insert in H0. inv H0.
+                  rewrite /word_of_argument in XX. destruct src; inv XX.
+                  rewrite /base.RegLocate in H4. destruct (reg1 !! r) eqn:XX; [subst s| inv H4].
+                  eapply Hregstk in XX. rewrite /stack in XX. rewrite /stack.
+                  destruct (nat_eq_dec d (length cs)); eauto.
+                * rewrite lookup_insert_ne in H0; auto.
+                  eapply Hregstk in H0. rewrite /stack in H0. rewrite /stack.
+                  destruct (nat_eq_dec d (length cs)); eauto.
+              + destruct (reg_eq_dec r PC).
+                * subst r. rewrite lookup_insert in H0. inv H0.
+                  rewrite /word_of_argument in XX. destruct src; inv XX.
+                  rewrite /base.RegLocate in H4. destruct (reg1 !! r) eqn:XX; [subst s| inv H4].
+                  eapply Hregstk in XX. rewrite /stack in XX. rewrite /stack.
+                  destruct (nat_eq_dec d (length cs)); eauto.
+                * rewrite lookup_insert_ne in H0; auto.
+                  eapply Hregstk in H0. rewrite /stack in H0. rewrite /stack.
+                  destruct (nat_eq_dec d (length cs)); eauto.
+            - destruct (a3 + 1)%a.
+              + rewrite insert_insert in H0. destruct (reg_eq_dec r PC); [subst r; rewrite lookup_insert in H0; inv H0|].
+                rewrite lookup_insert_ne in H0; auto. eapply Hregstk in H0.
+                rewrite /stack in H0. rewrite /stack.
+                destruct (nat_eq_dec d (length cs)); eauto.
+              + destruct (reg_eq_dec r PC); [subst r; rewrite lookup_insert in H0; inv H0|].
+                rewrite lookup_insert_ne in H0; auto. eapply Hregstk in H0.
+                rewrite /stack in H0. rewrite /stack.
+                destruct (nat_eq_dec d (length cs)); eauto. }
+        * rewrite lookup_insert_ne in H0; auto.
+          rewrite H1 in H0. destruct (a + 1)%a.
+          { destruct (reg_eq_dec PC r); [subst r; rewrite lookup_insert in H0; inv H0|].
+            rewrite lookup_insert_ne in H0; auto.
+            destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert in H0; inv H0|].
+            - rewrite /word_of_argument in H5. destruct src; inv H5.
+              rewrite /base.RegLocate in H4. destruct (reg1 !! r) eqn:XX; [subst s|inv H4].
+              eapply Hregstk in XX. rewrite /stack in XX. rewrite /stack.
+              destruct (nat_eq_dec d (length cs)); eauto.
+            - rewrite lookup_insert_ne in H0; auto.
+              eapply Hregstk in H0. rewrite /stack in H0. rewrite /stack.
+              destruct (nat_eq_dec d (length cs)); eauto. }
+          { destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert in H0; inv H0|].
+            - rewrite /word_of_argument in H5. destruct src; inv H5.
+              rewrite /base.RegLocate in H4. destruct (reg1 !! r) eqn:XX; [subst s|inv H4].
+              eapply Hregstk in XX. rewrite /stack in XX. rewrite /stack.
+              destruct (nat_eq_dec d (length cs)); eauto.
+            - rewrite lookup_insert_ne in H0; auto.
+              eapply Hregstk in H0. rewrite /stack in H0. rewrite /stack.
+              destruct (nat_eq_dec d (length cs)); eauto. }
+      + rewrite /incrementPC /incrementPC'; destruct (reg_eq_dec dst PC); [subst dst; rewrite !lookup_insert|]; intros.
+        * destruct (word_of_argument reg1 src) eqn:XX; simpl.
+          { destruct (reg_eq_dec r PC); [subst r; rewrite lookup_insert; rewrite lookup_insert in H0; inv H0; auto|].
+            rewrite lookup_insert_ne in H0; auto.
+            rewrite lookup_insert_ne; auto. }
+          { destruct c.
+            - destruct c as [[[[p' g'] b'] e'] a'].
+              destruct ((a' + 1)%a).
+              + destruct (reg_eq_dec PC r); [subst r; rewrite lookup_insert in H0; rewrite lookup_insert; inv H0; reflexivity|].
+                rewrite !lookup_insert_ne; auto.
+                rewrite !lookup_insert_ne in H0; auto.
+              + destruct (reg_eq_dec PC r); [subst r; rewrite lookup_insert in H0; rewrite lookup_insert; inv H0; reflexivity|].
+                rewrite lookup_insert_ne; auto.
+                rewrite lookup_insert_ne in H0; auto.
+            - destruct ((a2 + 1)%a).
+              + destruct (reg_eq_dec PC r); [subst r; rewrite lookup_insert in H0; rewrite lookup_insert; inv H0; reflexivity|].
+                rewrite !lookup_insert_ne; auto.
+                rewrite !lookup_insert_ne in H0; auto.
+              + destruct (reg_eq_dec PC r); [subst r; rewrite lookup_insert in H0; rewrite lookup_insert; inv H0; reflexivity|].
+                rewrite lookup_insert_ne; auto.
+                rewrite lookup_insert_ne in H0; auto.
+            - destruct ((a2 + 1)%a).
+              + destruct (reg_eq_dec PC r); [subst r; rewrite lookup_insert in H0; rewrite lookup_insert; inv H0; reflexivity|].
+                rewrite !lookup_insert_ne; auto.
+                rewrite !lookup_insert_ne in H0; auto.
+              + destruct (reg_eq_dec PC r); [subst r; rewrite lookup_insert in H0; rewrite lookup_insert; inv H0; reflexivity|].
+                rewrite lookup_insert_ne; auto.
+                rewrite lookup_insert_ne in H0; auto. }
+        * rewrite lookup_insert_ne in H0; auto.
+          rewrite lookup_insert_ne; auto.
+          rewrite H1 in H0. generalize (Hsregs _ _ H1); intros Y.
+          rewrite Y /=. destruct ((a + 1)%a).
+          { destruct (reg_eq_dec r PC); [subst r; rewrite lookup_insert in H0; rewrite lookup_insert; inv H0; auto|].
+            rewrite lookup_insert_ne in H0; auto.
+            rewrite lookup_insert_ne; auto.
+            destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert in H0; rewrite lookup_insert; inv H0; auto|].
+            rewrite lookup_insert_ne in H0; auto.
+            rewrite lookup_insert_ne; auto. }
+          { destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert in H0; rewrite lookup_insert; inv H0; auto|].
+            rewrite lookup_insert_ne in H0; auto.
+            rewrite lookup_insert_ne; auto. }
+    - (* Load *) admit.
+    - (* Store *) admit.
+    - (* Lt *)
+      assert ((c1 = lang.Failed /\ ((reg1' = reg1 /\ reg2' = reg2) \/ (exists n, reg1' = (<[dst := inl n]> reg1) /\ reg2' = (<[dst := inl n]> reg2))) /\ h' = h /\ stk' = stk /\ cs' = cs /\ c2 = Failed /\ mem2' = mem2) \/ (exists n, c1 = lang.NextI /\ incrementPC (<[dst := inl n]> reg1) = Some reg1' /\ h' = h /\ stk' = stk /\ cs' = cs /\ c2 = NextI /\ incrementPC' (<[dst := inl n]> reg2) = Some reg2' /\ mem2' = mem2)).
+      { simpl in H2, H3. destruct r1.
+        - destruct r2.
+          + rewrite /base.update_reg /lang.updatePC /= in H2.
+            destruct (base.RegLocate (<[dst:=inl (Z.b2z (z <? z0)%Z)]> reg1) PC) eqn:XX; rewrite XX in H2.
+            * left. inv H2. rewrite /update_reg /updatePC /= in H3.
+              destruct (<[dst:=inl (Z.b2z (z <? z0)%Z)]> reg2 !r! PC) eqn:YY; rewrite YY in H3; [inv H3; repeat split; eauto|].
+              destruct (reg_eq_dec dst PC); [subst dst; rewrite /RegLocate lookup_insert /= in YY; inv YY|].
+              rewrite /RegLocate lookup_insert_ne in YY; auto.
+              rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+              rewrite H1 in XX. inv XX.
+            * destruct (reg_eq_dec dst PC); [subst dst; rewrite /base.RegLocate lookup_insert in XX; inv XX|].
+              rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+              rewrite H1 in XX; inv XX. destruct (a + 1)%a eqn:ZZ.
+              { inv H2. right. rewrite /updatePC /update_reg /= in H3.
+                rewrite /RegLocate lookup_insert_ne in H3; auto.
+                generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                eexists. repeat split; eauto.
+                rewrite /incrementPC lookup_insert_ne // H1 ZZ //.
+                rewrite /incrementPC' lookup_insert_ne // XX /= ZZ //. }
+              { left. inv H2. rewrite /updatePC /update_reg /= in H3.
+                rewrite /RegLocate lookup_insert_ne in H3; auto.
+                generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                repeat split; eauto. }
+          + destruct (Hregsdef r) as [wr Hwr].
+            rewrite /base.RegLocate Hwr in H2.
+            generalize (Hsregs _ _ Hwr). intros Hwr'.
+            rewrite /RegLocate Hwr' in H3. destruct wr.
+            * simpl in H3. rewrite /base.update_reg /lang.updatePC /= in H2.
+              destruct (base.RegLocate (<[dst:=inl (Z.b2z (z <? z0)%Z)]> reg1) PC) eqn:XX; rewrite XX in H2.
+              { left. inv H2. rewrite /update_reg /updatePC /= in H3.
+                destruct (<[dst:=inl (Z.b2z (z <? z0)%Z)]> reg2 !r! PC) eqn:YY; rewrite YY in H3; [inv H3; repeat split; eauto|].
+                destruct (reg_eq_dec dst PC); [subst dst; rewrite /RegLocate lookup_insert /= in YY; inv YY|].
+                rewrite /RegLocate lookup_insert_ne in YY; auto.
+                rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                rewrite H1 in XX. inv XX. }
+              { destruct (reg_eq_dec dst PC); [subst dst; rewrite /base.RegLocate lookup_insert in XX; inv XX|].
+                rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                rewrite H1 in XX; inv XX. destruct (a + 1)%a eqn:ZZ.
+                - inv H2. right. rewrite /updatePC /update_reg /= in H3.
+                  rewrite /RegLocate lookup_insert_ne in H3; auto.
+                  generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                  eexists. repeat split; eauto.
+                  rewrite /incrementPC lookup_insert_ne // H1 ZZ //.
+                  rewrite /incrementPC' lookup_insert_ne // XX /= ZZ //.
+                - left. inv H2. rewrite /updatePC /update_reg /= in H3.
+                  rewrite /RegLocate lookup_insert_ne in H3; auto.
+                  generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                  repeat split; eauto. }
+            * inv H2. assert (exists c', translate_word (inr c) = inr c').
+              { destruct c; simpl; eauto. }
+              destruct H0 as [c' Hc']. rewrite Hc' in H3. inv H3.
+              left. repeat split; eauto.
+        - destruct r2.
+          + destruct (Hregsdef r) as [wr Hwr].
+            rewrite /base.RegLocate Hwr in H2.
+            generalize (Hsregs _ _ Hwr). intros Hwr'.
+            rewrite /RegLocate Hwr' in H3. destruct wr.
+            * simpl in H3. rewrite /base.update_reg /lang.updatePC /= in H2.
+              destruct (base.RegLocate (<[dst:=inl (Z.b2z (z0 <? z)%Z)]> reg1) PC) eqn:XX; rewrite XX in H2.
+              { left. inv H2. rewrite /update_reg /updatePC /= in H3.
+                destruct (<[dst:=inl (Z.b2z (z0 <? z)%Z)]> reg2 !r! PC) eqn:YY; rewrite YY in H3; [inv H3; repeat   split; eauto|].
+                destruct (reg_eq_dec dst PC); [subst dst; rewrite /RegLocate lookup_insert /= in YY; inv YY|].
+                rewrite /RegLocate lookup_insert_ne in YY; auto.
+                rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                rewrite H1 in XX. inv XX. }
+              { destruct (reg_eq_dec dst PC); [subst dst; rewrite /base.RegLocate lookup_insert in XX; inv XX|].
+                rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                rewrite H1 in XX; inv XX. destruct (a + 1)%a eqn:ZZ.
+                - inv H2. right. rewrite /updatePC /update_reg /= in H3.
+                  rewrite /RegLocate lookup_insert_ne in H3; auto.
+                  generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                  eexists. repeat split; eauto.
+                  rewrite /incrementPC lookup_insert_ne // H1 ZZ //.
+                  rewrite /incrementPC' lookup_insert_ne // XX /= ZZ //.
+                - left. inv H2. rewrite /updatePC /update_reg /= in H3.
+                  rewrite /RegLocate lookup_insert_ne in H3; auto.
+                  generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                  repeat split; eauto. }
+            * inv H2. assert (exists c', translate_word (inr c) = inr c').
+              { destruct c; simpl; eauto. }
+              destruct H0 as [c' Hc']. rewrite Hc' in H3. inv H3.
+              left. repeat split; eauto.
+          + destruct (Hregsdef r) as [wr Hwr].
+            rewrite /base.RegLocate Hwr in H2.
+            destruct (Hregsdef r0) as [wr0 Hwr0].
+            rewrite /base.RegLocate Hwr0 in H2.
+            generalize (Hsregs _ _ Hwr). intros Hwr'.
+            rewrite /RegLocate Hwr' in H3.
+            generalize (Hsregs _ _ Hwr0). intros Hwr0'.
+            rewrite /RegLocate Hwr0' in H3. destruct wr.
+            * destruct wr0.
+              { simpl in H3. rewrite /base.update_reg /lang.updatePC /= in H2.
+                destruct (base.RegLocate (<[dst:=inl (Z.b2z (z <? z0)%Z)]> reg1) PC) eqn:XX; rewrite XX in H2.
+                - left. inv H2. rewrite /update_reg /updatePC /= in H3.
+                  destruct (<[dst:=inl (Z.b2z (z <? z0)%Z)]> reg2 !r! PC) eqn:YY; rewrite YY in H3; [inv H3; repeat split; eauto|].
+                  destruct (reg_eq_dec dst PC); [subst dst; rewrite /RegLocate lookup_insert /= in YY; inv YY|].
+                  rewrite /RegLocate lookup_insert_ne in YY; auto.
+                  rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                  rewrite H1 in XX. inv XX.
+                - destruct (reg_eq_dec dst PC); [subst dst; rewrite /base.RegLocate lookup_insert in XX; inv XX|].
+                  rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                  rewrite H1 in XX; inv XX. destruct (a + 1)%a eqn:ZZ.
+                  + inv H2. right. rewrite /updatePC /update_reg /= in H3.
+                    rewrite /RegLocate lookup_insert_ne in H3; auto.
+                    generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                    eexists. repeat split; eauto.
+                    rewrite /incrementPC lookup_insert_ne // H1 ZZ //.
+                   rewrite /incrementPC' lookup_insert_ne // XX /= ZZ //.
+                  + left. inv H2. rewrite /updatePC /update_reg /= in H3.
+                    rewrite /RegLocate lookup_insert_ne in H3; auto.
+                    generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                    repeat split; eauto. }
+              { inv H2. assert (exists c', translate_word (inr c) = inr c').
+                { destruct c; simpl; eauto. }
+                destruct H0 as [c' Hc']. rewrite Hc' in H3. inv H3.
+                left. repeat split; eauto. } }
+      destruct H0 as [AA|AA].
+      + destruct AA as [-> [AA [-> [-> [-> [-> ->]]]]]].
+        split; [econstructor |]. destruct AA as [[-> ->] | AA]; [split; [|split; [|split; [|split; [|split]]]]; auto|].
+        destruct AA as [n [-> ->]]. split; [|split; [|split; [|split; [|split]]]]; auto.
+        * intro r; destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert; eauto|rewrite lookup_insert_ne; auto].
+        * intro r. destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert; inversion 1|].
+          rewrite lookup_insert_ne; auto. intros. eapply Hregstk in H0; auto.
+        * intro; destruct (reg_eq_dec r dst); [subst r; rewrite !lookup_insert /=; inversion 1; reflexivity|].
+          rewrite !lookup_insert_ne; auto.
+      + destruct AA as [n [-> [XX [-> [-> [-> [-> [YY ->]]]]]]]].
+        split; [econstructor|]. split; [|split; [|split; [|split; [|split]]]]; auto.
+        * intros; eapply (incrementPC_is_Some XX).
+          destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert; eauto|rewrite lookup_insert_ne //; auto].
+        * intros. rewrite /incrementPC in XX. destruct (reg_eq_dec PC dst); [subst dst; rewrite lookup_insert in XX; inv XX|rewrite lookup_insert_ne in XX; auto].
+          rewrite H1 in XX. destruct (a + 1)%a; inv XX.
+          destruct (reg_eq_dec r PC); [subst r; rewrite lookup_insert in H0; inv H0|].
+          rewrite lookup_insert_ne in H0; auto.
+          destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert in H0; inv H0|].
+          rewrite lookup_insert_ne in H0; auto.
+          eapply Hregstk in H0; eauto.
+        * intros. rewrite /incrementPC in XX. destruct (reg_eq_dec PC dst); [subst dst; rewrite lookup_insert in XX; inv XX|rewrite lookup_insert_ne in XX; auto].
+          rewrite H1 in XX. destruct (a + 1)%a eqn:AA; inv XX.
+          rewrite /incrementPC' in YY. rewrite lookup_insert_ne in YY; auto.
+          generalize (Hsregs _ _ H1). simpl; intro ZZ. rewrite ZZ in YY. rewrite AA in YY; inv YY.
+          destruct (reg_eq_dec r PC); [subst r; rewrite lookup_insert in H0; rewrite lookup_insert; inv H0; simpl; auto|].
+          rewrite lookup_insert_ne in H0; auto.
+          rewrite lookup_insert_ne; auto. destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert; rewrite lookup_insert in H0; inv H0; reflexivity|].
+          rewrite lookup_insert_ne in H0; auto.
+          rewrite lookup_insert_ne; auto.
+    - (* Add *)
+      assert ((c1 = lang.Failed /\ ((reg1' = reg1 /\ reg2' = reg2) \/ (exists n, reg1' = (<[dst := inl n]> reg1) /\ reg2' = (<[dst := inl n]> reg2))) /\ h' = h /\ stk' = stk /\ cs' = cs /\ c2 = Failed /\ mem2' = mem2) \/ (exists n, c1 = lang.NextI /\ incrementPC (<[dst := inl n]> reg1) = Some reg1' /\ h' = h /\ stk' = stk /\ cs' = cs /\ c2 = NextI /\ incrementPC' (<[dst := inl n]> reg2) = Some reg2' /\ mem2' = mem2)).
+      { simpl in H2, H3. destruct r1.
+        - destruct r2.
+          + rewrite /base.update_reg /lang.updatePC /= in H2.
+            destruct (base.RegLocate (<[dst:=inl (z + z0)%Z]> reg1) PC) eqn:XX; rewrite XX in H2.
+            * left. inv H2. rewrite /update_reg /updatePC /= in H3.
+              destruct (<[dst:=inl (z + z0)%Z]> reg2 !r! PC) eqn:YY; rewrite YY in H3; [inv H3; repeat split; eauto|].
+              destruct (reg_eq_dec dst PC); [subst dst; rewrite /RegLocate lookup_insert /= in YY; inv YY|].
+              rewrite /RegLocate lookup_insert_ne in YY; auto.
+              rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+              rewrite H1 in XX. inv XX.
+            * destruct (reg_eq_dec dst PC); [subst dst; rewrite /base.RegLocate lookup_insert in XX; inv XX|].
+              rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+              rewrite H1 in XX; inv XX. destruct (a + 1)%a eqn:ZZ.
+              { inv H2. right. rewrite /updatePC /update_reg /= in H3.
+                rewrite /RegLocate lookup_insert_ne in H3; auto.
+                generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                eexists. repeat split; eauto.
+                rewrite /incrementPC lookup_insert_ne // H1 ZZ //.
+                rewrite /incrementPC' lookup_insert_ne // XX /= ZZ //. }
+              { left. inv H2. rewrite /updatePC /update_reg /= in H3.
+                rewrite /RegLocate lookup_insert_ne in H3; auto.
+                generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                repeat split; eauto. }
+          + destruct (Hregsdef r) as [wr Hwr].
+            rewrite /base.RegLocate Hwr in H2.
+            generalize (Hsregs _ _ Hwr). intros Hwr'.
+            rewrite /RegLocate Hwr' in H3. destruct wr.
+            * simpl in H3. rewrite /base.update_reg /lang.updatePC /= in H2.
+              destruct (base.RegLocate (<[dst:=inl (z + z0)%Z]> reg1) PC) eqn:XX; rewrite XX in H2.
+              { left. inv H2. rewrite /update_reg /updatePC /= in H3.
+                destruct (<[dst:=inl (z + z0)%Z]> reg2 !r! PC) eqn:YY; rewrite YY in H3; [inv H3; repeat   split; eauto|].
+                destruct (reg_eq_dec dst PC); [subst dst; rewrite /RegLocate lookup_insert /= in YY; inv YY|].
+                rewrite /RegLocate lookup_insert_ne in YY; auto.
+                rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                rewrite H1 in XX. inv XX. }
+              { destruct (reg_eq_dec dst PC); [subst dst; rewrite /base.RegLocate lookup_insert in XX; inv XX|].
+                rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                rewrite H1 in XX; inv XX. destruct (a + 1)%a eqn:ZZ.
+                - inv H2. right. rewrite /updatePC /update_reg /= in H3.
+                  rewrite /RegLocate lookup_insert_ne in H3; auto.
+                  generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                  eexists. repeat split; eauto.
+                  rewrite /incrementPC lookup_insert_ne // H1 ZZ //.
+                  rewrite /incrementPC' lookup_insert_ne // XX /= ZZ //.
+                - left. inv H2. rewrite /updatePC /update_reg /= in H3.
+                  rewrite /RegLocate lookup_insert_ne in H3; auto.
+                  generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                  repeat split; eauto. }
+            * inv H2. assert (exists c', translate_word (inr c) = inr c').
+              { destruct c; simpl; eauto. }
+              destruct H0 as [c' Hc']. rewrite Hc' in H3. inv H3.
+              left. repeat split; eauto.
+        - destruct r2.
+          + destruct (Hregsdef r) as [wr Hwr].
+            rewrite /base.RegLocate Hwr in H2.
+            generalize (Hsregs _ _ Hwr). intros Hwr'.
+            rewrite /RegLocate Hwr' in H3. destruct wr.
+            * simpl in H3. rewrite /base.update_reg /lang.updatePC /= in H2.
+              destruct (base.RegLocate (<[dst:=inl (z0 + z)%Z]> reg1) PC) eqn:XX; rewrite XX in H2.
+              { left. inv H2. rewrite /update_reg /updatePC /= in H3.
+                destruct (<[dst:=inl (z0 + z)%Z]> reg2 !r! PC) eqn:YY; rewrite YY in H3; [inv H3; repeat   split; eauto|].
+                destruct (reg_eq_dec dst PC); [subst dst; rewrite /RegLocate lookup_insert /= in YY; inv YY|].
+                rewrite /RegLocate lookup_insert_ne in YY; auto.
+                rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                rewrite H1 in XX. inv XX. }
+              { destruct (reg_eq_dec dst PC); [subst dst; rewrite /base.RegLocate lookup_insert in XX; inv XX|].
+                rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                rewrite H1 in XX; inv XX. destruct (a + 1)%a eqn:ZZ.
+                - inv H2. right. rewrite /updatePC /update_reg /= in H3.
+                  rewrite /RegLocate lookup_insert_ne in H3; auto.
+                  generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                  eexists. repeat split; eauto.
+                  rewrite /incrementPC lookup_insert_ne // H1 ZZ //.
+                  rewrite /incrementPC' lookup_insert_ne // XX /= ZZ //.
+                - left. inv H2. rewrite /updatePC /update_reg /= in H3.
+                  rewrite /RegLocate lookup_insert_ne in H3; auto.
+                  generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                  repeat split; eauto. }
+            * inv H2. assert (exists c', translate_word (inr c) = inr c').
+              { destruct c; simpl; eauto. }
+              destruct H0 as [c' Hc']. rewrite Hc' in H3. inv H3.
+              left. repeat split; eauto.
+          + destruct (Hregsdef r) as [wr Hwr].
+            rewrite /base.RegLocate Hwr in H2.
+            destruct (Hregsdef r0) as [wr0 Hwr0].
+            rewrite /base.RegLocate Hwr0 in H2.
+            generalize (Hsregs _ _ Hwr). intros Hwr'.
+            rewrite /RegLocate Hwr' in H3.
+            generalize (Hsregs _ _ Hwr0). intros Hwr0'.
+            rewrite /RegLocate Hwr0' in H3. destruct wr.
+            * destruct wr0.
+              { simpl in H3. rewrite /base.update_reg /lang.updatePC /= in H2.
+                destruct (base.RegLocate (<[dst:=inl (z + z0)%Z]> reg1) PC) eqn:XX; rewrite XX in H2.
+                - left. inv H2. rewrite /update_reg /updatePC /= in H3.
+                  destruct (<[dst:=inl (z + z0)%Z]> reg2 !r! PC) eqn:YY; rewrite YY in H3; [inv H3; repeat split; eauto|].
+                  destruct (reg_eq_dec dst PC); [subst dst; rewrite /RegLocate lookup_insert /= in YY; inv YY|].
+                  rewrite /RegLocate lookup_insert_ne in YY; auto.
+                  rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                  rewrite H1 in XX. inv XX.
+                - destruct (reg_eq_dec dst PC); [subst dst; rewrite /base.RegLocate lookup_insert in XX; inv XX|].
+                  rewrite /base.RegLocate lookup_insert_ne in XX; auto.
+                  rewrite H1 in XX; inv XX. destruct (a + 1)%a eqn:ZZ.
+                  + inv H2. right. rewrite /updatePC /update_reg /= in H3.
+                    rewrite /RegLocate lookup_insert_ne in H3; auto.
+                    generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                    eexists. repeat split; eauto.
+                    rewrite /incrementPC lookup_insert_ne // H1 ZZ //.
+                  rewrite /incrementPC' lookup_insert_ne // XX /= ZZ //.
+                  + left. inv H2. rewrite /updatePC /update_reg /= in H3.
+                    rewrite /RegLocate lookup_insert_ne in H3; auto.
+                    generalize (Hsregs _ _ H1); intros XX. rewrite XX /= ZZ in H3. inv H3.
+                    repeat split; eauto. }
+              { inv H2. assert (exists c', translate_word (inr c) = inr c').
+                { destruct c; simpl; eauto. }
+                destruct H0 as [c' Hc']. rewrite Hc' in H3. inv H3.
+                left. repeat split; eauto. } }
+      destruct H0 as [AA|AA].
+      + destruct AA as [-> [AA [-> [-> [-> [-> ->]]]]]].
+        split; [econstructor |]. destruct AA as [[-> ->] | AA]; [split; [|split; [|split; [|split; [|split]]]]; auto|].
+        destruct AA as [n [-> ->]]. split; [|split; [|split; [|split; [|split]]]]; auto.
+        * intro r; destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert; eauto|rewrite lookup_insert_ne; auto].
+        * intro r. destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert; inversion 1|].
+          rewrite lookup_insert_ne; auto. intros. eapply Hregstk in H0; auto.
+        * intro; destruct (reg_eq_dec r dst); [subst r; rewrite !lookup_insert /=; inversion 1; reflexivity|].
+          rewrite !lookup_insert_ne; auto.
+      + destruct AA as [n [-> [XX [-> [-> [-> [-> [YY ->]]]]]]]].
+        split; [econstructor|]. split; [|split; [|split; [|split; [|split]]]]; auto.
+        * intros; eapply (incrementPC_is_Some XX).
+          destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert; eauto|rewrite lookup_insert_ne //; auto].
+        * intros. rewrite /incrementPC in XX. destruct (reg_eq_dec PC dst); [subst dst; rewrite lookup_insert in XX; inv XX|rewrite lookup_insert_ne in XX; auto].
+          rewrite H1 in XX. destruct (a + 1)%a; inv XX.
+          destruct (reg_eq_dec r PC); [subst r; rewrite lookup_insert in H0; inv H0|].
+          rewrite lookup_insert_ne in H0; auto.
+          destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert in H0; inv H0|].
+          rewrite lookup_insert_ne in H0; auto.
+          eapply Hregstk in H0; eauto.
+        * intros. rewrite /incrementPC in XX. destruct (reg_eq_dec PC dst); [subst dst; rewrite lookup_insert in XX; inv XX|rewrite lookup_insert_ne in XX; auto].
+          rewrite H1 in XX. destruct (a + 1)%a eqn:AA; inv XX.
+          rewrite /incrementPC' in YY. rewrite lookup_insert_ne in YY; auto.
+          generalize (Hsregs _ _ H1). simpl; intro ZZ. rewrite ZZ in YY. rewrite AA in YY; inv YY.
+          destruct (reg_eq_dec r PC); [subst r; rewrite lookup_insert in H0; rewrite lookup_insert; inv H0; simpl; auto|].
+          rewrite lookup_insert_ne in H0; auto.
+          rewrite lookup_insert_ne; auto. destruct (reg_eq_dec r dst); [subst r; rewrite lookup_insert; rewrite lookup_insert in H0; inv H0; reflexivity|].
+          rewrite lookup_insert_ne in H0; auto.
+          rewrite lookup_insert_ne; auto.
+
+    - (* Sub *) admit.
+    - (* Lea *) admit.
+    - (* Restrict *) admit.
+    - (* Subseg *) admit.
+    - (* IsPtr *) admit.
+    - (* GetL *) admit.
+    - (* GetP *) admit.
+    - (* GetB *) admit.
+    - (* GetE *) admit.
+    - (* GetA *) admit.
+    - (* Fail *)
+      simpl in H2, H3. inv H2; inv H3.
+      split; [|split; [|split; [|split; [|split; [|split]]]]]; auto.
+      econstructor.
+    - (* Halt *)
+      simpl in H2, H3. inv H2; inv H3.
+      split; [|split; [|split; [|split; [|split; [|split]]]]]; auto.
+      econstructor.
+    - (* LoadU *) admit.
+    - (* StoreU *) admit.
+    - (* PromoteU *) admit.
+
+
+
+
+
+  Admitted.
+
+
+
+
+
+
 
   Inductive sim_val: lang.val -> val -> Prop :=
   | sim_val_halted:
@@ -233,7 +850,16 @@ Section overlay_to_cap_lang.
             destruct (exec (decodeInstrW (mem2 !m! a)) (reg2, mem2)) eqn:YY. simpl.
             destruct e1 as [r'' m'']. destruct e0 as [[[r' h'] stk'] cs'].
             econstructor; eauto.
-            - eapply sim_expr_fill; eauto. admit.
+            - eapply sim_expr_fill; eauto.
+              rewrite /base.RegLocate /= in H5.
+              destruct (reg1 !! PC) as [pcw1|] eqn:X; try congruence; subst pcw1.
+              generalize (Hsregs _ _ X). simpl; intro Y.
+              
+
+
+
+
+              admit.
             - admit.
             - admit.
             - admit.

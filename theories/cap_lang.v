@@ -781,7 +781,7 @@ Definition can_address_only (w: Word) (addrs: gset Addr): Prop :=
     end
   end.
 
-Definition pwl (w: Word): bool :=
+Definition pwlW (w: Word): bool :=
   match w with
   | inl _ => false
   | inr (p, _, _, _, _) => pwlU p
