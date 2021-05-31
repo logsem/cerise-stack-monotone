@@ -65,18 +65,6 @@ Section fundamental.
                    ∗ (if bl then □ (∀ W (w : Word * Word), P W w -∗ interp W w) else rcond P interp)
     else  ⌜mem = <[pc_a:=pc_w]> ∅⌝ ∗ open_region pc_a W)%I.
 
-  Lemma load_inr_eq {regs r p0 g0 b0 e0 a0 p1 g1 b1 e1 a1}:
-    reg_allows_load regs r p0 g0 b0 e0 a0 →
-    read_reg_inr regs r p1 g1 b1 e1 a1 →
-    p0 = p1 ∧ g0 = g1 ∧ b0 = b1 ∧ e0 = e1 ∧ a0 = a1.
-  Proof.
-      intros Hrar H3.
-      pose (Hrar' := Hrar).
-      destruct Hrar' as (Hinr0 & _). destruct H3 as [Hinr1 | Hinl1].
-      * rewrite Hinr0 in Hinr1. inversion Hinr1.
-        subst. auto.
-      * destruct Hinl1 as [z Hinl1]. rewrite Hinl1 in Hinr0. by exfalso.
-  Qed.
 
   Lemma create_load_res:
     ∀ (W : WORLD) (r r' : leibnizO Reg) (p : Perm)
