@@ -200,7 +200,7 @@ Section opsem.
                            | [] => (Failed, φ)
                            | ((reg', m') :: cs) => (NextI, (reg', mem φ, m', cs))
                            end
-      | _ => let φ' :=  (update_reg φ PC (updatePcPerm (RegLocate (reg φ) r))) in (NextI, φ')
+      | _ => let φ' := (update_reg φ PC (updatePcPerm (RegLocate (reg φ) r))) in (NextI, φ')
       end
     | Jnz r1 r2 =>
       if nonZero (RegLocate (reg φ) r2) then
@@ -817,11 +817,11 @@ Section opsem.
     clear_stk_aux m a (Z.to_nat MemNum).
 
   Lemma clear_stk_spec:
-    forall m a, 
-      (forall a', (a <= a')%a -> (clear_stk m a) !! a' = None) /\ 
+    forall m a,
+      (forall a', (a <= a')%a -> (clear_stk m a) !! a' = None) /\
       (forall a', (a' < a)%a -> (clear_stk m a) !! a' = m !! a').
   Proof.
-    intros. 
+    intros.
     generalize (clear_stk_aux_spec (Z.to_nat MemNum) m a). intros [A B].
     split; intros.
     - assert ((a + (a' - a)%Z)%a = Some a') by solve_addr.
@@ -882,7 +882,7 @@ Section opsem.
       + right; simpl; auto.
   Qed.
 
-  Definition is_call (regs: base.Reg) rf rargs m a e: Prop :=
+  Definition is_call (regs: base.Reg) rf rargs (m: base.Mem) a e: Prop :=
     exists a',
       rf <> PC /\
       rf <> r_stk /\
@@ -901,6 +901,7 @@ Section opsem.
     is_call regs rf2 rargs2 m a e ->
     rf1 = rf2 /\ rargs1 = rargs2.
   Proof.
+    Local Opaque app. (* Hack so Qed terminates *)
     intros. destruct H0 as [a' [HA1 [HA2 [HA3 [HA4 [HA5 [HA6 [HA7 [HA8 HA9]]]]]]]]].
     destruct H1 as [a'' [HB1 [HB2 [HB3 [HB4 [HB5 [HB6 [HB7 [HB8 HB9]]]]]]]]].
     assert (Hleneq: length rargs1 = length rargs2).
@@ -908,7 +909,7 @@ Section opsem.
       destruct (HB8 36 ltac:(lia)) as [a_i' [Ha_i' Hinstr']].
       rewrite Ha_i' in Ha_i; inversion Ha_i; subst.
       unfold call_instrs in Hinstr, Hinstr'.
-      rewrite (lookup_app_l (call_instrs_prologue rargs1) _ 36) in Hinstr; [|rewrite call_instrs_prologue_length; lia].
+      rewrite (@lookup_app_l (base.Word) (call_instrs_prologue rargs1) _ 36) in Hinstr; [|rewrite call_instrs_prologue_length; lia].
       rewrite lookup_app_l in Hinstr'; [|rewrite call_instrs_prologue_length; lia].
       rewrite /call_instrs_prologue lookup_app_r in Hinstr; [|rewrite push_env_instrs_length; lia].
       rewrite push_env_instrs_length /= in Hinstr.
@@ -982,7 +983,7 @@ Section opsem.
     clear Hpush_regs_eq. eapply push_instrs_inj in Hpush_regs_eq'.
     eapply fmap_inj in Hpush_regs_eq'; auto.
     inversion 1; auto.
-  Admitted. (* Infinite Qed ?*)
+  Qed.
 
   Inductive step: Conf → Conf → Prop :=
   | step_exec_fail:
@@ -1456,20 +1457,12 @@ Definition initial_state `{MachineParameters} (b_stk e_stk: Addr) (c: overlay_co
 Definition can_address_only (w: base.Word) (addrs: gset Addr): Prop :=
   match w with
   | inl _ => True
-  | inr (Regular (p, _, b, e, _)) =>
-    match p with
-    | O | E => True
-    | _ => forall a, (b <= a < e)%a -> a ∈ addrs
-    end
-  | inr (Stk _ p b e _) =>
-    match p with
-    | O | E => True
-    | _ => forall a, (b <= a < e)%a -> a ∈ addrs
-    end
-  | inr (Ret _ _ _) => True
+  | inr (Regular (_, _, b, e, _)) =>
+    forall a, (b <= a < e)%a -> a ∈ addrs
+  | _ => False
   end.
 
-Definition pwl (w: base.Word): bool :=
+Definition pwlW (w: base.Word): bool :=
   match w with
   | inl _ => false
   | inr (Regular (p, _, _, _, _)) => pwlU p

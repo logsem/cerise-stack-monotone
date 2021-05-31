@@ -1,5 +1,5 @@
 From cap_machine.overlay Require Import base lang.
-From cap_machine Require Import cap_lang simulation linking.
+From cap_machine Require Import cap_lang simulation linking region machine_run.
 From stdpp Require Import base gmap fin_maps list.
 From Coq Require Import Eqdep_dec ssreflect ssrfun ssrbool.
 Set Implicit Arguments.
@@ -127,7 +127,7 @@ Section overlay_to_cap_lang.
     - simpl; intros. eauto.
     - destruct a; simpl; intros.
       eapply IHK in H0; auto.
-      destruct H0 as [e2' [A B]].
+      destruct H0 as [e2' [A B] ].
       inv B. exists e3; split; auto.
   Qed.
 
@@ -160,7 +160,7 @@ Section overlay_to_cap_lang.
     destruct (r1 !! PC) eqn:X; [|inv H0].
     destruct s; inv H0.
     destruct c; inv H2.
-    - destruct c as [[[[p' g'] b'] e'] a'].
+    - destruct c as [ [ [ [p' g'] b'] e'] a'].
       destruct (a' + 1)%a; inv H1.
       destruct (reg_eq_dec x PC).
       + subst x. rewrite lookup_insert X; split; intro; eauto.
@@ -197,36 +197,74 @@ Section overlay_to_cap_lang.
     | lang.Seq e => flag_of_expr e
     end.
 
-  Inductive sim_cs: base.Mem -> list Stackframe -> machine_base.Mem -> Prop :=
+  Definition can_step (e: lang.expr): Prop :=
+    flag_of_expr e = lang.Executable \/ flag_of_expr e = lang.NextI.
+  
+  Lemma can_step_fill:
+    forall K e, can_step (fill K e) = can_step e.
+  Proof.
+    induction K; simpl; auto.
+    intros. destruct a. simpl.
+    rewrite IHK. rewrite /can_step /=. reflexivity.
+  Qed.
+
+  Definition interp (w: base.Word) (h: base.Mem) (stk: base.Mem) (cs: list Stackframe): Prop :=
+    match w with
+    | inl n => True
+    | inr (Regular _) => lang.pwlW w = false /\ lang.is_global w = true /\ lang.can_address_only w (dom _ h)
+    | inr (Stk d p b e a) => d = length cs /\ forall x, (b <= x < lang.canReadUpTo w)%a -> exists w, stk !! x = Some w
+    | inr (Ret b e a) => match cs with
+                         | [] => False
+                         | (reg', stk')::cs' => exists b_stk e_stk a_stk, reg' !! call.r_stk = Some (inr (Stk (length cs') URWLX b_stk e_stk a_stk)) /\ a = ^(a_stk + 31)%a /\ True (* TODO describe return capability shape *)
+                         end
+    end.
+
+  (* w is legally stored at address a *)
+  Definition canBeStored (w: base.Word) (a: Addr): Prop :=
+    match w with
+    | inl _ => True
+    | inr (Regular (p, g, b, e, a)) => match g with
+                                       | Monotone => (lang.canReadUpTo w <= a)%a
+                                       | _ => True
+                                       end
+    | inr _ => (lang.canReadUpTo w <= a)%a
+    end.
+
+  Inductive sim_cs: bool -> base.Mem -> list Stackframe -> machine_base.Mem -> Prop :=
   | sim_cs_nil:
-      forall h m,
-        sim_cs h [] m
-  | sim_cs_cons:
+      forall b h m,
+        sim_cs b h [] m
+  | sim_cs_cons_true:
       forall reg stk cs h m
-        (Hregsdef: forall r, is_Some (reg !! r))
-        (Hregstk: forall r d p b e a, reg !! r = Some (inr (Stk d p b e a)) -> exists s, stack d ((reg, stk)::cs) = Some s /\ forall x, (b <= x < e)%a -> exists w, s !! x = Some w /\ m !! x = Some (translate_word w))
-        (Hregret: forall r d b e a, reg !! r = Some (inr (Ret d b e a)) -> exists s, stack d ((reg, stk)::cs) = Some s /\ forall x, (b <= x < e)%a -> exists w, s !! x = Some w /\ m !! x = Some (translate_word w))
-        (* TODO: need to describe return pointer code *)
-        (Hregh: forall r p g b e a, reg !! r = Some (inr (Regular (p, g, b, e, a))) -> forall x, (b <= x < e)%a -> exists w, h !! x = Some w /\ m !! x = Some (translate_word w))
-        (Hstkstk: forall y d p b e a, stk !! y = Some (inr (Stk d p b e a)) -> exists s, stack d ((reg, stk)::cs) = Some s /\ forall x, (b <= x < e)%a -> exists w, s !! x = Some w /\ m !! x = Some (translate_word w))
-        (Hstlret: forall y d b e a, stk !! y = Some (inr (Ret d b e a)) -> exists s, stack d ((reg, stk)::cs) = Some s /\ forall x, (b <= x < e)%a -> exists w, s !! x = Some w /\ m !! x = Some (translate_word w))
-        (* TODO: need to describe return pointer code *)
-        (Hstkh: forall y p g b e a, stk !! y = Some (inr (Regular (p, g, b, e, a))) -> forall x, (b <= x < e)%a -> exists w, h !! x = Some w /\ m !! x = Some (translate_word w))
-        (Hsstk: forall a w, stk !! a = Some w -> m !! a = Some (translate_word w))
-        (Hcs: sim_cs h cs m),
-        sim_cs h ((reg, stk)::cs) m.
+        (Hregsdef: forall r, exists w, reg !! r = Some w /\ interp w h stk cs)
+        (Hstkdisjheap: forall a, is_Some (stk !! a) -> is_Some (h !! a) -> False)
+        (Hstksim: forall a w, stk !! a = Some w -> m !! a = Some (translate_word w) /\ interp w h stk cs /\ canBeStored w a)
+        (Hcontiguous: exists b_stk e_stk a_stk, reg !! call.r_stk = Some (inr (Stk (length cs) URWLX b_stk e_stk a_stk)) /\ dom (gset _) stk = list_to_set (region_addrs b_stk ^(a_stk + 37)%a) /\ forall (i: nat) r, ((list_difference all_registers [PC; call.r_stk]) !! i) = Some r -> stk !! ^(a_stk + i)%a = reg !! r)
+        (Hcs: sim_cs true h cs m),
+        sim_cs true h ((reg, stk)::cs) m
+ | sim_cs_cons_false:
+      (* false indicates topmost frame *)
+      forall reg stk cs h m
+        (Hregsdef: forall r, exists w, reg !! r = Some w /\ interp w h stk cs)
+        (Hstkdisjheap: forall a, is_Some (stk !! a) -> is_Some (h !! a) -> False)
+        (Hstksim: forall a w, stk !! a = Some w -> m !! a = Some (translate_word w) /\ interp w h stk cs /\ canBeStored w a)
+        (* This is the only difference, for the topmost frame, the shape of the stack is not frozen yet *)
+        (Hcontiguous: exists b_stk e_stk, dom (gset _) stk = list_to_set (region_addrs b_stk e_stk))
+        (Hcs: sim_cs true h cs m),
+        sim_cs false h ((reg, stk)::cs) m.
 
   Inductive sim: language.cfg overlay_lang -> language.cfg cap_lang -> Prop :=
   | sim_intro:
       forall e1 e2 reg1 reg2 h stk cs mem2
         (Hsexpr: sim_expr e1 e2)
-        (Hcswf: sim_cs h ((reg1, stk)::cs) mem2)
-        (Hsregs: forall r w, reg1 !! r = Some w -> reg2 !! r = Some (translate_word w))
-        (Hsh: forall a w, h !! a = Some w -> mem2 !! a = Some (translate_word w) /\ lang.is_global w /\ lang.can_address_only w (dom _ h))
-        (*(Hdisj: forall a, a ∈ dom (gset _) h -> (e_stk <= a)%a)*),
+        (Hstkdisj: can_step e1 -> forall d1 d2, d1 < d2 -> forall stk1 stk2, stack d1 ((reg1, stk)::cs) = Some stk1 -> stack d2 ((reg1, stk)::cs) = Some stk2 -> forall a1 a2, is_Some (stk1 !! a1) -> is_Some (stk2 !! a2) -> (a1 < a2)%a)
+        (Hcswf: can_step e1 -> sim_cs false h ((reg1, stk)::cs) mem2)
+        (Hsregs: can_step e1 -> (forall r w, reg1 !! r = Some w -> reg2 !! r = Some (translate_word w)))
+        (Hsh: can_step e1 -> (forall a w, h !! a = Some w -> mem2 !! a = Some (translate_word w) /\ lang.pwlW w = false /\ lang.is_global w = true /\ lang.can_address_only w (dom _ h)))
+        (Hdisj: can_step e1 -> (forall a, a ∈ dom (gset _) h -> (e_stk <= a)%a)),
         sim ([e1], (reg1, h, stk, cs)) ([e2], (reg2, mem2)).
 
-  Lemma exec_sim:
+(*  Lemma exec_sim:
     forall reg1 reg1' reg2 reg2' h h' stk stk' cs cs' mem2 mem2' p g b e a c1 c2
       (Hregsdef: forall r, is_Some (reg1 !! r))
       (Hregstk: forall r d p b e a, reg1 !! r = Some (inr (Stk d p b e a)) -> is_Some (stack d ((reg1,stk)::cs)))
@@ -744,7 +782,7 @@ Section overlay_to_cap_lang.
 
 
 
-  Admitted.
+  Admitted.*)
 
 
 
@@ -762,118 +800,140 @@ Section overlay_to_cap_lang.
 
   Lemma overlay_to_cap_lang_fsim:
     forall (c: overlay_component),
-      is_program e_stk _ _ _ _ lang.can_address_only lang.pwl lang.is_global c ->
-      @forward_simulation overlay_lang cap_lang (lang.initial_state b_stk e_stk c) (initial_state call.r_stk b_stk e_stk (compile c)) sim sim_val.
+      is_program e_stk _ _ _ _ lang.can_address_only lang.pwlW lang.is_global c ->
+      @forward_simulation_tc overlay_lang cap_lang (lang.initial_state b_stk e_stk c) (initial_state call.r_stk b_stk e_stk (compile c)) sim sim_val.
   Proof.
     intros. econstructor.
     - inv H0. cbn -[list_to_set].
       econstructor.
       + repeat econstructor.
+      + intros. destruct d1.
+        * simpl in H2. inv H2.
+          rewrite lookup_empty in H4. inv H4. congruence.
+        * simpl in H2. congruence.
+      + intros. econstructor.
+        * intros. destruct (reg_eq_dec r call.r_stk).
+          { subst r. rewrite lookup_insert. eauto.
+            eexists; split; eauto. simpl. split; auto.
+            intros. solve_addr. }
+          { rewrite lookup_insert_ne; auto.
+            destruct (reg_eq_dec r PC).
+            - subst r. rewrite lookup_insert.
+              eexists; split; eauto. inv Hwfcomp.
+              destruct Hw_main as [A [B C] ]. simpl in A.
+              destruct w_main; simpl; auto.
+              destruct c; simpl in A.
+              + destruct c as [ [ [ [p g] b] e] a].
+                simpl in B. auto.
+              + elim A.
+              + elim A.
+            - rewrite lookup_insert_ne; auto.
+              exists (inl 0%Z). split; [|simpl; auto].
+              rewrite lookup_gset_to_gmap_Some. split; auto.
+              eapply all_registers_s_correct. }
+        * intros. rewrite lookup_empty in H1; inv H1; congruence.
+        * intros. rewrite lookup_empty in H1; inv H1.
+        * exists b_stk, b_stk. rewrite region_addrs_empty; [|clear; solve_addr].
+          simpl. rewrite dom_empty_L. reflexivity.
+        * econstructor.
       + intros. destruct (reg_eq_dec r call.r_stk).
-        * subst r. rewrite lookup_insert. eauto.
-        * destruct (reg_eq_dec r PC).
-          { subst r. rewrite lookup_insert_ne; auto.
-            rewrite lookup_insert. eauto. }
-          { do 2 (rewrite lookup_insert_ne; auto).
-            exists (inl 0%Z). erewrite lookup_gset_to_gmap_Some.
-            split; auto. eapply all_registers_s_correct. }
-      + intros. inv Hwfcomp. destruct (reg_eq_dec r call.r_stk).
-        * subst r. rewrite lookup_insert in H0. inv H0. simpl. eauto.
-        * destruct (reg_eq_dec r PC).
-          { subst r. rewrite lookup_insert_ne in H0; auto.
-            rewrite lookup_insert in H0. inv H0.
-            destruct Hw_main as [A B]. inv B. }
-          { do 2 (rewrite lookup_insert_ne in H0; auto).
-            erewrite lookup_gset_to_gmap_Some in H0. destruct H0 as [A B].
-            inv B. }
-      + intros. destruct (reg_eq_dec r call.r_stk).
-        * subst r. rewrite lookup_insert in H0.
-          rewrite lookup_insert. inv H0; reflexivity.
-        * destruct (reg_eq_dec r PC).
-          { subst r.
-            rewrite lookup_insert_ne in H0; auto.
-            rewrite lookup_insert in H0.
+        * subst r. rewrite lookup_insert in H1.
+          inv H1. rewrite lookup_insert. reflexivity.
+        * rewrite lookup_insert_ne in H1; auto.
+          rewrite lookup_insert_ne; auto.
+          destruct (reg_eq_dec r PC).
+          { subst r. rewrite lookup_insert in H1.
+            rewrite lookup_insert. inv H1. reflexivity. }
+          { rewrite lookup_insert_ne in H1; auto.
             rewrite lookup_insert_ne; auto.
-            rewrite lookup_insert. inv H0; eauto. }
-          { do 2 (rewrite lookup_insert_ne in H0; auto).
-            do 2 (rewrite lookup_insert_ne; auto).
-            erewrite lookup_gset_to_gmap_Some in H0. destruct H0 as [A B].
-            inv B. simpl translate_word. rewrite lookup_gset_to_gmap_Some.
+            rewrite lookup_gset_to_gmap_Some.
+            eapply lookup_gset_to_gmap_Some in H1.
+            destruct H1 as [A B]; inv B.
             split; auto. }
-      + intros. rewrite lookup_fmap H0 /= //.
-      + intros. rewrite lookup_empty in H0; inv H0.
-      + eapply map_disjoint_empty_r.
-    - intros. inv H2; inv H1.
-      inv H3. inv H1. assert (e0 = e1 /\ t1 = [] /\ t2 = []).
-      { destruct t1, t2; simpl in H3; inv H3; auto.
-        + symmetry in H5. apply app_eq_nil in H5.
+      + intros. rewrite lookup_fmap H1 /=. split; auto.
+        inv Hwfcomp. inv Hwf_pre. generalize (Hnpwl _ _ H1).
+        intros [A [B C] ]; repeat split; auto.
+      + intros. inv Hwfcomp. inv Hwf_pre. eapply Hdisjstk; auto.
+    - intros. inv H1. inv H2. inv H1.
+      assert (e0 = e1 /\ t1 = [] /\ t2 = []).
+      { destruct t1, t2; simpl in H2; inv H2; auto.
+        - symmetry in H5. apply app_eq_nil in H5.
           destruct H5 as [A B]; inv B.
-        + symmetry in H5. apply app_eq_nil in H5.
+        - symmetry in H5. apply app_eq_nil in H5.
           destruct H5 as [A B]; inv B. }
-      destruct H1 as [A [B C]]; subst e0; subst t1; subst t2.
-      clear H3. simpl. inv H4. destruct (sim_expr_fill_inv Hsexpr) as [e22 [A B]].
+      destruct H1 as [A [B C] ]; subst e0; subst t1; subst t2.
+      inv H2. rewrite !app_nil_l.
+      inv H4. destruct (sim_expr_fill_inv Hsexpr) as [e22 [A B] ].
       generalize (sim_expr_determ Hsexpr A). intros; subst e2. inv H3.
-      + inv B. inv H3. inv H1.
-        * simpl in H4. eexists. split.
-          { eapply rtc_once. exists []. econstructor; eauto.
+      + (* General exec case*)
+        inv B. inv H3.
+        specialize (Hcswf ltac:(rewrite can_step_fill /can_step /=; auto)).
+        specialize (Hsregs ltac:(rewrite can_step_fill /can_step /=; auto)).
+        specialize (Hsh ltac:(rewrite can_step_fill /can_step /=; auto)).
+        specialize (Hdisj ltac:(rewrite can_step_fill /can_step /=; auto)).
+        inv H1.
+        * (* not correct PC *)
+          simpl in H4. eexists. split.
+          { eapply tc_once. exists []. econstructor; eauto.
             { f_equal; eauto. instantiate (1 := []).
               instantiate (2 := []). reflexivity. }
             econstructor; eauto. econstructor.
             eapply step_exec_fail. simpl; intro HA.
             rewrite /RegLocate in HA.
             inv HA. destruct (reg2 !! PC) as [pcw2|] eqn:X; try congruence.
-            subst pcw2. rewrite /base.RegLocate in H4.
-            destruct (Hregsdef PC) as [pcw1 Y]. rewrite Y in H4.
+            subst pcw2. rewrite /base.RegLocate in H4. inv Hcswf.
+            destruct (Hregsdef PC) as [pcw1 [Y Y'] ]. rewrite Y in H4.
             generalize (Hsregs PC _ Y). rewrite X; intros Z; inv Z.
             destruct pcw1; simpl in H5; try congruence.
             destruct c0.
             + inv H5. eapply H4. econstructor; eauto.
             + inv H5. eapply H4. econstructor; eauto.
-            + inv H5. destruct H3 as [? | [? | ?]]; congruence. }
+            + inv H5. destruct H3 as [? | [? | ?] ]; congruence. }
           { simpl. econstructor; eauto. eapply sim_expr_fill.
             do 2 econstructor. }
-        * simpl in H5. rewrite /base.RegLocate in H5.
+        * (* not correct PC stack *)
+          simpl in H5. rewrite /base.RegLocate in H5.
           destruct (reg1 !! PC) as [pcw1|] eqn:X; try congruence. subst pcw1.
-          eapply Hregstk in X. simpl in X, H6; destruct X; congruence.
-        * eexists. split.
-          { eapply rtc_once. exists []. econstructor; eauto.
+          inv Hcswf. destruct (Hregsdef PC) as [pcw1 [HA HB] ].
+          rewrite X in HA; inv HA. simpl in HB. destruct HB.
+          simpl in H6. destruct (nat_eq_dec d (@length Stackframe cs)); try congruence.
+        * (* Regular exec *)
+          simpl in H5, H6. rewrite H5 in H6. simpl.
+          set res := exec (decodeInstrW (mem2 !m! a)) (reg2, mem2).
+          exists ([@ectx_language.fill cap_ectx_lang (map (fun _ => SeqCtx) K) (Instr res.1)], res.2).
+          split.
+          { eapply tc_once. econstructor. econstructor; eauto.
             - f_equal; eauto. instantiate (1 := []).
-              instantiate (2 := []). reflexivity.
+            instantiate (2 := []). reflexivity.
+            - instantiate (1 := res.2).
+              instantiate (1 := []). reflexivity.
             - econstructor; eauto. econstructor.
-              rewrite /base.RegLocate /= in H5.
-              destruct (reg1 !! PC) as [pcw1|] eqn:X; try congruence; subst pcw1.
-              simpl in H6. rewrite /base.RegLocate X in H6.
-              generalize (isCorrectPC_translate_word H6). simpl; intro Y.
-              generalize (Hsregs _ _ X). simpl; intro Z.
-              eapply step_exec_instr; eauto; simpl; rewrite /RegLocate Z; eauto. }
-          { simpl. destruct (lang.exec (decodeInstrW' (base.MemLocate h a)) (reg1, h, stk, cs)) eqn:XX.
-            destruct (exec (decodeInstrW (mem2 !m! a)) (reg2, mem2)) eqn:YY. simpl.
-            destruct e1 as [r'' m'']. destruct e0 as [[[r' h'] stk'] cs'].
-            econstructor; eauto.
-            - eapply sim_expr_fill; eauto.
-              rewrite /base.RegLocate /= in H5.
-              destruct (reg1 !! PC) as [pcw1|] eqn:X; try congruence; subst pcw1.
-              generalize (Hsregs _ _ X). simpl; intro Y.
-              
+              rewrite /base.RegLocate in H5.
+              destruct (reg1 !! PC) eqn:HPC; [|congruence].
+              subst s. generalize (Hsregs _ _ HPC); simpl.
+              intros HPC'. econstructor; simpl; eauto.
+              + rewrite /RegLocate HPC'. reflexivity.
+              + rewrite /RegLocate HPC'. generalize (isCorrectPC_translate_word H6).
+                simpl; auto. }
+          { destruct (lang.exec (decodeInstrW' (base.MemLocate h a)) (reg1, h, stk, cs)) as [c1 [ [ [reg1' h'] stk'] cs'] ] eqn:Hexec.
+            
 
 
 
 
-              admit.
-            - admit.
-            - admit.
-            - admit.
-            - admit.
-            - admit.
-            - admit. }
-        * admit.
-        * (* call global *)
+
+          }
+        * (* Regular stack exec *) admit.
+        * (* Regular call *)
+          simpl in H5, H6. rewrite H5 in H6. simpl.
+          eexists. split.
+          { (* TODO: change machine_run_conf *) admit. } 
           admit.
-        * (* call stack *)
-          admit.
-      + inv B. inv H2. inv H3.
+        * (* Stack call *) admit.
+      + (* NextI case *)
+        inv B. inv H2. inv H3.
         exists ([@ectx_language.fill cap_ectx_lang (map (fun _ => SeqCtx) K) (Seq (Instr Executable))], (reg2, mem2)). split.
-        * eapply rtc_once. econstructor. econstructor; eauto.
+        * eapply tc_once. econstructor. econstructor; eauto.
           { f_equal; eauto. instantiate (1 := []).
             instantiate (2 := []). reflexivity. }
           { instantiate (1 := (reg2, mem2)).
@@ -881,11 +941,22 @@ Section overlay_to_cap_lang.
           { econstructor; eauto.
             econstructor. }
         * econstructor; eauto.
-          eapply sim_expr_fill; eauto.
-          do 3 econstructor.
-      + inv B. inv H2. inv H3.
+          { eapply sim_expr_fill; eauto.
+            do 3 econstructor. }
+          { intros. eapply Hstkdisj; eauto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hcswf. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hsregs; auto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hsh; auto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hdisj; auto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+      + (* Halted case *)
+        inv B. inv H2. inv H3.
         exists ([@ectx_language.fill cap_ectx_lang (map (fun _ => SeqCtx) K) (Instr Halted)], (reg2, mem2)). split.
-        * eapply rtc_once. econstructor. econstructor; eauto.
+        * eapply tc_once. econstructor. econstructor; eauto.
           { f_equal; eauto. instantiate (1 := []).
             instantiate (2 := []). reflexivity. }
           { instantiate (1 := (reg2, mem2)).
@@ -893,11 +964,22 @@ Section overlay_to_cap_lang.
           { econstructor; eauto.
             econstructor. }
         * econstructor; eauto.
-          eapply sim_expr_fill; eauto.
-          do 2 econstructor.
-      + inv B. inv H2. inv H3.
+          { eapply sim_expr_fill; eauto.
+            do 3 econstructor. }
+          { intros. eapply Hstkdisj; eauto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hcswf. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hsregs; auto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hsh; auto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hdisj; auto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+      + (* Failed case *)
+        inv B. inv H2. inv H3.
         exists ([@ectx_language.fill cap_ectx_lang (map (fun _ => SeqCtx) K) (Instr Failed)], (reg2, mem2)). split.
-        * eapply rtc_once. econstructor. econstructor; eauto.
+        * eapply tc_once. econstructor. econstructor; eauto.
           { f_equal; eauto. instantiate (1 := []).
             instantiate (2 := []). reflexivity. }
           { instantiate (1 := (reg2, mem2)).
@@ -905,14 +987,21 @@ Section overlay_to_cap_lang.
           { econstructor; eauto.
             econstructor. }
         * econstructor; eauto.
-          eapply sim_expr_fill; eauto.
-          do 2 econstructor.
-    - intros. inv H1. inv H2.
-      destruct H3 as [A B].
-      simpl in A; inv A.
-      destruct x; simpl in B; try congruence.
-      inv Hsexpr.
-      destruct c0; simpl in B; try congruence; inv H2; inv B; eexists; split; econstructor; eauto.
+          { eapply sim_expr_fill; eauto.
+            do 3 econstructor. }
+          { intros. eapply Hstkdisj; eauto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hcswf. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hsregs; auto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hsh; auto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+          { intros. eapply Hdisj; auto. rewrite can_step_fill.
+            rewrite /can_step /=; auto. }
+    - intros. inv H1. destruct H3 as [A B].
+      inv H2. simpl in A. inv A. destruct x; simpl in B; [|congruence].
+      inv Hsexpr. inv H2; [congruence| | |]; inv B; eexists; split; econstructor; simpl; split; reflexivity.
   Admitted.
 
 End overlay_to_cap_lang.

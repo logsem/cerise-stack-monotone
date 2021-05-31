@@ -31,7 +31,7 @@ Section Linking.
   | wf_pre_intro:
       forall ms imp exp
         (Hdisj: forall s, is_Some (exp !! s) -> ~ exists a, (s, a) ∈ imp)
-        (Hexp: forall s w, exp !! s = Some w -> can_address_only w (dom _ ms))
+        (Hexp: forall s w, exp !! s = Some w -> can_address_only w (dom _ ms) /\ pwl w = false /\ is_global w = true)
         (Himp: forall s a, (s, a) ∈ imp -> is_Some (ms !! a))
         (Hnpwl: forall a w, ms !! a = Some w -> can_address_only w (dom _ ms) /\ pwl w = false /\ is_global w = true)
         (Hdisjstk: forall a, a ∈ dom (gset _) ms -> (e_stk <= a)%a), (* \/ (a < b_stk)%a *)
@@ -45,7 +45,7 @@ Section Linking.
   | wf_main:
       forall comp w_main
         (Hwf_pre: well_formed_pre_comp comp)
-        (Hw_main: can_address_only w_main (dom _ (comp.1.1)) /\ is_global w_main = true),
+        (Hw_main: can_address_only w_main (dom _ (comp.1.1)) /\ pwl w_main = false /\ is_global w_main = true),
         well_formed_comp (Main comp w_main).
 
   Inductive is_program: component -> Prop :=
