@@ -1,6 +1,6 @@
 From iris.proofmode Require Import tactics.
 From iris.program_logic Require Export weakestpre.
-From cap_machine.binary_model Require Export logrel_binary region_invariants_transitions.
+From cap_machine.binary_model Require Export logrel_binary region_invariants_transitions_binary.
 From iris.base_logic Require Export invariants na_invariants saved_prop.
 Import uPred.
 

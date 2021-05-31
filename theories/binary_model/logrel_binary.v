@@ -2,7 +2,7 @@ From iris.proofmode Require Import tactics.
 From iris.program_logic Require Export weakestpre.
 (* From cap_machine.rules Require Export rules. *)
 From cap_machine Require Export cap_lang region.
-From cap_machine.binary_model Require Export region_invariants.
+From cap_machine.binary_model Require Export region_invariants_binary.
 From iris.algebra Require Import gmap agree auth.
 From iris.base_logic Require Export invariants na_invariants saved_prop.
 Import uPred.

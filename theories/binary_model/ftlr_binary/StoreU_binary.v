@@ -1,8 +1,8 @@
 From stdpp Require Import base.
 From iris.proofmode Require Import tactics.
 From iris.program_logic Require Import weakestpre adequacy lifting.
-From cap_machine.binary_model Require Export logrel_binary monotone.
-From cap_machine.binary_model Require Import ftlr_base interp_weakening.
+From cap_machine.binary_model Require Export logrel_binary monotone_binary.
+From cap_machine.binary_model Require Import ftlr_base_binary interp_weakening_binary.
 From cap_machine.rules Require Import rules_StoreU.
 From cap_machine.binary_model.rules_binary Require Import rules_binary_StoreU.
 From cap_machine Require Import stdpp_extra.

@@ -1,8 +1,8 @@
-From cap_machine.binary_model.ftlr Require Export Mov Jmp Jnz Load Store AddSubLt Lea Restrict Subseg IsPtr Get StoreU LoadU PromoteU.
+From cap_machine.binary_model.ftlr_binary Require Export Mov_binary Jmp_binary Jnz_binary Load_binary Store_binary AddSubLt_binary Lea_binary Restrict_binary Subseg_binary IsPtr_binary Get_binary StoreU_binary LoadU_binary PromoteU_binary.
 From iris.proofmode Require Import tactics.
 From iris.program_logic Require Import weakestpre adequacy lifting.
 From stdpp Require Import base.
-From cap_machine.binary_model Require Export logrel_binary region_invariants.
+From cap_machine.binary_model Require Export logrel_binary region_invariants_binary.
 
 Section fundamental.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
