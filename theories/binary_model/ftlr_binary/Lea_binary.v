@@ -68,7 +68,7 @@ Section fundamental.
     specialize (Lea_spec_determ _ _ _ _ _ _ _ HSpec H0) as [Heq ->].
 
     destruct HSpec as [ * Hdst ? Hz Hoffset HUa HincrPC |].
-    { apply incrementPC_Some_inv in HincrPC as (p''&g''&b''&e''&a''& ? & HPC & Z & Hregs').
+    { apply incrementPC_Some_inv in HincrPC as (p''&g''&b''&e''&a''& ? & HPC & Z & Hregs' & XX).
 
       assert (p'' = p ∧ g'' = g ∧ b'' = b ∧ e'' = e) as (-> & -> & -> & ->).
       { destruct (decide (PC = dst)); simplify_map_eq; auto. }

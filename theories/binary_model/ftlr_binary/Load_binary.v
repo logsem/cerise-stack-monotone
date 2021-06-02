@@ -330,7 +330,7 @@ Section fundamental.
 
     destruct HSpec as [* ? ? Hincr|].
     { apply incrementPC_Some_inv in Hincr.
-      destruct Hincr as (?&?&?&?&?&?&?&?&?).
+      destruct Hincr as (?&?&?&?&?&?&?&?&?&?).
       iApply wp_pure_step_later; auto. iNext.
       iMod (do_step_pure _ [] with "[$Hspec $Hj]") as "Hs /=";auto.
 

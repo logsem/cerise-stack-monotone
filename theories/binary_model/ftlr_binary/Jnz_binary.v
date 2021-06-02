@@ -71,7 +71,7 @@ Section fundamental.
     { iApply wp_pure_step_later; auto. iNext.
       iApply wp_value; auto. iIntros; discriminate. }
     { match goal with
-      | H: incrementPC _ = Some _ |- _ => apply incrementPC_Some_inv in H as (p''&g''&b''&e''&a''& ? & HPC & Z & Hregs')
+      | H: incrementPC _ = Some _ |- _ => apply incrementPC_Some_inv in H as (p''&g''&b''&e''&a''& ? & HPC & Z & Hregs' & XX)
       end. simplify_map_eq. rewrite insert_insert.
       iMod (do_step_pure _ [] with "[$Hspec $Hj]") as "Hs /=";auto.
       iApply wp_pure_step_later; auto. iNext.

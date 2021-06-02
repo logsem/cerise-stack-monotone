@@ -64,9 +64,9 @@ Section fundamental.
         destruct (decide (dst = PC)).
         + subst. rewrite H4 in HPC. inv HPC. rewrite lookup_insert in H17.
           destruct (a'0 + 1)%a eqn:Hsome;[inversion H17|].
-          destruct (a + 1)%a eqn:Hsome';[|inversion H6]. inv H6.
+          destruct (a + 1)%a eqn:Hsome';[|inversion H6]. destruct p; try congruence; inv H6.
           solve_addr.
-        + rewrite lookup_insert_ne// HPC in H17. destruct (a+1)%a eqn:Hsome;inversion H6;inversion H17. }
+        + rewrite lookup_insert_ne// HPC in H17. destruct (a+1)%a eqn:Hsome; destruct p; try congruence; inversion H6;inversion H17. }
     { rewrite H4 in H10. inv H10. rewrite H1 in H14. inv H14.
       rewrite H0 in H11. inv H11. inv H15. rewrite H2 in H11.
       repeat (rewrite decide_True// in H11). inv H11.
@@ -899,7 +899,7 @@ Section fundamental.
       - subst. destruct (a' + 1)%a eqn:Hincr';inversion Hincr.
         apply incrementPC_Some_inv in Hincr.
 
-        destruct Hincr as (?&?&?&?&?&?&?&?&?).
+        destruct Hincr as (?&?&?&?&?&?&?&?&?&XYZ).
         iApply wp_pure_step_later; auto. iNext.
         (* From this, derive value relation for the current PC*)
         iDestruct (execcPC_implies_interp _ _ _ _ _ a with "Hinv") as "HVPC"; eauto.
@@ -969,7 +969,7 @@ Section fundamental.
         iExists _,_. iFrame. iPureIntro. eapply related_sts_pub_priv_trans_world;eauto.
       - apply incrementPC_Some_inv in Hincr.
 
-        destruct Hincr as (?&?&?&?&?&?&?&?&?).
+        destruct Hincr as (?&?&?&?&?&?&?&?&?&XYZ).
         iApply wp_pure_step_later; auto. iNext.
         iMod (do_step_pure _ [] with "[$Hspec $Hj]") as "Hj /=";auto.
 
@@ -1017,7 +1017,7 @@ Section fundamental.
             destruct H3 as [H3 _]. inversion H3;subst;auto.
             iDestruct (interp_monotone with "[] HVPC") as "HVPC'";[iPureIntro;apply H8|].
             iClear "HVPC".
-            rewrite fixpoint_interp1_eq /=.
+            rewrite (fixpoint_interp1_eq (new_worldU W a0 p0 g0 b0 e0 a0 r.1 offs)).
             destruct Hp as [-> | [-> | [-> _] ] ]; try iDestruct "HVPC'" as "[_ HVPC']"; try iFrame "HVPC'".
             iApply (big_sepL_mono with "HVPC'"). intros.  iIntros "H". iApply and_exist_r.
             iDestruct "H" as (P0) "(?&?&?)". iExists _;iFrame.
