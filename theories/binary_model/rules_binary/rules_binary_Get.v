@@ -77,7 +77,7 @@ Section cap_lang_spec_rules.
     (* Success *)
 
     eapply (incrementPC_success_updatePC _ σm) in Hregs'
-        as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & ->).
+        as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & -> & ?).
     eapply updatePC_success_incl with (m':=σm) in HuPC. 2: by eapply insert_mono; eauto.
     simplify_pair_eq. iFrame.
     iMod ((regspec_heap_update_inSepM _ _ _ dst) with "Hown Hmap") as "[Hown Hmap]"; eauto.
@@ -121,7 +121,8 @@ Section cap_lang_spec_rules.
       iDestruct (regs_of_map_3 with "Hmap") as "(?&?&?)"; eauto; by iFrame. }
     { (* Failure (contradiction) *)
       destruct Hfail; eauto; rewrite lookup_insert_ne// lookup_insert_ne// lookup_insert in e; simplify_eq.
-      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto]. congruence. }
+      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto].
+      destruct e0; try congruence. inv Hvpc; naive_solver. }
   Qed.
 
 End cap_lang_spec_rules.

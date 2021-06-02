@@ -759,7 +759,7 @@ Section fundamental.
       - subst. destruct (a' + 1)%a eqn:Hincr';inversion Hincr. 
         apply incrementPC_Some_inv in Hincr.
 
-        destruct Hincr as (?&?&?&?&?&?&?&?&?).
+        destruct Hincr as (?&?&?&?&?&?&?&?&?&XX).
         iApply wp_pure_step_later; auto. iNext.
         (* From this, derive value relation for the current PC*)
         iDestruct (execcPC_implies_interp _ _ _ _ _ a with "Hinv") as "HVPC"; eauto.
@@ -817,7 +817,7 @@ Section fundamental.
         iExists _,_. iFrame. iPureIntro. eapply related_sts_pub_priv_trans_world;eauto.
       - apply incrementPC_Some_inv in Hincr.
 
-        destruct Hincr as (?&?&?&?&?&?&?&?&?).
+        destruct Hincr as (?&?&?&?&?&?&?&?&?&XX).
         iApply wp_pure_step_later; auto. iNext.
 
         (* From this, derive value relation for the current PC*)

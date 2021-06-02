@@ -135,7 +135,7 @@ Section cap_lang_rules.
       iFailWP "Hφ" Restrict_fail_PC_overflow. }
 
     eapply (incrementPC_success_updatePC _ m) in Hregs'
-      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & ->).
+      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & -> & ?).
     eapply updatePC_success_incl with (m':=m) in HuPC. 2: by eapply insert_mono; eauto.
     simplify_pair_eq. iFrame.
     iMod ((gen_heap_update_inSepM _ _ dst) with "Hr Hmap") as "[Hr Hmap]"; eauto.
@@ -143,6 +143,7 @@ Section cap_lang_rules.
     iFrame. iApply "Hφ". iFrame. iPureIntro. econstructor; eauto.
   Qed.
 
+  (*
   Lemma wp_restrict_success_reg_PC Ep pc_p pc_g pc_b pc_e pc_a pc_a' w rv z a'  :
     decodeInstrW w = Restrict PC (inr rv) →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
@@ -173,8 +174,8 @@ Section cap_lang_rules.
        iDestruct (regs_of_map_2 with "Hmap") as "(?&?)"; eauto; iFrame. }
      { (* Failure (contradiction) *)
        destruct Hfail; simplify_map_eq; eauto; try congruence.
-       incrementPC_inv; simplify_map_eq; eauto. congruence. }
-   Qed.
+       incrementPC_inv; simplify_map_eq; eauto. destruct e3; try congruence. }
+   Qed.*)
 
    Lemma wp_restrict_success_reg Ep pc_p pc_g pc_b pc_e pc_a pc_a' w r1 rv p g b e a z  :
      decodeInstrW w = Restrict r1 (inr rv) →
@@ -208,9 +209,11 @@ Section cap_lang_rules.
       iDestruct (regs_of_map_3 with "Hmap") as "(?&?&?)"; eauto; iFrame. }
     { (* Failure (contradiction) *)
       destruct Hfail; simplify_map_eq; eauto; try congruence.
-      incrementPC_inv; simplify_map_eq; eauto. congruence. }
+      incrementPC_inv; simplify_map_eq; eauto. destruct e4; try congruence.
+      inv Hvpc. naive_solver. }
    Qed.
 
+   (*
    Lemma wp_restrict_success_z_PC Ep pc_p pc_g pc_b pc_e pc_a pc_a' w z :
      decodeInstrW w = Restrict PC (inl z) →
      isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
@@ -241,7 +244,7 @@ Section cap_lang_rules.
      { (* Failure (contradiction) *)
        destruct Hfail; simplify_map_eq; eauto. congruence.
        incrementPC_inv; simplify_map_eq; eauto. congruence. }
-   Qed.
+   Qed.*)
 
    Lemma wp_restrict_success_z Ep pc_p pc_g pc_b pc_e pc_a pc_a' w r1 p g b e a z :
      decodeInstrW w = Restrict r1 (inl z) →
@@ -276,7 +279,8 @@ Section cap_lang_rules.
        iDestruct (regs_of_map_2 with "Hmap") as "(?&?)"; eauto; iFrame. }
      { (* Failure (contradiction) *)
        destruct Hfail; simplify_map_eq; eauto; try congruence.
-       incrementPC_inv; simplify_map_eq; eauto. congruence. }
+       incrementPC_inv; simplify_map_eq; eauto. 
+       destruct e4; try congruence. inv Hvpc. naive_solver. }
    Qed.
 
 End cap_lang_rules.

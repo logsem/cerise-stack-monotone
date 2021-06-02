@@ -366,7 +366,7 @@ Section fundamental.
 
     destruct HSpec as [* ? ? ? -> Hincr|].
     { apply incrementPC_Some_inv in Hincr.
-      destruct Hincr as (?&?&?&?&?&?&?&?&?).
+      destruct Hincr as (?&?&?&?&?&?&?&?&?&?).
       iApply wp_pure_step_later; auto. iNext.
 
       (* From this, derive value relation for the current PC*)

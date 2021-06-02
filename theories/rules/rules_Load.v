@@ -216,7 +216,7 @@ Section cap_lang_rules.
      (* Success *)
      rewrite /update_reg /= in Hstep.
      eapply (incrementPC_success_updatePC _ m) in Hregs'
-       as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & ->).
+       as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & -> & Hperm).
      eapply updatePC_success_incl in HuPC. 2: by eapply insert_mono.
      rewrite HuPC in Hstep; clear HuPC; inversion Hstep; clear Hstep; subst c σ2. cbn.
      iFrame.
@@ -228,7 +228,8 @@ Section cap_lang_rules.
          exact Hr''2.
          auto.
        * exact Hmema.
-       * unfold incrementPC. by rewrite HPC'' Ha_pc'.
+       * unfold incrementPC. rewrite HPC'' Ha_pc'.
+         destruct Hperm as [? [? [? [? ?]]]]; destruct p1; try congruence; auto.
      Unshelve. all: auto.
    Qed.
 
@@ -278,7 +279,9 @@ Section cap_lang_rules.
        iApply "Hφ". iFrame. }
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
-       destruct o. all: congruence. }
+       destruct o. all: try congruence.
+       inv Hvpc. destruct e3; try congruence. 
+       destruct H5 as [? | [? | [? | [? | ?]]]]; destruct H11 as [? | [? | ?]]; try congruence. }
   Qed.
 
   Lemma wp_load_success_notinstr E r1 r2 pc_p pc_g pc_b pc_e pc_a w w' w'' p g b e a pc_a' :
@@ -378,11 +381,14 @@ Section cap_lang_rules.
        iDestruct (regs_of_map_2 with "[$Hmap]") as "[HPC Hr1]"; eauto. iFrame. }
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
-       destruct o. all: congruence. }
+       destruct o. all: try congruence.
+       inv Hvpc. destruct e3; try congruence. 
+       destruct H3 as [? | [? | [? | [? | ?]]]]; destruct H9 as [? | [? | ?]]; try congruence. }
     Qed.
 
+  (* Never used *)
   (* If a points to a capability, the load into PC success if its address can be incr *)
-  Lemma wp_load_success_PC E r2 pc_p pc_g pc_b pc_e pc_a w
+  (*Lemma wp_load_success_PC E r2 pc_p pc_g pc_b pc_e pc_a w
         p g b e a p' g' b' e' a' a'' :
     decodeInstrW w = Load PC r2 →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
@@ -422,7 +428,9 @@ Section cap_lang_rules.
        iDestruct (regs_of_map_2 with "[$Hmap]") as "[HPC Hr2]"; eauto. iFrame. }
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
-       destruct o. all: congruence. }
+       destruct o. all: try congruence.
+       inv Hvpc. destruct e3; try congruence. 
+       destruct H4 as [? | [? | [? | [? | ?]]]]; destruct H10 as [? | [? | ?]]; try congruence. }
   Qed.
 
   Lemma wp_load_success_fromPC E r1 pc_p pc_g pc_b pc_e pc_a pc_a' w w'' :
@@ -463,6 +471,6 @@ Section cap_lang_rules.
        apply isCorrectPC_ra_wb in Hvpc. apply andb_prop_elim in Hvpc as [Hra Hwb].
        destruct o; apply Is_true_false in H3. all:congruence.
      }
-  Qed.
+  Qed.*)
 
 End cap_lang_rules.

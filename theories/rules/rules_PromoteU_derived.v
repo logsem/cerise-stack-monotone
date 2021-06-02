@@ -50,7 +50,7 @@ Section cap_lang_rules.
        iDestruct (regs_of_map_2 with "[$Hmap]") as "[HPC Hr1]"; eauto. iFrame. }
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
-       all: try congruence.
+       destruct H5; try congruence. inv Hvpc. naive_solver.
      }
   Qed.
 

@@ -73,8 +73,12 @@ Definition updatePC (φ: ExecConf): Conf :=
   match RegLocate (reg φ) PC with
   | inr ((p, g), b, e, a) =>
     match (a + 1)%a with
-    | Some a' => let φ' := (update_reg φ PC (inr ((p, g), b, e, a'))) in
-                 (NextI, φ')
+    | Some a' =>
+      match p with 
+      | E | URWLX | URWX | URWL | URW => (Failed, φ)
+      | _ => let φ' := (update_reg φ PC (inr ((p, g), b, e, a'))) in
+             (NextI, φ')
+      end
     | None => (Failed, φ)
     end
   | _ => (Failed, φ)

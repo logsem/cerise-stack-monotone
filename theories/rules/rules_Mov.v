@@ -78,7 +78,7 @@ Section cap_lang_rules.
       iFrame. iApply "Hφ"; iFrame. iPureIntro. econstructor; eauto. }
 
     eapply (incrementPC_success_updatePC _ m) in Hregs'
-      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & ->).
+      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & -> & ?).
     eapply updatePC_success_incl with (m':=m) in HuPC. 2: by eapply insert_mono; eauto.
     simplify_pair_eq. iFrame.
     iMod ((gen_heap_update_inSepM _ _ dst) with "Hr Hmap") as "[Hr Hmap]"; eauto.
@@ -112,7 +112,8 @@ Section cap_lang_rules.
       rewrite (insert_commute _ PC r1) // insert_insert insert_commute // insert_insert.
       iDestruct (regs_of_map_2 with "Hmap") as "(?&?)"; eauto; iFrame. }
     { (* Failure (contradiction) *)
-      incrementPC_inv; simplify_map_eq; eauto. congruence. }
+      incrementPC_inv; simplify_map_eq; eauto. destruct H4; try congruence. 
+      inv Hvpc. naive_solver. }
   Qed.
 
   Lemma wp_move_success_reg E pc_p pc_g pc_b pc_e pc_a pc_a' w r1 wr1 rv wrv :
@@ -143,7 +144,8 @@ Section cap_lang_rules.
       rewrite (insert_commute _ PC r1) // insert_insert (insert_commute _ PC r1) // insert_insert.
       iDestruct (regs_of_map_3 with "Hmap") as "(?&?&?)"; eauto; iFrame. }
     { (* Failure (contradiction) *)
-      incrementPC_inv; simplify_map_eq; eauto. congruence. }
+      incrementPC_inv; simplify_map_eq; eauto. 
+      destruct H6; try congruence. inv Hvpc. naive_solver. }
   Qed.
 
   Lemma wp_move_success_reg_same E pc_p pc_g pc_b pc_e pc_a pc_a' w r1 wr1 :
@@ -172,7 +174,8 @@ Section cap_lang_rules.
       rewrite (insert_commute _ PC r1) // insert_insert insert_commute // insert_insert.
       iDestruct (regs_of_map_2 with "Hmap") as "(?&?)"; eauto; iFrame. }
     { (* Failure (contradiction) *)
-      incrementPC_inv; simplify_map_eq; eauto. congruence. }
+      incrementPC_inv; simplify_map_eq; eauto. 
+      destruct H4; try congruence. inv Hvpc. naive_solver. }
   Qed.
 
   Lemma wp_move_success_reg_samePC E pc_p pc_g pc_b pc_e pc_a pc_a' w :
@@ -199,9 +202,11 @@ Section cap_lang_rules.
       rewrite !insert_insert.
       iDestruct (regs_of_map_1 with "Hmap") as "?"; eauto; iFrame. }
     { (* Failure (contradiction) *)
-      incrementPC_inv; simplify_map_eq; eauto. congruence. }
+      incrementPC_inv; simplify_map_eq; eauto. 
+      destruct H3; try congruence. inv Hvpc. naive_solver. }
   Qed.
 
+  (*
   Lemma wp_move_success_reg_toPC E pc_p pc_g pc_b pc_e pc_a w r1 p g b e a a' :
     decodeInstrW w = Mov PC (inr r1) →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
@@ -229,7 +234,7 @@ Section cap_lang_rules.
       iDestruct (regs_of_map_2 with "Hmap") as "(?&?)"; eauto; iFrame. }
     { (* Failure (contradiction) *)
       incrementPC_inv; simplify_map_eq; eauto. congruence. }
-  Qed.
+  Qed.*)
 
   Lemma wp_move_success_reg_fromPC E pc_p pc_g pc_b pc_e pc_a pc_a' w r1 wr1 :
     decodeInstrW w = Mov r1 (inr PC) →
@@ -257,7 +262,8 @@ Section cap_lang_rules.
       rewrite (insert_commute _ PC r1) // insert_insert insert_commute // insert_insert.
       iDestruct (regs_of_map_2 with "Hmap") as "(?&?)"; eauto; iFrame. }
     { (* Failure (contradiction) *)
-      incrementPC_inv; simplify_map_eq; eauto. congruence. }
+      incrementPC_inv; simplify_map_eq; eauto. 
+      destruct H4; try congruence. inv Hvpc. naive_solver. }
   Qed.
 
 End cap_lang_rules.

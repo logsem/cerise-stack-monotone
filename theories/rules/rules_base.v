@@ -738,7 +738,11 @@ Definition incrementPC (regs: Reg) : option Reg :=
   match regs !! PC with
   | Some (inr ((p, g), b, e, a)) =>
     match (a + 1)%a with
-    | Some a' => Some (<[ PC := inr ((p, g), b, e, a') ]> regs)
+    | Some a' => 
+      match p with
+      | E | URWLX | URWX | URWL | URW => None
+      | _ => Some (<[ PC := inr ((p, g), b, e, a') ]> regs)
+      end
     | None => None
     end
   | _ => None
@@ -749,24 +753,25 @@ Lemma incrementPC_Some_inv regs regs' :
   exists p g b e a a',
     regs !! PC = Some (inr ((p, g), b, e, a)) ∧
     (a + 1)%a = Some a' ∧
-    regs' = <[ PC := inr ((p, g), b, e, a') ]> regs.
+    regs' = <[ PC := inr ((p, g), b, e, a') ]> regs /\
+    (p <> E /\ p <> URWLX /\ p <> URWX /\ p <> URWL /\ p <> URW).
 Proof.
   unfold incrementPC.
   destruct (regs !! PC) as [ [| [ [ [ [? ?] ?] ?] u] ] |];
     try congruence.
-  case_eq (u+1)%a; try congruence. intros ? ?. inversion 1.
-  do 6 eexists. split; eauto.
+  case_eq (u+1)%a; try congruence. intros ? ?. destruct p; try congruence; inversion 1; do 6 eexists; repeat split; eauto.
 Qed.
 
-Lemma incrementPC_None_inv regs pg b e a :
+Lemma incrementPC_None_inv regs p g b e a :
   incrementPC regs = None ->
-  regs !! PC = Some (inr (pg, b, e, a)) ->
-  (a + 1)%a = None.
+  regs !! PC = Some (inr (p, g, b, e, a)) ->
+  (a + 1)%a = None \/ (p = E \/ p = URW \/ p = URWX \/ p = URWLX \/ p = URWL).
 Proof.
   unfold incrementPC.
   destruct (regs !! PC) as [ [| [ [ [ [? ?] ?] ?] u] ] |];
     try congruence.
-  case_eq (u+1)%a; congruence.
+  case_eq (u+1)%a; [|left; congruence].
+  right. destruct p0; inversion H1; try congruence; auto.
 Qed.
 
 Lemma incrementPC_overflow_mono regs regs' :
@@ -779,7 +784,7 @@ Proof.
   pose proof (lookup_weaken _ _ _ _ HPC Hincl) as HPC'.
   rewrite HPC HPC' in Hi |- *.
   destruct c as [| ((((?&?)&?)&?)&aa)]; first by auto.
-  destruct (aa+1)%a; last by auto. congruence.
+  destruct (aa+1)%a; last by auto. destruct p; congruence.
 Qed.
 
 (* todo: instead, define updatePC on top of incrementPC *)
@@ -790,7 +795,7 @@ Proof.
    rewrite /incrementPC /updatePC /RegLocate /=.
    destruct (regs !! PC) as [X|]; auto.
    destruct X as [| [[[[? ?] ?] ?] a']]; auto.
-   destruct (a' + 1)%a; auto. congruence.
+   destruct (a' + 1)%a; auto. destruct p; try congruence; auto.
 Qed.
 
 Lemma incrementPC_success_updatePC regs m regs' :
@@ -799,13 +804,14 @@ Lemma incrementPC_success_updatePC regs m regs' :
     regs !! PC = Some (inr ((p, g, b, e, a))) ∧
     (a + 1)%a = Some a' ∧
     updatePC (regs, m) = (NextI, (<[ PC := inr ((p, g), b, e, a') ]> regs, m)) ∧
-    regs' = <[ PC := inr ((p, g), b, e, a') ]> regs.
+    regs' = <[ PC := inr ((p, g), b, e, a') ]> regs /\
+    (p <> E /\ p <> URWLX /\ p <> URWX /\ p <> URWL /\ p <> URW).
 Proof.
   rewrite /incrementPC /updatePC /update_reg /RegLocate /=.
   destruct (regs !! PC) as [X|] eqn:?; auto; try congruence; [].
   destruct X as [| [[[[? ?] ?] ?] a']] eqn:?; try congruence; [].
-  destruct (a' + 1)%a eqn:?; [| congruence]. inversion 1; subst regs'.
-  do 6 eexists. repeat split; auto.
+  destruct (a' + 1)%a eqn:?; [| congruence]. destruct p; try congruence; inversion 1; subst regs';
+  do 6 eexists; repeat split; auto.
 Qed.
 
 Lemma updatePC_success_incl m m' regs regs' w :
@@ -819,10 +825,9 @@ Proof.
     pose proof (lookup_weaken _ _ _ _ Hrr Hincl) as ->%regs_lookup_eq.
     destruct w1 as [|((((?&?)&?)&?)&a1)]; simplify_eq.
     destruct (a1 + 1)%a eqn:Ha1; simplify_eq. rewrite /update_reg /=.
-    f_equal. f_equal.
     assert (HH: forall (reg1 reg2:Reg), reg1 = reg2 -> reg1 !! PC = reg2 !! PC)
-      by (intros * ->; auto).
-    apply HH in Hu. rewrite !lookup_insert in Hu. by simplify_eq. }
+    by (intros * ->; auto).
+    destruct p; try congruence; f_equal; f_equal; inversion Hu; apply HH in H0; rewrite !lookup_insert in H0; by simplify_eq. }
   { unfold RegLocate in Hu. rewrite Hrr in Hu. inversion Hu. }
 Qed.
 
@@ -835,13 +840,13 @@ Proof.
   intros [w HPC] Hincl Hfail. rewrite /updatePC /RegLocate /= in Hfail |- *.
   rewrite !HPC in Hfail. have -> := lookup_weaken _ _ _ _ HPC Hincl.
   destruct w as [|((((?&?)&?)&?)&a1)]; simplify_eq; auto;[].
-  destruct (a1 + 1)%a; simplify_eq; auto.
+  destruct (a1 + 1)%a; destruct p; try congruence; simplify_eq; auto.
 Qed.
 
 Ltac incrementPC_inv :=
   match goal with
   | H : incrementPC _ = Some _ |- _ =>
-    apply incrementPC_Some_inv in H as (?&?&?&?&?&?&?&?&?)
+    apply incrementPC_Some_inv in H as (?&?&?&?&?&?&?&?&?&?)
   | H : incrementPC _ = None |- _ =>
     eapply incrementPC_None_inv in H
   end; simplify_eq.

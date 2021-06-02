@@ -16,20 +16,21 @@ Definition updatePC (φ: ExecConf): Conf :=
   match RegLocate (reg φ) PC with
   | inr (Regular ((p, g), b, e, a)) =>
     match (a + 1)%a with
-    | Some a' => let φ' := (update_reg φ PC (inr (Regular ((p, g), b, e, a')))) in
-                (NextI, φ')
+    | Some a' => 
+      match p with
+      | E | URWLX | URWX | URWL | URW => (Failed, φ)
+      | _ => let φ' := (update_reg φ PC (inr (Regular ((p, g), b, e, a')))) in (NextI, φ')
+      end
     | None => (Failed, φ)
     end
   | inr (Stk d p b e a) =>
     match (a + 1)%a with
-    | Some a' => let φ' := (update_reg φ PC (inr (Stk d p b e a'))) in
-                (NextI, φ')
-    | None => (Failed, φ)
-    end
-  | inr (Ret b e a) =>
-    match (a + 1)%a with
-    | Some a' => let φ' := (update_reg φ PC (inr (Ret b e a'))) in
-                (NextI, φ')
+    | Some a' => 
+      match p with
+      | E | URWLX | URWX | URWL | URW => (Failed, φ)
+      | _ => let φ' := (update_reg φ PC (inr (Stk d p b e a'))) in
+                  (NextI, φ')
+      end
     | None => (Failed, φ)
     end
   | _ => (Failed, φ)

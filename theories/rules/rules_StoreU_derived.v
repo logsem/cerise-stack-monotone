@@ -93,6 +93,8 @@ Section cap_lang_rules.
        all: try congruence.
        erewrite wb_implies_verify_access in e4; eauto. simplify_eq. congruence.
        erewrite wb_implies_verify_access in e4; eauto. simplify_eq.
+       destruct e8; try congruence. inv Hvpc. naive_solver.
+       destruct e7; try congruence. inv Hvpc. naive_solver.
        Unshelve. all:auto.
      }
   Qed.
@@ -192,6 +194,8 @@ Section cap_lang_rules.
        all: try congruence.
        erewrite wb_implies_verify_access in e4; eauto. simplify_eq. congruence.
        erewrite wb_implies_verify_access in e4; eauto. simplify_eq.
+       destruct e8; try congruence. inv Hvpc; naive_solver.
+       destruct e7; try congruence. inv Hvpc; naive_solver.
        Unshelve. all:auto.
      }
   Qed.
@@ -244,6 +248,8 @@ Section cap_lang_rules.
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
        all: try congruence.
        erewrite wb_implies_verify_access in e4; eauto. simplify_eq.
+       destruct e8; try congruence. inv Hvpc. naive_solver.
+       destruct e7; try congruence. inv Hvpc. naive_solver.
        Unshelve. all:auto.
      }
   Qed.

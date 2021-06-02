@@ -217,7 +217,7 @@ Section fundamental.
       }
 
       apply incrementPC_Some_inv in H8.
-      destruct H8 as (?&?&?&?&?&?&?&?&?).
+      destruct H8 as (?&?&?&?&?&?&?&?&?&HX).
       iApply wp_pure_step_later; auto. iNext.
       destruct (decide (x = RX ∨ x = RWX ∨ x = RWLX)).
       2 : {

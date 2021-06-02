@@ -280,7 +280,7 @@ Section fundamental.
 
     destruct HSpec as [* ? ? Hincr|].
     { apply incrementPC_Some_inv in Hincr.
-      destruct Hincr as (?&?&?&?&?&?&?&?&?).
+      destruct Hincr as (?&?&?&?&?&?&?&?&?&XX).
       iApply wp_pure_step_later; auto. iNext.
 
       (* Step 5: return all the resources we had in order to close the second location in the region, in the cases where we need to *)

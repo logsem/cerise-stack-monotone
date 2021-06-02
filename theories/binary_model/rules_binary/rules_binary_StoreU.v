@@ -134,7 +134,7 @@ Section cap_lang_spec_rules.
          iMod ((regspec_heap_update_inSepM _ _ _ rdst) with "Hown Hmap") as "[Hown Hmap]"; eauto.
          iFailStep_alt StoreU_fail_incrPC2. }
 
-       destruct (incrementPC_success_updatePC _ σm _ Hincr) as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & ->).
+       destruct (incrementPC_success_updatePC _ σm _ Hincr) as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & -> & ?).
        eapply updatePC_success_incl in HuPC. 2: by eapply insert_mono.
        instantiate (1 := <[a:=wsrc]> σm) in HuPC.
        rewrite HuPC in Hstep. inversion Hstep; clear Hstep; subst c σ2. cbn.
@@ -160,7 +160,7 @@ Section cap_lang_spec_rules.
        inv Hstep. simpl.
        iFailStep_alt StoreU_fail_incrPC3. }
 
-     destruct (incrementPC_success_updatePC regs (<[a':=wsrc]> σm) _ Hincr) as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & ->).
+     destruct (incrementPC_success_updatePC regs (<[a':=wsrc]> σm) _ Hincr) as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & -> & ?).
      eapply updatePC_success_incl in HuPC; eauto.
      instantiate (1 := <[a':=wsrc]> σm) in HuPC.
      rewrite HuPC in Hstep.

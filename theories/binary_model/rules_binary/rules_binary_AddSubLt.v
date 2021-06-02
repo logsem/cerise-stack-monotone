@@ -95,7 +95,7 @@ Section cap_lang_spec_rules.
     (* Success *)
 
     eapply (incrementPC_success_updatePC _ σm) in Hregs'
-      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & ->).
+      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & -> & ?).
     eapply updatePC_success_incl with (m':=σm) in HuPC. 2: by eapply insert_mono; eauto.
     simplify_pair_eq. iFrame.
     iMod ((regspec_heap_update_inSepM _ _ _ dst) with "Hown Hmap") as "[Hr Hmap]"; eauto.
@@ -158,7 +158,8 @@ Section cap_lang_spec_rules.
       by iDestruct (regs_of_map_3 with "Hmap") as "(?&?&?)"; eauto; iFrame. }
     { (* Failure (contradiction) *)
       destruct Hfail; simplify_map_eq; eauto.
-      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert; eauto]. congruence. 
+      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert; eauto].
+      destruct e1; try congruence. inv Hvpc; naive_solver.
     } 
   Qed.
 
@@ -194,7 +195,8 @@ Section cap_lang_spec_rules.
       iDestruct (regs_of_map_3 with "Hmap") as "(?&?&?)"; eauto; by iFrame. }
     { (* Failure (contradiction) *)
       destruct Hfail; simpl in *; simplify_map_eq_alt. 
-      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert; eauto]. congruence. }
+      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert; eauto].
+      destruct e1; try congruence. inv Hvpc; naive_solver. }
   Qed.
 
   Lemma step_add_sub_lt_success_z_dst E K dst pc_p pc_g pc_b pc_e pc_a w ins n1 n2 pc_a' :
@@ -225,7 +227,8 @@ Section cap_lang_spec_rules.
       iDestruct (regs_of_map_2 with "Hmap") as "(?&?)"; eauto; by iFrame. }
     { (* Failure (contradiction) *)
       destruct Hfail; simpl in *; simplify_map_eq_alt.
-      incrementPC_inv; [|rewrite lookup_insert_ne// lookup_insert; eauto]. congruence. }
+      incrementPC_inv; [|rewrite lookup_insert_ne// lookup_insert; eauto].
+      destruct e1; try congruence. inv Hvpc; naive_solver. }
   Qed.
 
   Lemma step_add_sub_lt_success_dst_z E K dst pc_p pc_g pc_b pc_e pc_a w ins n1 n2 pc_a' :
@@ -256,7 +259,8 @@ Section cap_lang_spec_rules.
       iDestruct (regs_of_map_2 with "Hmap") as "(?&?)"; eauto; by iFrame. }
     { (* Failure (contradiction) *)
       destruct Hfail;simpl in *;simplify_map_eq_alt; eauto.
-      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto]. congruence. }
+      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto].
+      destruct e1; try congruence. inv Hvpc; naive_solver. }
   Qed.
 
 End cap_lang_spec_rules.

@@ -184,7 +184,7 @@ Section cap_lang_rules.
      (* Success *)
 
      eapply (incrementPC_success_updatePC _ m) in Hregs'
-       as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & ->).
+       as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & -> & ?).
      eapply updatePC_success_incl in HuPC. 2: by eapply insert_mono; eauto.
      rewrite HuPC in HH; clear HuPC; inversion HH; clear HH; subst c σ2. cbn.
      iFrame.
@@ -225,7 +225,9 @@ Section cap_lang_rules.
        rewrite !insert_insert. (* TODO: add to simplify_map_eq via simpl_map? *)
        iApply (regs_of_map_2 with "Hmap"); eauto. }
      { (* Failure (contradiction) *)
-       destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto. congruence.
+       destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto. 
+       destruct e3; try congruence.
+       inv Hvpc. naive_solver.
        inv Hvpc. naive_solver. }
    Qed.
 
@@ -266,7 +268,9 @@ Section cap_lang_rules.
        rewrite (insert_commute _ r1 PC) // (insert_commute _ r1 rv) // insert_insert.
        iApply (regs_of_map_3 with "Hmap"); eauto. }
      { (* Failure (contradiction) *)
-       destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto. congruence.
+       destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
+       destruct e4; try congruence.
+       inv Hvpc. destruct H3 as [? | [? | [? | [? | ?]]]]; destruct H10 as [? | [? | ?]]; congruence.
        destruct p0; tauto. }
    Qed.
 
@@ -296,7 +300,9 @@ Section cap_lang_rules.
        iApply "Hφ". iFrame. incrementPC_inv; simplify_map_eq.
        rewrite !insert_insert. iApply (regs_of_map_1 with "Hmap"); eauto. }
      { (* Failure (contradiction) *)
-       destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto. congruence.
+       destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
+       destruct e3; try congruence.
+       inv Hvpc. naive_solver.
        inv Hvpc. naive_solver. }
    Qed.
 
@@ -334,7 +340,9 @@ Section cap_lang_rules.
        rewrite insert_commute // insert_insert insert_commute // insert_insert.
        iDestruct (regs_of_map_2 with "Hmap") as "[? ?]"; eauto. iFrame. }
      { (* Failure (contradiction) *)
-       destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto. congruence.
+       destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto. 
+       destruct e4; try congruence.
+       inv Hvpc. naive_solver.
        destruct p0; tauto. }
    Qed.
 

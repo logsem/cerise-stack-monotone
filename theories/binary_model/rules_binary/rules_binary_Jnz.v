@@ -65,7 +65,7 @@ Section cap_lang_spec_rules.
       iPureIntro; econstructor; eauto. }
     
     destruct (incrementPC_success_updatePC _ σm _ HX)
-      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & ->).
+      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & -> & ?).
     eapply updatePC_success_incl with (m':=σm) in HuPC; eauto. simplify_pair_eq.
     iMod ((regspec_heap_update_inSepM _ _ _ PC) with "Hown Hmap") as "[Hown Hmap]"; eauto.
     iMod (exprspec_mapsto_update _ _ (fill K (Instr NextI)) with "Hown Hj") as "[Hown Hj]".
@@ -98,7 +98,8 @@ Section cap_lang_spec_rules.
     by unfold regs_of; rewrite !dom_insert; set_solver+.
     
     destruct Hspec as [ | | ];eauto. 
-    { incrementPC_inv;[|rewrite lookup_insert;eauto]. congruence. }
+    { incrementPC_inv;[|rewrite lookup_insert;eauto]. 
+      destruct H7; try congruence. inv Hvpc; naive_solver. }
     { iFrame. incrementPC_inv. rewrite insert_insert. 
       iDestruct (regs_of_map_3 with "Hmap") as "(?&?&?)"; eauto. rewrite lookup_insert in H7; simplify_eq. by iFrame. }
     { rewrite lookup_insert_ne// lookup_insert_ne// lookup_insert in H5. simplify_eq. }
@@ -137,7 +138,7 @@ Section cap_lang_spec_rules.
    { rewrite lookup_insert_ne// lookup_insert_ne// lookup_insert in H6.
      rewrite lookup_insert_ne// lookup_insert in H7. 
      simplify_eq. rewrite insert_insert. iDestruct (regs_of_map_3 with "Hmap") as "(?&?&?)"; eauto. by iFrame. 
-   } 
+   }
   Qed.
 
 

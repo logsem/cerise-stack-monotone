@@ -108,7 +108,7 @@ Section cap_lang_spec_rules.
      (* Success *)
      rewrite /update_reg /= in Hstep.
      eapply (incrementPC_success_updatePC _ σm) in Hregs'
-       as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & ->).
+       as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & -> & ?).
      eapply updatePC_success_incl in HuPC. 2: by eapply insert_mono.
      rewrite HuPC in Hstep; clear HuPC; inversion Hstep; clear Hstep; subst c σ2. cbn.
      iFrame.
@@ -124,7 +124,8 @@ Section cap_lang_spec_rules.
       exact Hr''2.
       auto.
     * exact Hmema.
-    * unfold incrementPC. by rewrite HPC'' Ha_pc'.
+    * unfold incrementPC. rewrite HPC'' Ha_pc'.
+      destruct p1; naive_solver.
       Unshelve. all: auto.
   Qed.
 
@@ -170,7 +171,8 @@ Section cap_lang_spec_rules.
        iDestruct (regs_of_map_2 with "[$Hmap]") as "[HPC Hr1]"; eauto. rewrite Hloadv. by iFrame. }
      { (* Failure (contradiction) *)
        destruct Hfail; try (incrementPC_inv;[|rewrite lookup_insert_ne//]);simplify_map_eq;eauto.
-       destruct o. all: congruence.
+       destruct o. all: try congruence.
+       destruct e3; try congruence. inv Hvpc; naive_solver.
      }
   Qed.
 
@@ -246,7 +248,8 @@ Section cap_lang_spec_rules.
      { (* Failure (contradiction) *)
        destruct Hfail; simplify_map_eq_alt.
        destruct o;congruence.
-       incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto]. congruence. }
+       incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto].
+       destruct e3; try congruence. inv Hvpc; naive_solver. }
   Qed.
 
   Lemma step_load_success_alt E K r1 r2 pc_p pc_g pc_b pc_e pc_a w w' w'' p g b e a pc_a' :

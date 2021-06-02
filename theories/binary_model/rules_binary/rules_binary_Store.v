@@ -141,7 +141,7 @@ Section cap_lang_spec_rules.
      (* Success *)
       clear Hstep. rewrite /update_mem /= in HH.
       eapply (incrementPC_success_updatePC _ (<[a:=storev]> σm)) in Hregs'
-        as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Hincr & HuPC & ->).
+        as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Hincr & HuPC & -> & ?).
       eapply (updatePC_success_incl _ (<[a:=storev]> σm)) in HuPC. 2: by eauto.
       rewrite HuPC in HH; clear HuPC; inversion HH; clear HH; subst c σ2. cbn.
       iMod ((regspec_heap_update_inSepM _ _ _ PC) with "Hown Hmap") as "[Hown Hmap]"; eauto.
@@ -153,7 +153,7 @@ Section cap_lang_spec_rules.
 
       iPureIntro. eapply Store_spec_success; eauto.
         * split; auto. exact Hr'1. all: auto.
-        * unfold incrementPC. rewrite HPC'' Hincr.  auto.
+        * unfold incrementPC. rewrite HPC'' Hincr. destruct p1; naive_solver.
   Qed.
 
   Lemma step_store_success_reg E K pc_p pc_g pc_b pc_e pc_a pc_a' w dst src w'
@@ -203,7 +203,8 @@ Section cap_lang_spec_rules.
      { (* Failure (contradiction) *)
        destruct X; simpl in *; simplify_map_eq_alt.
        destruct o. all: try congruence.
-       incrementPC_inv;[|rewrite lookup_insert;eauto]. congruence.
+       incrementPC_inv;[|rewrite lookup_insert;eauto]. 
+       destruct e0; try congruence. inv Hvpc; naive_solver.
      }
     Qed.
 
@@ -250,9 +251,9 @@ Section cap_lang_spec_rules.
      { (* Failure (contradiction) *)
        destruct X; simplify_map_eq_alt.
        destruct o. all: try congruence. inversion e2. subst. rewrite /canStore in e3. congruence.
-       incrementPC_inv;[|rewrite lookup_insert;eauto]. congruence.
+       incrementPC_inv;[|rewrite lookup_insert;eauto].
+       destruct e0; try congruence. inv Hvpc; naive_solver.
      }
   Qed.
-
 
 End cap_lang_spec_rules.

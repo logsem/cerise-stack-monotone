@@ -72,7 +72,7 @@ Section cap_lang_spec_rules.
     }
 
     eapply (incrementPC_success_updatePC _ σm) in Hregs'
-      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & ->).
+      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & -> & ?).
     eapply updatePC_success_incl with (m':=σm) in HuPC. 2: by eapply insert_mono; eauto.
     simplify_pair_eq.
     iMod ((regspec_heap_update_inSepM _ _ _ dst wsrc) with "Hown Hmap") as "[Hown Hmap]"; eauto.
@@ -115,7 +115,8 @@ Section cap_lang_spec_rules.
       rewrite (insert_commute _ PC r1) // insert_insert insert_commute // insert_insert.
       iDestruct (rules_binary_base.regs_of_map_2 with "Hmap") as "(?&?)"; eauto; by iFrame. }
     { (* Failure (contradiction) *)
-      incrementPC_inv; [|rewrite lookup_insert_ne// lookup_insert;eauto]. congruence. }
+      incrementPC_inv; [|rewrite lookup_insert_ne// lookup_insert;eauto].
+      destruct H4; try congruence. inv Hvpc; naive_solver. }
   Qed.
 
   Lemma step_move_success_reg E K pc_p pc_g pc_b pc_e pc_a pc_a' w r1 wr1 rv wrv :
@@ -148,7 +149,8 @@ Section cap_lang_spec_rules.
       rewrite (insert_commute _ PC r1) // insert_insert (insert_commute _ PC r1) // insert_insert.
       iDestruct (rules_binary_base.regs_of_map_3 with "Hmap") as "(?&?&?)"; eauto; by iFrame. }
     { (* Failure (contradiction) *)
-      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto]. congruence. }
+      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto].
+      destruct H6; try congruence. inv Hvpc; naive_solver. }
   Qed.
 
    Lemma step_move_success_z E K pc_p pc_g pc_b pc_e pc_a pc_a' w r1 wr1 z :
@@ -177,7 +179,8 @@ Section cap_lang_spec_rules.
       rewrite (insert_commute _ PC r1) // insert_insert insert_commute // insert_insert.
       iDestruct (rules_binary_base.regs_of_map_2 with "Hmap") as "(?&?)"; eauto; by iFrame. }
     { (* Failure (contradiction) *)
-      incrementPC_inv; [|rewrite lookup_insert_ne// lookup_insert;eauto]. congruence. }
+      incrementPC_inv; [|rewrite lookup_insert_ne// lookup_insert;eauto].
+      destruct H4; try congruence. inv Hvpc; naive_solver. }
   Qed.
 
 End cap_lang_spec_rules.

@@ -92,6 +92,7 @@ Section cap_lang_rules.
        all: try congruence.
        erewrite  wb_implies_verify_access in e4;eauto. simplify_eq.
        Unshelve. all:auto.
+       destruct e6; try congruence. inv Hvpc. naive_solver.
      }
   Qed.
 
@@ -134,6 +135,7 @@ Section cap_lang_rules.
     (a' + 1)%a = Some a'' →
     (a1 + zoff)%a = Some a ->
     (zoff < 0)%Z ->
+    isCorrectPC (inr ((p',g'),b',e',a'')) ->
 
     {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
           ∗ ▷ pc_a ↦ₐ w
@@ -148,7 +150,7 @@ Section cap_lang_rules.
              ∗ r2 ↦ᵣ inl zoff
              ∗ a ↦ₐ inr ((p',g'),b',e',a') }}}.
   Proof.
-    iIntros (Hinstr Hvpc HU Hwb Hwb2 Hpca' Hincr Hlt φ)
+    iIntros (Hinstr Hvpc HU Hwb Hwb2 Hpca' Hincr Hlt HX φ)
             "(>HPC & >Hi & >Hr1 & >Hr2 & >Ha) Hφ".
     iDestruct (map_of_regs_3 with "HPC Hr1 Hr2") as "[Hmap (%&%&%) ]".
     iDestruct (memMap_resource_2ne_apply with "Hi Ha") as "[Hmem %]"; auto.
@@ -175,7 +177,8 @@ Section cap_lang_rules.
        destruct Hfail; simplify_map_eq; first congruence.
        all: erewrite  wb_implies_verify_access in e4;eauto.
        * by exfalso.
-       * simplify_map_eq. eapply (incrementPC_None_inv _ _ _ _ a') in e6; last by simplify_map_eq. congruence.
+       * simplify_map_eq. eapply (incrementPC_None_inv _ _ _ _ _ a') in e6; last by simplify_map_eq. destruct e6; try congruence.
+       inv HX; naive_solver.
        Unshelve. all:auto.
      }
   Qed.
@@ -187,6 +190,7 @@ Section cap_lang_rules.
     isU p = true -> withinBounds ((p, g), b, e, a) = true →
     (a' + 1)%a = Some a'' →
     (a + 1)%a = Some a1 ->
+    isCorrectPC (inr ((p',g'),b',e',a'')) ->
 
     {{{ ▷ PC ↦ᵣ inr ((pc_p,pc_g),pc_b,pc_e,pc_a)
           ∗ ▷ pc_a ↦ₐ w
@@ -201,7 +205,7 @@ Section cap_lang_rules.
              ∗ r2 ↦ᵣ inl (-1)%Z
              ∗ a ↦ₐ inr ((p',g'),b',e',a') }}}.
   Proof.
-    iIntros (Hinstr Hvpc HU Hwb Hpca' Hincr φ)
+    iIntros (Hinstr Hvpc HU Hwb Hpca' Hincr HX φ)
             "(>HPC & >Hi & >Hr1 & >Hr2 & >Ha) Hφ".
     iApply (wp_loadU_success_reg_to_PC_any with "[$Hr1 $HPC $Hr2 $Hi $Ha]");[..|iFrame];eauto.
     - apply withinBounds_le_addr in Hwb as [Hle Hlt]. solve_addr.

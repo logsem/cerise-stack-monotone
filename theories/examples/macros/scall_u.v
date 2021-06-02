@@ -434,6 +434,7 @@ Section scall.
     isU p_r = true → (* Stack capability is uninitialized *)
     (pc_cont + 1)%a = Some pc_next ->
     (s_last + 1)%a = Some stack_own_e ->
+    isCorrectPC (inr (pc_p, pc_g, pc_b, pc_e, pc_next)) ->
 
     (▷ PC ↦ᵣ inr (p, g, b_r, stack_own_e, stack_own_b) (* only permission up to adv frame, i.e. stack_own_e *)
        ∗ ▷ r_t1 ↦ᵣ rt1w
@@ -454,7 +455,7 @@ Section scall.
                WP Seq (Instr Executable) {{ φ }})
        ⊢ WP Seq (Instr Executable) {{ φ }})%I.
   Proof.
-    iIntros (Hvpc Hwb HUstk Hstack1 Hstack2) "(>HPC & >Hr_t1 & >Hr_stk & >Hframe & Hφ)".
+    iIntros (Hvpc Hwb HUstk Hstack1 Hstack2 HX) "(>HPC & >Hr_t1 & >Hr_stk & >Hframe & Hφ)".
     rewrite /region_mapsto.
     iDestruct (big_sepL2_length with "Hframe") as %Hframe_length.
     set (l := region_addrs stack_own_b stack_own_e) in *.

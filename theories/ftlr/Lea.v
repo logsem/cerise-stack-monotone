@@ -39,7 +39,7 @@ Section fundamental.
 
     iIntros "!>" (regs' retv). iDestruct 1 as (HSpec) "[Ha Hmap]".
     destruct HSpec as [ * Hdst ? Hz Hoffset HUa HincrPC |].
-    { apply incrementPC_Some_inv in HincrPC as (p''&g''&b''&e''&a''& ? & HPC & Z & Hregs').
+    { apply incrementPC_Some_inv in HincrPC as (p''&g''&b''&e''&a''& ? & HPC & Z & Hregs' & XX).
 
       assert (p'' = p ∧ g'' = g ∧ b'' = b ∧ e'' = e) as (-> & -> & -> & ->).
       { destruct (decide (PC = dst)); simplify_map_eq; auto. }

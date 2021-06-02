@@ -297,7 +297,7 @@ Section cap_lang_rules.
      (* Success *)
       clear Hstep. rewrite /update_mem /= in HH.
       eapply (incrementPC_success_updatePC _ (<[a:=storev]> m)) in Hregs'
-        as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & ->).
+        as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & -> & X).
       eapply (updatePC_success_incl _ (<[a:=storev]> m)) in HuPC. 2: by eauto.
       rewrite HuPC in HH; clear HuPC; inversion HH; clear HH; subst c σ2. cbn.
 
@@ -306,7 +306,8 @@ Section cap_lang_rules.
       iFrame. iModIntro. iApply "Hφ". iFrame.
       iPureIntro. eapply Store_spec_success; eauto.
         * split; auto. exact Hr'1. all: auto.
-        * unfold incrementPC. by rewrite HPC'' Ha_pc'.
+        * unfold incrementPC. rewrite HPC'' Ha_pc'.
+          destruct X as [? [? [? [? ?]]]]; destruct p1; auto; congruence.
       Unshelve. all: auto.
    Qed.
 
@@ -346,7 +347,9 @@ Section cap_lang_rules.
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
        apply isCorrectPC_ra_wb in Hvpc. apply andb_prop_elim in Hvpc as [_ Hwb].
-       destruct o; last apply Is_true_false in H2. all:congruence.
+       destruct o; last apply Is_true_false in H2. all:try congruence.
+       destruct e; try congruence.
+       inv Hvpc. destruct H2 as [? | [? | [? | [? | ?]]]]; destruct H9 as [? | [? | ?]]; congruence.
      }
    Qed.
 
@@ -480,7 +483,9 @@ Section cap_lang_rules.
        iDestruct (regs_of_map_2 with "[$Hmap]") as "[HPC Hsrc]"; eauto. iFrame. }
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
-       destruct o. all: congruence.
+       destruct o. all: try congruence.
+       destruct e0; try congruence.
+       inv Hvpc. destruct H3 as [? | [? | [? | [? | ?]]]]; destruct H10 as [? | [? | ?]]; congruence.
      }
     Qed.
 
@@ -800,7 +805,9 @@ Section cap_lang_rules.
        iDestruct (regs_of_map_3 with "[$Hmap]") as "[HPC [Hsrc Hdst] ]"; eauto. iFrame. }
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
-       destruct o. all: try congruence.
+       destruct o. all: try try congruence.
+       destruct e0; try congruence.
+       inv Hvpc. destruct H6 as [? | [? | [? | [? | ?]]]]; destruct H13 as [? | [? | ?]]; congruence.
      }
     Qed.
 
@@ -849,6 +856,8 @@ Section cap_lang_rules.
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
        destruct o. all: try congruence.
+       destruct e0; try congruence.
+       inv Hvpc. destruct H4 as [? | [? | [? | [? | ?]]]]; destruct H11 as [? | [? | ?]]; congruence.
      }
     Qed.
 
@@ -895,6 +904,8 @@ Section cap_lang_rules.
      { (* Failure (contradiction) *)
        destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto.
        destruct o. all: try congruence.
+       destruct e0; try congruence.
+       inv Hvpc. destruct H4 as [? | [? | [? | [? | ?]]]]; destruct H11 as [? | [? | ?]]; congruence.
      }
    Qed.
 

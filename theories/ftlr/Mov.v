@@ -43,7 +43,7 @@ Section fundamental.
     { (* TODO: it might be possible to refactor the proof below by using more simplify_map_eq *)
       (* TODO: use incrementPC_inv *)
       match goal with
-      | H: incrementPC _ = Some _ |- _ => apply incrementPC_Some_inv in H as (p''&g''&b''&e''&a''& ? & HPC & Z & Hregs')
+      | H: incrementPC _ = Some _ |- _ => apply incrementPC_Some_inv in H as (p''&g''&b''&e''&a''& ? & HPC & Z & Hregs' & XX)
       end. simplify_map_eq.
       iApply wp_pure_step_later; auto. iNext.
       destruct (reg_eq_dec dst PC).

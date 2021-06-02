@@ -11,10 +11,10 @@ export COQDOCFLAGS
 all: coq
 
 fundamental: Makefile.coq
-	$(MAKE) -f Makefile.coq pretty-timed only TGTS="theories/fundamental.vo"
+	$(MAKE) -f Makefile.coq only TGTS="theories/fundamental.vo"
 
 fundamental-binary: Makefile.coq
-	$(MAKE) -f Makefile.coq pretty-timed only TGTS="theories/binary_model/fundamental_binary.vo"
+	$(MAKE) -f Makefile.coq only TGTS="theories/binary_model/fundamental_binary.vo"
 
 coq: Makefile.coq
 	$(MAKE) -f Makefile.coq pretty-timed

@@ -74,7 +74,7 @@ Section cap_lang_rules.
     (* Success *)
 
     eapply (incrementPC_success_updatePC _ m) in Hregs'
-      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & ->).
+      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & -> & ?).
     eapply updatePC_success_incl with (m':=m) in HuPC. 2: by eapply insert_mono; eauto.
     simplify_pair_eq. iFrame.
     iMod ((gen_heap_update_inSepM _ _ dst) with "Hr Hmap") as "[Hr Hmap]"; eauto.
@@ -107,7 +107,8 @@ Section cap_lang_rules.
      { iApply "Hφ". iFrame. incrementPC_inv; simplify_map_eq.
        rewrite (insert_commute _ PC dst) // insert_insert insert_commute // insert_insert.
        iDestruct (regs_of_map_2 with "Hmap") as "(?&?)"; eauto; iFrame. }
-     { incrementPC_inv; simplify_map_eq; eauto. congruence. }
+     { incrementPC_inv; simplify_map_eq; eauto. destruct H4; try congruence.
+       inv Hvpc. destruct H3 as [? | [? | [? | [? | ?]]]]; destruct H10 as [? | [? | ?]]; congruence. }
    Qed.
 
    Lemma wp_IsPtr_success E pc_p pc_g pc_b pc_e pc_a pc_a' w dst r wr w' :
@@ -140,7 +141,8 @@ Section cap_lang_rules.
               (insert_commute _ dst PC) // insert_insert.
       iDestruct (regs_of_map_3 with "Hmap") as "(?&?&?)"; eauto; iFrame. }
     { (* Failure (contradiction) *)
-      incrementPC_inv; simplify_map_eq; eauto. congruence. }
+      incrementPC_inv; simplify_map_eq; eauto. destruct H6; try congruence.
+      inv Hvpc. destruct H5 as [? | [? | [? | [? | ?]]]]; destruct H12 as [? | [? | ?]]; congruence. }
    Qed.
 
    Lemma wp_IsPtr_success_dst E pc_p pc_g pc_b pc_e pc_a pc_a' w dst w' :
@@ -168,7 +170,8 @@ Section cap_lang_rules.
      { iApply "Hφ". iFrame. incrementPC_inv; simplify_map_eq.
        rewrite (insert_commute _ PC dst) // insert_insert insert_commute // insert_insert.
        iDestruct (regs_of_map_2 with "Hmap") as "(?&?)"; eauto; iFrame. }
-     { incrementPC_inv; simplify_map_eq; eauto. congruence. }
+     { incrementPC_inv; simplify_map_eq; eauto. destruct H4; try congruence.
+     inv Hvpc. destruct H3 as [? | [? | [? | [? | ?]]]]; destruct H10 as [? | [? | ?]]; congruence. }
    Qed.
 
 End cap_lang_rules.

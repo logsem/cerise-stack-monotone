@@ -92,7 +92,7 @@ Section cap_lang_rules.
 
      generalize Hregs'; intros HH.
      eapply (incrementPC_success_updatePC _ m) in Hregs'
-       as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & ->).
+       as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & -> & ?).
      eapply updatePC_success_incl in HuPC. 2: by eapply insert_mono; eauto.
      rewrite HuPC in Hstep; clear HuPC; inversion Hstep. subst c σ2. cbn.
      iFrame. iMod ((gen_heap_update_inSepM _ _ dst) with "Hr Hmap") as "[Hr Hmap]"; eauto.

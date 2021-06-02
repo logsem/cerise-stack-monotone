@@ -128,7 +128,7 @@ Section cap_lang_spec_rules.
        rewrite H3;eauto. rewrite H3;eauto. rewrite Hma Hinstr;eauto. auto.
      }
 
-     destruct (incrementPC_success_updatePC _ σm _ Hincr) as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & ->).
+     destruct (incrementPC_success_updatePC _ σm _ Hincr) as (p1 & g1 & b1 & e1 & a1 & a_pc1 & HPC'' & Ha_pc' & HuPC & -> & ?).
      eapply updatePC_success_incl in HuPC. 2: by eapply insert_mono.
      rewrite HuPC in Hstep; clear HuPC; inversion Hstep; clear Hstep; subst c σ2. cbn.
      iFrame.

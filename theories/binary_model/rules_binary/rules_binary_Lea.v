@@ -127,7 +127,7 @@ Section cap_lang_spec_rules.
      (* Success *)
 
      eapply (incrementPC_success_updatePC _ σm) in Hregs'
-       as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & ->).
+       as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & -> & ?).
      eapply updatePC_success_incl in HuPC. 2: by eapply insert_mono; eauto.
      rewrite HuPC in HH; clear HuPC; inversion HH; clear HH; subst c σ2. cbn.
      iFrame.
@@ -180,7 +180,8 @@ Section cap_lang_spec_rules.
        simplify_map_eq_alt. iDestruct (regs_of_map_2 with "Hmap") as "[? ?]"; eauto. by iFrame. }
      { (* Failure (contradiction) *)
        destruct Hfail; eauto; simpl in *; simplify_map_eq_alt.
-       incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto]. congruence.
+       incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto].
+       destruct e4; try congruence. inv Hvpc; naive_solver.
        destruct p0;try done.
      }
    Qed.
@@ -222,7 +223,8 @@ Section cap_lang_spec_rules.
        iFrame. iModIntro. iApply (regs_of_map_3 with "Hmap"); eauto. }
      { (* Failure (contradiction) *)
        destruct Hfail; simpl in *; simplify_eq; eauto; simplify_map_eq_alt.
-       incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto]. congruence.
+       incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto].
+       destruct e4; try congruence. inv Hvpc; naive_solver.
        destruct p0;try done.
      }
    Qed.

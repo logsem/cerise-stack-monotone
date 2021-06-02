@@ -78,7 +78,7 @@ Section cap_lang_rules.
       inv Hstep. iFrame. iApply "Hφ". iFrame. iPureIntro; econstructor; eauto. }
 
     destruct (incrementPC_success_updatePC _ m _ HX)
-      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & ->).
+      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Ha_pc' & HuPC & -> & ?).
     eapply updatePC_success_incl with (m':=m) in HuPC; eauto. simplify_pair_eq.
     iMod ((gen_heap_update_inSepM _ _ PC) with "Hr Hmap") as "[Hr Hmap]"; eauto.
     iFrame. iApply "Hφ". iFrame. iPureIntro. econstructor 2; eauto.
@@ -251,7 +251,7 @@ Section cap_lang_rules.
     iNext. iIntros (regs' retv) "(#Hspec & Hpc_a & Hmap)". iDestruct "Hspec" as %Hspec.
 
    destruct Hspec as [ | | ]; try incrementPC_inv; simplify_map_eq; eauto.
-   { congruence. }
+   { destruct H7; try congruence. inv Hvpc. naive_solver. }
    { iApply "Hφ". iFrame. rewrite insert_insert.
      iDestruct (regs_of_map_3 with "Hmap") as "(?&?&?)"; eauto; iFrame. }
   Qed.

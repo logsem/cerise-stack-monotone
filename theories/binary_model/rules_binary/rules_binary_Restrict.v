@@ -84,7 +84,7 @@ Section cap_lang_spec_rules.
       iFailStep Restrict_fail_PC_overflow. }
 
     eapply (incrementPC_success_updatePC _ σm) in Hregs'
-      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & ->).
+      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & -> & ?).
     eapply updatePC_success_incl with (m':=σm) in HuPC. 2: by eapply insert_mono; eauto.
     simplify_pair_eq. iFrame.
     iMod ((regspec_heap_update_inSepM _ _ _ dst) with "Hown Hmap") as "[Hr Hmap]"; eauto.
@@ -129,7 +129,8 @@ Section cap_lang_spec_rules.
       iDestruct (regs_of_map_2 with "Hregs") as "(?&?)"; eauto; by iFrame. }
     { (* Failure (contradiction) *)
       destruct Hfail; simpl in *; simplify_map_eq_alt; eauto; try congruence.
-      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto]. congruence. }
+      incrementPC_inv;[|rewrite lookup_insert_ne// lookup_insert;eauto].
+      destruct e4; try congruence. inv Hvpc; naive_solver. }
   Qed.
 
 

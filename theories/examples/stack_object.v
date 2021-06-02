@@ -699,6 +699,7 @@ Section stack_object.
       { clear -Ha_param Haf2 Haf3 Hb_r_adv Ha_r_adv Hsize. apply le_addr_withinBounds;solve_addr. }
       { iContiguous_next_a Hcont_code6. }
       { clear -Ha_r_adv Hb_r_adv. solve_addr. }
+      { eapply (isCorrectPC_contiguous_range _ _ _ _ _ _ _ _ Hvpc_code6); eauto. repeat econstructor. }
       iNext. iIntros "(HPC & Hr_stk & Hr_t1 & Hact)".
       iDestruct "Hr_t1" as (rt1w) "Hr_t1".
 

@@ -66,7 +66,7 @@ Section cap_lang_spec_rules.
     }
 
     eapply (incrementPC_success_updatePC _ σm) in H'regs'
-      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & ->).
+      as (p' & g' & b' & e' & a'' & a_pc' & HPC'' & Hincr & HuPC & -> & ?).
     eapply updatePC_success_incl with (m':=σm) in HuPC. 2: by eapply insert_mono; eauto.
     simplify_pair_eq.
     iMod ((regspec_heap_update_inSepM _ _ _ dst (match wsrc with inl _ => inl 0%Z | inr _ => inl 1%Z end)) with "Hown Hmap") as "[Hown Hmap]"; eauto.
