@@ -6,6 +6,7 @@ From cap_machine.overlay Require Import base.
 
 (* Call r rargs implements a calling convention with arguments passed on the stack
    Assuming that r0, r1, r2 ∉ {r} ∪ rargs, and r_stk contains a stack capability, it will
+   - push a placeholder for the return point, instantiated during the preparation of the return capability
    - save *all* registers on the stack except PC and r_stk
    - prepare the return capability
    - prepare the stack capability in r_stk for a new frame
@@ -13,6 +14,13 @@ From cap_machine.overlay Require Import base.
    - push all arguments
    - clear all registers except PC, r and r_stk
    - jmp r *)
+
+(* The return capability works as follows:
+   - When invoked, it will copy itself from the PC register to another register
+   - Use that capability to restore the stack capability in r_stk
+   - Restore all registers (the environment)
+   - Finally jump to the return point
+*)
 
 Section call.
 
@@ -42,7 +50,7 @@ Section call.
   Proof. induction ρs; simpl; auto. Qed.
 
   (* Pop instruction *)
-  Definition pop_instrs r: list Word := [inl (encodeInstr (LoadU r r_stk (inl (-1)%Z))); inl (encodeInstr (Lea r_stk (inl (-1)%Z)))].
+  Definition pop_instrs r: list Z := [(encodeInstr (LoadU r r_stk (inl (-1)%Z))); (encodeInstr (Lea r_stk (inl (-1)%Z)))].
 
   (* Push all registers except r_stk and PC *)
   Definition push_env_instrs: list Word :=
@@ -53,7 +61,7 @@ Section call.
   Proof. reflexivity. Qed.
 
   (* Pop all registers except r_stk and PC, must be reverse order from push *)
-  Definition pop_env_instrs: list Word :=
+  Definition pop_env_instrs: list Z :=
     foldl (fun b r => (pop_instrs r) ++ b) [] (list_difference all_registers [PC; r_stk]).
 
   Lemma pop_env_instrs_length:
@@ -61,19 +69,25 @@ Section call.
   Proof. reflexivity. Qed.
 
   Definition call_instrs_prologue (rargs: list RegName): list Word :=
+    (* Placeholder for PC *)
+    push_instrs [inl 0%Z]
     (* Save environment *)
-    push_env_instrs
+    ++ push_env_instrs
+    (* Save stack capability *)
+    ++ push_instrs [inr r_stk]
     (* Prepare return capability *)
-    ++ push_instrs [ inl (encodeInstr (Mov (R 1 eq_refl) (inr PC)))
-                   ; inl (encodeInstr (Lea (R 1 eq_refl) (inl 5%Z)))
-                   ; inl (encodeInstr (Load r_stk (R 1 eq_refl)))
-                   ; inl (encodeInstr (LoadU PC r_stk (inl (-1)%Z)))]
+    ++ push_instrs ([ inl (encodeInstr (Mov (R 1 eq_refl) (inr PC)))
+                    ; inl (encodeInstr (Lea (R 1 eq_refl) (inl (- 1)%Z)))
+                    ; inl (encodeInstr (Load r_stk (R 1 eq_refl)))]
+                    ++ List.map inl pop_env_instrs
+                    ++ [ inl (encodeInstr (LoadU PC r_stk (inl (- 1)%Z)))])
     ++ [ inl (encodeInstr (Mov (R 1 eq_refl) (inr PC)))
        ; inl (encodeInstr (Lea (R 1 eq_refl) (inl (43 + length rargs)%Z))) (* offset to beginning of environment restoration *)]
-    ++ push_instrs [inr (R 1 eq_refl); inr r_stk].
+    (* Replace placeholder with return point *)
+    ++ [inl (encodeInstr (StoreU r_stk (inl (- 109)%Z) (inr (R 1 eq_refl))))].
 
   Lemma call_instrs_prologue_length:
-    forall rargs, length (call_instrs_prologue rargs) = 39.
+    forall rargs, length (call_instrs_prologue rargs) = 102.
   Proof.
     intros. rewrite !app_length /=. reflexivity.
   Qed.
@@ -83,7 +97,7 @@ Section call.
     call_instrs_prologue rargs
     ++ [ inl (encodeInstr (Mov (R 0 eq_refl) (inr r_stk)))
        ; inl (encodeInstr (PromoteU (R 0 eq_refl)))
-       ; inl (encodeInstr (Lea (R 0 eq_refl) (inl (-6)%Z)))
+       ; inl (encodeInstr (Lea (R 0 eq_refl) (inl (-66)%Z)))
        ; inl (encodeInstr (Restrict (R 0 eq_refl) (inl (encodePermPair (E, Monotone)))))
        ]
     (* Prepare new stack capability for callee *)
@@ -97,9 +111,7 @@ Section call.
     (* Clear all registers *)
     ++ rclear_instrs (list_difference all_registers [PC; r; r_stk])
     (* Jump to callee *)
-    ++ [inl (encodeInstr (Jmp r))]
-    (* Restore environment *)
-    ++ [inl (encodeInstr (Lea r_stk (inl (-1)%Z)))] ++ pop_env_instrs.
+    ++ [inl (encodeInstr (Jmp r))].
 
   Lemma all_registers_list_difference_length:
     forall r, r <> PC ->
@@ -118,7 +130,8 @@ Section call.
       r <> r_stk ->
       length (call_instrs r rargs) = 141 + length rargs.
   Proof.
-    intros. rewrite /call_instrs 11!app_length push_env_instrs_length pop_env_instrs_length !push_instrs_length !map_length all_registers_list_difference_length //.
+    intros. rewrite /call_instrs 11!app_length push_env_instrs_length !push_instrs_length !map_length all_registers_list_difference_length //.
+    rewrite !app_length !map_length pop_env_instrs_length.
     simpl length. lia.
   Qed.
 

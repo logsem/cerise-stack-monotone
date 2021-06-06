@@ -906,57 +906,59 @@ Section opsem.
     intros. destruct H0 as [a' [HA1 [HA2 [HA3 [HA4 [HA5 [HA6 [HA7 [HA8 HA9]]]]]]]]].
     destruct H1 as [a'' [HB1 [HB2 [HB3 [HB4 [HB5 [HB6 [HB7 [HB8 HB9]]]]]]]]].
     assert (Hleneq: length rargs1 = length rargs2).
-    { destruct (HA8 36 ltac:(lia)) as [a_i [Ha_i Hinstr]].
-      destruct (HB8 36 ltac:(lia)) as [a_i' [Ha_i' Hinstr']].
+    { destruct (HA8 100 ltac:(lia)) as [a_i [Ha_i Hinstr]].
+      destruct (HB8 100 ltac:(lia)) as [a_i' [Ha_i' Hinstr']].
       rewrite Ha_i' in Ha_i; inversion Ha_i; subst.
       unfold call_instrs in Hinstr, Hinstr'.
-      rewrite (@lookup_app_l (base.Word) (call_instrs_prologue rargs1) _ 36) in Hinstr; [|rewrite call_instrs_prologue_length; lia].
+      rewrite (@lookup_app_l (base.Word) (call_instrs_prologue rargs1) _ 100) in Hinstr; [|rewrite call_instrs_prologue_length; lia].
       rewrite lookup_app_l in Hinstr'; [|rewrite call_instrs_prologue_length; lia].
-      rewrite /call_instrs_prologue lookup_app_r in Hinstr; [|rewrite push_env_instrs_length; lia].
-      rewrite push_env_instrs_length /= in Hinstr.
-      rewrite /call_instrs_prologue lookup_app_r in Hinstr'; [|rewrite push_env_instrs_length; lia].
-      rewrite push_env_instrs_length /= in Hinstr'.
+      rewrite /call_instrs_prologue lookup_app_r in Hinstr; [|simpl; lia].
+      rewrite /= lookup_app_r in Hinstr; [|rewrite push_env_instrs_length; lia].
+      rewrite /= lookup_app_r in Hinstr; [|simpl; lia].
+      rewrite /= lookup_app_r in Hinstr; [|rewrite push_instrs_length !app_length map_length pop_env_instrs_length /=; lia].
+      rewrite push_instrs_length !app_length map_length pop_env_instrs_length /= in Hinstr.
+      rewrite lookup_app_l /= in Hinstr; [|simpl; lia].
+      rewrite /call_instrs_prologue lookup_app_r in Hinstr'; [|simpl; lia].
+      rewrite /= lookup_app_r in Hinstr'; [|rewrite push_env_instrs_length; lia].
+      rewrite /= lookup_app_r in Hinstr'; [|simpl; lia].
+      rewrite /= lookup_app_r in Hinstr'; [|rewrite push_instrs_length !app_length map_length pop_env_instrs_length /=; lia].
+      rewrite push_instrs_length !app_length map_length pop_env_instrs_length /= in Hinstr'.
+      rewrite lookup_app_l /= in Hinstr'; [|simpl; lia].
       rewrite -Hinstr' in Hinstr. inversion Hinstr.
       eapply encode_instr_inj in H1. inversion H1. lia. }
     split.
-    { destruct (HA8 (77 + length rargs1) ltac:(lia)) as [a_i [Ha_i Hinstr]].
-      destruct (HB8 (77 + length rargs1) ltac:(lia)) as [a_i' [Ha_i' Hinstr']].
+    { destruct (HA8 (140 + length rargs1) ltac:(lia)) as [a_i [Ha_i Hinstr]].
+      destruct (HB8 (140 + length rargs1) ltac:(lia)) as [a_i' [Ha_i' Hinstr']].
       rewrite Ha_i' in Ha_i; inversion Ha_i; subst.
       rewrite /call_instrs in Hinstr, Hinstr'.
       rewrite lookup_app_r in Hinstr; [|rewrite call_instrs_prologue_length; lia].
       rewrite lookup_app_r in Hinstr'; [|rewrite call_instrs_prologue_length; lia].
-      rewrite call_instrs_prologue_length in Hinstr.
-      rewrite call_instrs_prologue_length in Hinstr'.
+      rewrite call_instrs_prologue_length lookup_app_r in Hinstr; [|simpl; lia].
       rewrite lookup_app_r in Hinstr; [|simpl; lia].
-      rewrite lookup_app_r in Hinstr'; [|simpl; lia].
-      simpl length in Hinstr, Hinstr'.
-      rewrite lookup_app_r in Hinstr; [|simpl; lia].
-      rewrite lookup_app_r in Hinstr'; [|simpl; lia].
-      simpl length in Hinstr, Hinstr'.
-      rewrite lookup_app_r in Hinstr; [|simpl; lia].
-      rewrite lookup_app_r in Hinstr'; [|simpl; lia].
-      simpl length in Hinstr, Hinstr'.
+      simpl length in Hinstr.
+      rewrite lookup_app_r in Hinstr; [|rewrite push_instrs_length /=; lia].
+      rewrite push_instrs_length in Hinstr. simpl length in Hinstr.
       rewrite lookup_app_r in Hinstr; [|rewrite push_instrs_length map_length; lia].
+      rewrite lookup_app_r in Hinstr; [|rewrite rclear_instrs_length all_registers_list_difference_length // push_instrs_length map_length; lia].
+      rewrite rclear_instrs_length all_registers_list_difference_length // push_instrs_length map_length in Hinstr.
+      rewrite call_instrs_prologue_length lookup_app_r in Hinstr'; [|simpl; lia].
+      rewrite lookup_app_r in Hinstr'; [|simpl; lia].
+      simpl length in Hinstr'.
+      rewrite lookup_app_r in Hinstr'; [|rewrite push_instrs_length /=; lia].
+      rewrite push_instrs_length in Hinstr'. simpl length in Hinstr'.
       rewrite lookup_app_r in Hinstr'; [|rewrite push_instrs_length map_length; lia].
-      simpl length in Hinstr, Hinstr'.
-      rewrite push_instrs_length map_length in Hinstr.
-      rewrite push_instrs_length map_length in Hinstr'.
-      rewrite lookup_app_r in Hinstr; [|rewrite rclear_instrs_length all_registers_list_difference_length //; lia].
-      rewrite lookup_app_r in Hinstr'; [|rewrite rclear_instrs_length all_registers_list_difference_length //; lia].
-      rewrite rclear_instrs_length all_registers_list_difference_length // in Hinstr.
-      rewrite rclear_instrs_length all_registers_list_difference_length // in Hinstr'.
-      rewrite lookup_app_l in Hinstr; [|simpl length; lia].
-      rewrite lookup_app_l in Hinstr'; [|simpl length; lia].
-      replace (77 + length rargs1 - 39 - 4 - 3 - 1 - length rargs1 - 30) with 0 in Hinstr by lia.
-      replace (77 + length rargs1 - 39 - 4 - 3 - 1 - length rargs2 - 30) with 0 in Hinstr' by lia.
+      rewrite lookup_app_r in Hinstr'; [|rewrite rclear_instrs_length all_registers_list_difference_length // push_instrs_length map_length; lia].
+      rewrite rclear_instrs_length all_registers_list_difference_length // push_instrs_length map_length in Hinstr'.
+      replace (140 + length rargs1 - 102 - 4 - 3 - 1 - length rargs1 - 30) with 0 in Hinstr by lia.
+      replace (140 + length rargs1 - 102 - 4 - 3 - 1 - length rargs2 - 30) with 0 in Hinstr' by lia.
       simpl in Hinstr, Hinstr'. rewrite -Hinstr' in Hinstr. inversion Hinstr.
       eapply encode_instr_inj in H1. inversion H1; auto. }
     destruct (nat_eq_dec (length rargs1) 0).
     { eapply nil_length_inv in e0. subst rargs1.
       destruct rargs2; auto. simpl in Hleneq. inversion Hleneq. }
     assert (Hpush_regs_eq: forall i, i < length rargs1 -> (push_instrs (map (fun r => inr r) rargs1)) !! i = (push_instrs (map (fun r => inr r) rargs2)) !! i).
-    { intros. destruct (HA8 (47 + i) ltac:(lia)) as [a_i [Ha_i Hinstr]].
-      destruct (HB8 (47 + i) ltac:(lia)) as [a_i' [Ha_i' Hinstr']].
+    { intros. destruct (HA8 (110 + i) ltac:(lia)) as [a_i [Ha_i Hinstr]].
+      destruct (HB8 (110 + i) ltac:(lia)) as [a_i' [Ha_i' Hinstr']].
       rewrite Ha_i' in Ha_i; inversion Ha_i; subst.
       rewrite /call_instrs in Hinstr, Hinstr'.
       rewrite lookup_app_r in Hinstr; [|rewrite call_instrs_prologue_length; lia].
@@ -974,8 +976,8 @@ Section opsem.
       simpl length in Hinstr, Hinstr'.
       rewrite lookup_app_l in Hinstr; [|rewrite push_instrs_length map_length; lia].
       rewrite lookup_app_l in Hinstr'; [|rewrite push_instrs_length map_length; lia].
-      replace (47 + i - 39 - 4 - 3 - 1) with i in Hinstr by lia.
-      replace (47 + i - 39 - 4 - 3 - 1) with i in Hinstr' by lia.
+      replace (110 + i - 102 - 4 - 3 - 1) with i in Hinstr by lia.
+      replace (110 + i - 102 - 4 - 3 - 1) with i in Hinstr' by lia.
       rewrite -Hinstr' in Hinstr; inversion Hinstr. auto. }
     assert (Hpush_regs_eq': push_instrs (map (λ r : RegName, inr r) rargs1) = push_instrs (map (λ r : RegName, inr r) rargs2)).
     { eapply list_eq_same_length; [eauto|rewrite !push_instrs_length !map_length //|].
@@ -1011,21 +1013,12 @@ Section opsem.
         stack d ((reg φ, stk φ)::(callstack φ)) = Some m ->
         decodeInstrW' (m !m! a) = i →
         exec i φ = c →
-        (~ exists rf rargs, is_call (reg φ) rf rargs m a e) ->
         step (Executable, φ) (c.1, c.2)
   | step_exec_call:
       forall φ p g b e a c rf rargs,
         RegLocate (reg φ) PC = inr (Regular ((p, g), b, e, a)) ->
         isCorrectPC ((reg φ) !r! PC) →
         is_call (reg φ) rf rargs (mem φ) a e ->
-        c = exec_call φ rf rargs ->
-        step (Executable, φ) (c.1, c.2)
-  | step_exec_call':
-      forall φ d p b e a c m rf rargs,
-        RegLocate (reg φ) PC = inr (Stk d p b e a) ->
-        isCorrectPC ((reg φ) !r! PC) →
-        stack d ((reg φ, stk φ)::(callstack φ)) = Some m ->
-        is_call (reg φ) rf rargs m a e ->
         c = exec_call φ rf rargs ->
         step (Executable, φ) (c.1, c.2).
 
@@ -1144,10 +1137,7 @@ Section opsem.
           do 2 eexists. eapply step_exec_call; eauto.
         * do 2 eexists; eapply step_exec_instr; eauto.
       + destruct (stack d ((reg φ, stk φ)::(callstack φ))) as [m|] eqn:Hstk.
-        * destruct (is_call_dec (reg φ) m a e) as [Hiscall|Hiscall].
-          { destruct Hiscall as [rf [rargs Hiscall]].
-            do 2 eexists. eapply step_exec_call'; eauto. }
-          { do 2 eexists; eapply step_exec_instr'; eauto. }
+        * do 2 eexists; eapply step_exec_instr'; eauto.
         * do 2 eexists. eapply step_exec_fail'; eauto.
     - exists Failed, φ. constructor 1; eauto.
   Qed.
@@ -1163,36 +1153,16 @@ Section opsem.
     - rewrite H4 in H6; inv H6.
       elim H10. eauto.
     - rewrite H4 in H6; inv H6.
-      rewrite H9 in H8; inv H8.
-      elim H11. eauto.
-    - rewrite H4 in H6; inv H6.
       elim H11. eauto.
     - rewrite H4 in H6; inv H6.
       destruct (is_call_determ _ _ _ _ _ _ _ _ H8 H9) as [<- <-].
-      reflexivity.
-    - rewrite H4 in H6; inv H6.
-      rewrite H10 in H8; inv H8.
-      elim H13. eauto.
-    - rewrite H4 in H6; inv H6.
-      rewrite H10 in H8; inv H8.
-      destruct (is_call_determ _ _ _ _ _ _ _ _ H11 H9) as [<- <-].
       reflexivity.
     - rewrite H4 in H6; inv H6.
       elim H10. eauto.
     - rewrite H4 in H6; inv H6.
-      rewrite H9 in H8; inv H8.
-      elim H11. eauto.
-    - rewrite H4 in H6; inv H6.
       elim H11. eauto.
     - rewrite H4 in H6; inv H6.
       destruct (is_call_determ _ _ _ _ _ _ _ _ H8 H9) as [<- <-].
-      reflexivity.
-    - rewrite H4 in H6; inv H6.
-      rewrite H10 in H8; inv H8.
-      elim H13. eauto.
-    - rewrite H4 in H6; inv H6.
-      rewrite H10 in H8; inv H8.
-      destruct (is_call_determ _ _ _ _ _ _ _ _ H11 H9) as [<- <-].
       reflexivity.
   Qed.
 
@@ -1409,10 +1379,6 @@ Proof.
       * case_eq (exec (decodeInstrW' (m !m! a)) σ); intros.
         destruct c; eauto.
         generalize (exec_not_executable (decodeInstrW' (m !m! a)) σ).
-        rewrite H1. simpl; congruence.
-      * case_eq (exec_call σ rf rargs); intros.
-        destruct c; eauto.
-        generalize (exec_call_not_executable σ rf rargs).
         rewrite H1. simpl; congruence.
       * case_eq (exec_call σ rf rargs); intros.
         destruct c; eauto.
