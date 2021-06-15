@@ -82,9 +82,9 @@ Section call.
                     ++ List.map inl pop_env_instrs
                     ++ [ inl (encodeInstr (LoadU PC r_stk (inl (- 1)%Z)))])
     ++ [ inl (encodeInstr (Mov (R 1 eq_refl) (inr PC)))
-       ; inl (encodeInstr (Lea (R 1 eq_refl) (inl (43 + length rargs)%Z))) (* offset to beginning of environment restoration *)]
+       ; inl (encodeInstr (Lea (R 1 eq_refl) (inl (41 + length rargs)%Z))) (* offset to beginning of environment restoration *)]
     (* Replace placeholder with return point *)
-    ++ [inl (encodeInstr (StoreU r_stk (inl (- 109)%Z) (inr (R 1 eq_refl))))].
+    ++ [inl (encodeInstr (StoreU r_stk (inl (- 99)%Z) (inr (R 1 eq_refl))))].
 
   Lemma call_instrs_prologue_length:
     forall rargs, length (call_instrs_prologue rargs) = 102.
