@@ -107,7 +107,7 @@ Section call.
     (* Push return capability *)
     ++ push_instrs [inr (R 0 eq_refl)]
     (* Push all arguments *)
-    ++ push_instrs (map (fun r => inr r) rargs)
+    ++ push_instrs (map inr rargs)
     (* Clear all registers *)
     ++ rclear_instrs (list_difference all_registers [PC; r; r_stk])
     (* Jump to callee *)

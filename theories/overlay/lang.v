@@ -838,7 +838,10 @@ Section opsem.
     end.
 
   (* Simplification for now: do not allow passing stack derived capabilities *)
-  (* Definition is_reasonable (cs: list Stackframe) (a: Addr) (w: base.Word): Prop := *)
+  (* Definition is_reasonable (cs: list Stackframe) (a: Addr) (w: base.Word): Prop := 
+     match cs with
+     | [] => True
+     | (reg, sf):: cs => *)
   Definition is_reasonable (w: base.Word): Prop :=
     match w with
     | inl _ => True
@@ -860,8 +863,8 @@ Section opsem.
 
   Definition is_call (regs: base.Reg) rf rargs (m: base.Mem) a e: Prop :=
     exists a',
-      rf <> PC /\
-      rf <> r_stk /\
+      PC ∉ rf::rargs /\
+      r_stk ∉ rf::rargs /\
       (R 0 eq_refl) ∉ rf::rargs /\
       (R 1 eq_refl) ∉ rf::rargs /\
       (R 2 eq_refl) ∉ rf::rargs /\
@@ -869,7 +872,7 @@ Section opsem.
       (a' < e)%a /\
       (forall i, (i < (141 + length rargs))%nat ->
             exists a_i, (a + i)%a = Some a_i /\ (call_instrs rf rargs) !! i = m !! a_i) /\
-      (forall r, r ∈ rargs -> is_reasonable (regs !r! r)).
+      (forall r, r ∈ rf::rargs -> is_reasonable (regs !r! r)).
 
   Lemma is_call_determ:
     forall regs rf1 rf2 rargs1 rargs2 m a e,
@@ -880,6 +883,10 @@ Section opsem.
     Local Opaque app. (* Hack so Qed terminates *)
     intros. destruct H0 as [a' [HA1 [HA2 [HA3 [HA4 [HA5 [HA6 [HA7 [HA8 HA9]]]]]]]]].
     destruct H1 as [a'' [HB1 [HB2 [HB3 [HB4 [HB5 [HB6 [HB7 [HB8 HB9]]]]]]]]].
+    eapply not_elem_of_cons in HA1. destruct HA1 as [HA1 HA1'].
+    eapply not_elem_of_cons in HA2. destruct HA2 as [HA2 HA2'].
+    eapply not_elem_of_cons in HB1. destruct HB1 as [HB1 HB1'].
+    eapply not_elem_of_cons in HB2. destruct HB2 as [HB2 HB2'].
     assert (Hleneq: length rargs1 = length rargs2).
     { destruct (HA8 100 ltac:(lia)) as [a_i [Ha_i Hinstr]].
       destruct (HB8 100 ltac:(lia)) as [a_i' [Ha_i' Hinstr']].
@@ -1092,12 +1099,14 @@ Section opsem.
     - intros. destruct H0 as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
       revert HD HE. clear. intros HD HE.
       eapply Nat.leb_le. solve_addr.
-    - intros rargs. destruct (reg_eq_dec rf PC).
+    - intros rargs. destruct (elem_of_list_dec PC (rf::rargs)).
       { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
         eapply HPC; auto. }
-      destruct (reg_eq_dec rf r_stk).
+      destruct (elem_of_list_dec r_stk (rf::rargs)).
       { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
         eapply Hstk; auto. }
+      eapply not_elem_of_cons in n; destruct n as [n Hn].
+      eapply not_elem_of_cons in n0; destruct n0 as [n0 Hn0].
       destruct (elem_of_list_dec (R 0 eq_refl) (rf::rargs)).
       { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
         eapply HA; auto. }
@@ -1130,11 +1139,11 @@ Section opsem.
             rewrite call_instrs_length; auto. eapply fin_to_nat_lt.
         - right; intros [a_i' [A B]].
           inversion A. }
-      assert (Decision (∀ r : RegName, r ∈ rargs → is_reasonable (regs !r! r))).
-      { clear. induction rargs.
+      assert (Decision (∀ r : RegName, r ∈ rf::rargs → is_reasonable (regs !r! r))).
+      { clear. induction (rf::rargs).
         - left. intros. inversion H.
         - destruct (is_reasonable_dec (regs !r! a)).
-          + destruct IHrargs.
+          + destruct IHl.
             * left. intros. eapply elem_of_cons in H.
               destruct H; [subst a|]; auto.
             * right. red; intros. eapply n.
@@ -1146,7 +1155,7 @@ Section opsem.
            eapply n4. intros. eapply (HF (fin_to_nat i)).
            generalize (fin_to_nat_lt i). lia. }
       destruct H1.
-      { left. exists a'. repeat split; eauto.
+      { left. exists a'. repeat split; eauto; [eapply not_elem_of_cons; auto|eapply not_elem_of_cons; auto|].
         intros. assert (i0 < (141 + length rargs)) by lia.
         generalize (e0 (nat_to_fin H1)). rewrite fin_to_nat_to_fin. auto. }
       right. intro X. destruct X as [a'' [HPC [Hstk [HA [HB [HC [HD [HE [HF HG]]]]]]]]].
