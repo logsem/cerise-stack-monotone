@@ -53,7 +53,9 @@ Section cap_lang_rules.
               (insert_commute _ PC dst) // insert_insert.
       iDestruct (regs_of_map_3 with "Hmap") as "(?&?&?)"; eauto; iFrame. done. }
     { (* Failure (contradiction) *)
-      destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto. congruence. }
+      destruct Hfail; try incrementPC_inv; simplify_map_eq; eauto. inversion e1. congruence.
+      inv Hvpc. destruct H5 as [? | [? | [? | [? | ?]]]]; destruct H12 as [? | [? | ?]]; congruence.
+    }
   Qed.
 
   (* store and increment *)
@@ -111,6 +113,10 @@ Section cap_lang_rules.
        all: try congruence.
        erewrite wb_implies_verify_access in e4; eauto. simplify_eq. congruence.
        erewrite wb_implies_verify_access in e4; eauto. simplify_eq.
+       destruct e8. congruence. destruct H6 as [?|[?|[?|[?|?]]]]; inv Hvpc; destruct H13 as [?|[?|?]].
+       all: try congruence.
+       destruct e7. congruence. destruct H6 as [?|[?|[?|[?|?]]]]; inv Hvpc; destruct H13 as [?|[?|?]].
+       all: try congruence.
        Unshelve. all:auto.
      }
   Qed.
@@ -210,6 +216,10 @@ Section cap_lang_rules.
        all: try congruence.
        erewrite wb_implies_verify_access in e4; eauto. simplify_eq. congruence.
        erewrite wb_implies_verify_access in e4; eauto. simplify_eq.
+       destruct e8. congruence. destruct H4 as [?|[?|[?|[?|?]]]]; inv Hvpc;destruct H11 as [?|[?|?]].
+       all: try congruence.
+       destruct e7. congruence. destruct H4 as [?|[?|[?|[?|?]]]]; inv Hvpc; destruct H11 as [?|[?|?]].
+       all: try congruence.
        Unshelve. all:auto.
      }
   Qed.
@@ -263,6 +273,10 @@ Section cap_lang_rules.
        all: try congruence.
        erewrite wb_implies_verify_access in e4; eauto. simplify_eq.
        Unshelve. all:auto.
+       destruct e8. congruence. destruct H4 as [?|[?|[?|[?|?]]]]; inv Hvpc; destruct H11 as [?|[?|?]].
+       all: try congruence.
+       destruct e7. congruence. destruct H4 as [?|[?|[?|[?|?]]]]; inv Hvpc; destruct H11 as [?|[?|?]].
+       all: try congruence.
      }
   Qed.
 

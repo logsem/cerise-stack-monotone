@@ -134,15 +134,21 @@ Section Linking.
   Inductive link: component -> component -> component -> Prop :=
   | link_lib_lib:
       forall comp1 comp2 comp
-        (Hlink: link_pre_comp comp1 comp2 comp),
+        (Hlink: link_pre_comp comp1 comp2 comp)
+        (Hwf_l: well_formed_comp (Lib comp1))
+        (Hwf_r: well_formed_comp (Lib comp2)),
         link (Lib comp1) (Lib comp2) (Lib comp)
   | link_lib_main:
       forall comp1 comp2 comp w_main
-        (Hlink: link_pre_comp comp1 comp2 comp),
+        (Hlink: link_pre_comp comp1 comp2 comp)
+        (Hwf_l: well_formed_comp (Lib comp1))
+        (Hwf_r: well_formed_comp (Main comp2 w_main)),
         link (Lib comp1) (Main comp2 w_main) (Main comp w_main)
   | link_main_lib:
       forall comp1 comp2 comp w_main
-        (Hlink: link_pre_comp comp1 comp2 comp),
+        (Hlink: link_pre_comp comp1 comp2 comp)
+        (Hwf_l: well_formed_comp (Main comp1 w_main))
+        (Hwf_r: well_formed_comp (Lib comp2)),
         link (Main comp1 w_main) (Lib comp2) (Main comp w_main).
 
   Inductive is_context (c comp p: component): Prop :=
