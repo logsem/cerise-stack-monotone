@@ -837,32 +837,7 @@ Section opsem.
     | inr _ => Fail
     end.
 
-  Definition exec_call (φ: ExecConf) (rf: RegName) (rargs: list RegName): Conf :=
-    match (reg φ) !r! r_stk with
-    | inr (Stk d URWLX b e a) =>
-      match exec_instrs (List.map decodeInstrW' (call_instrs_prologue rargs)) φ with
-      | None => (Failed, φ)
-      | Some φ' =>
-        match (reg φ') !r! r_stk with
-        | inr (Stk d URWLX b e a') =>
-          let saved_regs := <[PC := addPC ((reg φ) !r! PC) (142 + length rargs)]> (reg φ) in
-          let saved_stk := clear_stk (stk φ') a' in
-          let new_stk_cap := Stk (d + 1) URWLX a' e ^(a' + 1)%a in
-          let new_stk := <[a' := inr (Ret b a' ^(a' + (-6)%Z)%a)]> (∅: base.Mem) in
-          let interm_state := (<[r_stk := inr new_stk_cap]> (reg φ'), mem φ', new_stk, (saved_regs, saved_stk)::callstack φ') in
-          match exec_instrs (List.map decodeInstrW' (push_instrs (map (fun r => inr r) rargs))) interm_state with
-          | None => (Failed, φ)
-          | Some φ'' =>
-            let new_regs := <[PC := (updatePcPerm (RegLocate (reg φ'') rf))]> (clear_regs (reg φ'') (list_difference all_registers [PC; rf; r_stk])) in
-            (NextI, (new_regs, mem φ'', stk φ'', callstack φ''))
-          end
-        | _ => (Failed, φ)
-        end
-      end
-    | _ => (Failed, φ)
-    end.
-
-  (* Simplification: do not allow passing stack derived capabilities *)
+  (* Simplification for now: do not allow passing stack derived capabilities *)
   (* Definition is_reasonable (cs: list Stackframe) (a: Addr) (w: base.Word): Prop := *)
   Definition is_reasonable (w: base.Word): Prop :=
     match w with
@@ -890,10 +865,10 @@ Section opsem.
       (R 0 eq_refl) ∉ rf::rargs /\
       (R 1 eq_refl) ∉ rf::rargs /\
       (R 2 eq_refl) ∉ rf::rargs /\
-      (a + (142 + length rargs))%a = Some a' /\
+      (a + (141 + length rargs))%a = Some a' /\
       (a' < e)%a /\
-      (forall i, (i <= (141 + length rargs))%nat ->
-            exists a_i, (a + i)%a = Some a_i /\ (call_instrs rf rargs) !! i = Some (m !m! a_i)) /\
+      (forall i, (i < (141 + length rargs))%nat ->
+            exists a_i, (a + i)%a = Some a_i /\ (call_instrs rf rargs) !! i = m !! a_i) /\
       (forall r, r ∈ rargs -> is_reasonable (regs !r! r)).
 
   Lemma is_call_determ:
@@ -988,6 +963,52 @@ Section opsem.
     inversion 1; auto.
   Qed.
 
+  (* Pushing a list of words starting at address a *)
+  Definition push_words (stk: base.Mem) (a: Addr) (ws: list base.Word) :=
+    match (foldl (fun oastk w => match oastk with None => None | Some (a, stk) => if canStoreU URWLX a w then Some (^(a + 1)%a, <[a:=w]> stk) else None end) (Some (a, stk)) ws) with
+    | Some (_, stk) => Some stk
+    | None => None
+    end.
+
+  Definition exec_call (φ: ExecConf) (rf: RegName) (rargs: list RegName) pcp pcg (pcb pce pca: Addr): Conf :=
+    match pcg with
+    | Monotone => (Failed, φ) (* Can't store PC if it's monotone because we currently assume heap is above stack *)
+    | _ =>
+    match (reg φ) !r! r_stk with
+    | inr (Stk d URWLX b e a) =>
+      if (Addr_le_dec b a) then
+      (* We know that d = length (callstack φ) *)
+      match (a + (100 + length rargs))%a with
+      | Some a' => match (pca + (length (call_instrs rf rargs)))%a with
+                   | Some pca' =>
+                     if (Addr_le_dec a' e) then
+                     let saved_regs := <[PC := inr (Regular (pcp, pcg, pcb, pce, pca'))]> (<[r_stk := inr (Stk d URWLX b e ^(a + 1)%a)]> (reg φ)) in
+                     match push_words (stk φ) a ([inr (Regular (pcp, pcg, pcb, pce, ^(pca' + -1)%a))] ++ (map (fun r => ((reg φ) !r! r)) (list_difference all_registers [PC; r_stk])) ++ [inr (Stk d URWLX b e ^(a + 32)%a)] ++ ([inl (encodeInstr (Mov (R 1 eq_refl) (inr PC))); inl (encodeInstr (Lea (R 1 eq_refl) (inl (- 1)%Z))); inl (encodeInstr (Load r_stk (R 1 eq_refl)))] ++ List.map inl pop_env_instrs ++ [inl (encodeInstr (LoadU PC r_stk (inl (- 1)%Z)))])) with
+                     | Some saved_stk =>
+                       match push_words ∅ ^(a + 99)%a ([inr (Ret b ^(a + 99)%a ^(a + 33)%a)] ++ (map (fun r => ((reg φ) !r! r)) rargs)) with
+                       | Some new_stk => (NextI, (<[PC := updatePcPerm ((reg φ !r! rf))]> (<[r_stk := inr (Stk (d + 1) URWLX ^(a + 99)%a e ^(a + (100 + length rargs))%a)]> (<[rf := (reg φ) !r! rf]> (gset_to_gmap (inl 0%Z) (list_to_set all_registers)))), new_stk, mem φ, (saved_regs, saved_stk)::callstack φ))
+                       | None => (Failed, φ)
+                       end
+                     | None => (Failed, φ)
+                     end
+                     else (Failed, φ)
+                   | None => (Failed, φ)
+                   end
+      | None => (Failed, φ) (* Not enough space to push everything on the stack *)
+      end
+      else (Failed, φ)
+    | _ => 
+      (* Won't be able to store the return capability if not URWLX *)
+      (Failed, φ)
+    end
+    end.
+
+  Definition depth_of (w: base.Word): option nat :=
+    match w with
+    | inr (Stk d _ _ _ _) => Some d
+    | _ => None
+    end.
+
   Inductive step: Conf → Conf → Prop :=
   | step_exec_fail:
       forall φ,
@@ -1004,7 +1025,7 @@ Section opsem.
         isCorrectPC ((reg φ) !r! PC) →
         decodeInstrW' ((mem φ) !m! a) = i →
         exec i φ = c →
-        (~ exists rf rargs, is_call (reg φ) rf rargs (mem φ) a e) ->
+        (~ exists rf rargs, is_call (reg φ) rf rargs (mem φ) a e /\ (exec_call φ rf rargs p g b e a).1 = NextI) \/ (match depth_of ((reg φ) !r! r_stk) with Some d => d <> length (callstack φ) | None => True end) ->
         step (Executable, φ) (c.1, c.2)
   | step_exec_instr':
       forall φ d p b e a i c m,
@@ -1015,12 +1036,13 @@ Section opsem.
         exec i φ = c →
         step (Executable, φ) (c.1, c.2)
   | step_exec_call:
-      forall φ p g b e a c rf rargs,
+      forall φ p g b e a φ' rf rargs,
         RegLocate (reg φ) PC = inr (Regular ((p, g), b, e, a)) ->
         isCorrectPC ((reg φ) !r! PC) →
         is_call (reg φ) rf rargs (mem φ) a e ->
-        c = exec_call φ rf rargs ->
-        step (Executable, φ) (c.1, c.2).
+        depth_of ((reg φ) !r! r_stk) = Some (length (callstack φ)) ->
+        exec_call φ rf rargs p g b e a  = (NextI, φ') ->
+        step (Executable, φ) (NextI, φ').
 
   (* TODO: move into stdpp_extra and maybe upstream *)
   Global Instance lists_finite {A} `{Finite A} n:
@@ -1085,23 +1107,27 @@ Section opsem.
       destruct (elem_of_list_dec (R 2 eq_refl) (rf::rargs)).
       { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
         eapply HC; auto. }
-      destruct ((a + (142 + length rargs))%a) as [a'|] eqn:Ha'.
+      destruct ((a + (141 + length rargs))%a) as [a'|] eqn:Ha'.
       2: { right. intro X. destruct X as [a' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
            congruence. }
       destruct (Addr_lt_dec a' e).
       2: { right. intro X. destruct X as [a'' [HPC [Hstk [HA [HB [HC [HD [HE HF]]]]]]]].
            rewrite HD in Ha'; inversion Ha'; subst.
            eapply n4; auto. }
-      assert (Decision (∀ (i : fin (S (141 + length rargs))), ∃ a_i : Addr, (a + fin_to_nat i)%a = Some a_i ∧ call_instrs rf rargs !! (fin_to_nat i) = Some (m !m! a_i))).
+      assert (Decision (∀ (i : fin (141 + length rargs)), ∃ a_i : Addr, (a + fin_to_nat i)%a = Some a_i ∧ call_instrs rf rargs !! (fin_to_nat i) = m !! a_i)).
       { eapply forall_dec. intros. destruct (a + x)%a as [a_i|] eqn:Ha_i.
         - case_eq ((call_instrs rf rargs) !! (fin_to_nat x)); intros.
-          + destruct (base.word_eq_dec w (m !m! a_i)).
-            * subst w. left; eauto.
+          + destruct (m !! a_i) as [w'|] eqn:Hw'.
+            * destruct (base.word_eq_dec w w').
+              { subst w; left; eauto. }
+              { right. intros [a_i' [A B]].
+                inversion A; subst a_i'; clear A.
+                rewrite B in H0; inversion H0; subst. congruence. }
             * right. intros [a_i' [A B]].
               inversion A; subst a_i'; clear A.
               rewrite B in H0; inversion H0; subst. congruence.
-          + right. intros [a_i' [A B]].
-            rewrite B in H0; inversion H0.
+          + exfalso. rewrite list_lookup_lookup_total_lt in H0; [congruence|].
+            rewrite call_instrs_length; auto. eapply fin_to_nat_lt.
         - right; intros [a_i' [A B]].
           inversion A. }
       assert (Decision (∀ r : RegName, r ∈ rargs → is_reasonable (regs !r! r))).
@@ -1121,7 +1147,7 @@ Section opsem.
            generalize (fin_to_nat_lt i). lia. }
       destruct H1.
       { left. exists a'. repeat split; eauto.
-        intros. assert (i0 < S (141 + length rargs)) by lia.
+        intros. assert (i0 < (141 + length rargs)) by lia.
         generalize (e0 (nat_to_fin H1)). rewrite fin_to_nat_to_fin. auto. }
       right. intro X. destruct X as [a'' [HPC [Hstk [HA [HB [HC [HD [HE [HF HG]]]]]]]]].
       eapply n4; auto.
@@ -1134,8 +1160,23 @@ Section opsem.
     - inversion i; subst.
       + destruct (is_call_dec (reg φ) (mem φ) a e) as [Hiscall|Hiscall].
         * destruct Hiscall as [rf [rargs Hiscall]].
-          do 2 eexists. eapply step_exec_call; eauto.
+          destruct (depth_of (RegLocate (reg φ) r_stk)) eqn:X.
+          { destruct (nat_eq_dec n (length (callstack φ))).
+            - subst n.
+              + destruct (exec_call φ rf rargs p g b e a) as [cf φ'] eqn:Hexec.
+                assert (cf = NextI \/ cf <> NextI) as [->|Hne] by (destruct cf; auto).
+                * do 2 eexists. eapply step_exec_call; eauto.
+                * do 2 eexists; eapply step_exec_instr; eauto.
+                  left. intro Y. destruct Y as [rf' [rargs' [HY HZ]]].
+                  generalize (is_call_determ _ _ _ _ _ _ _ _ HY Hiscall).
+                  intros [-> ->]. rewrite Hexec /= in HZ. elim Hne; auto.
+            - do 2 eexists; eapply step_exec_instr; eauto.
+              right; rewrite X /=; auto. }
+          { do 2 eexists; eapply step_exec_instr; eauto.
+            right; rewrite X /=; auto. }
         * do 2 eexists; eapply step_exec_instr; eauto.
+          left. intro X. eapply Hiscall. destruct X as [rf [rargs [Hiscall' ?]]].
+          eauto.
       + destruct (stack d ((reg φ, stk φ)::(callstack φ))) as [m|] eqn:Hstk.
         * do 2 eexists; eapply step_exec_instr'; eauto.
         * do 2 eexists. eapply step_exec_fail'; eauto.
@@ -1151,19 +1192,16 @@ Section opsem.
     Ltac inv H := inversion H; clear H; subst.
     intros * H1 H2; split; inv H1; inv H2; auto; try congruence.
     - rewrite H4 in H6; inv H6.
-      elim H10. eauto.
+      destruct H10 as [X | X]; [elim X; eexists; eexists; split; eauto; rewrite H11; eauto|rewrite H9 in X; elim X; eauto].
     - rewrite H4 in H6; inv H6.
-      elim H11. eauto.
+      destruct H13 as [X | X]; [elim X; eexists; eexists; split; eauto; rewrite H10; eauto|rewrite H9 in X; elim X; eauto].
     - rewrite H4 in H6; inv H6.
-      destruct (is_call_determ _ _ _ _ _ _ _ _ H8 H9) as [<- <-].
-      reflexivity.
+      destruct H10 as [X | X]; [elim X; eexists; eexists; split; eauto; rewrite H11; eauto|rewrite H9 in X; elim X; eauto].
     - rewrite H4 in H6; inv H6.
-      elim H10. eauto.
+      destruct H13 as [X | X]; [elim X; eexists; eexists; split; eauto; rewrite H10; eauto|rewrite H9 in X; elim X; eauto].
     - rewrite H4 in H6; inv H6.
-      elim H11. eauto.
-    - rewrite H4 in H6; inv H6.
-      destruct (is_call_determ _ _ _ _ _ _ _ _ H8 H9) as [<- <-].
-      reflexivity.
+      destruct (is_call_determ _ _ _ _ _ _ _ _ H8 H11) as [<- <-].
+      rewrite H10 in H13; inv H13; auto.
   Qed.
 
   Inductive val: Type :=
@@ -1356,8 +1394,8 @@ Proof.
 Qed.
 
 Lemma exec_call_not_executable `{MachineParameters}:
-  forall σ rf rargs,
-    (exec_call σ rf rargs).1 <> Executable.
+  forall σ rf rargs p g b e a,
+    (exec_call σ rf rargs p g b e a).1 <> Executable.
 Proof.
   intros. rewrite /exec_call.
   repeat match goal with
@@ -1379,10 +1417,6 @@ Proof.
       * case_eq (exec (decodeInstrW' (m !m! a)) σ); intros.
         destruct c; eauto.
         generalize (exec_not_executable (decodeInstrW' (m !m! a)) σ).
-        rewrite H1. simpl; congruence.
-      * case_eq (exec_call σ rf rargs); intros.
-        destruct c; eauto.
-        generalize (exec_call_not_executable σ rf rargs).
         rewrite H1. simpl; congruence.
     + inversion Ha.
   - intros K e' -> Hval%eq_None_not_Some.
