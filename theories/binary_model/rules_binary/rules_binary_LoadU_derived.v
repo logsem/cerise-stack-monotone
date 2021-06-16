@@ -71,6 +71,8 @@ Section cap_lang_rules.
        all: try congruence.
        erewrite  wb_implies_verify_access in e4;eauto. simplify_eq.
        Unshelve. all:auto.
+       destruct e6. congruence. destruct H6 as [?|[?|[?|[?|?]]]]; inv Hvpc; destruct H13 as [?|[?|?]].
+       all: try congruence.
      }
   Qed.
 
@@ -110,6 +112,7 @@ Section cap_lang_rules.
   Lemma step_loadU_success_reg_to_PC_any E K r1 r2 zoff pc_p pc_g pc_b pc_e pc_a w p g b e a a1 p' g' b' e' a' a'' :
     decodeInstrW w = LoadU PC r1 (inr r2)  →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
+    (isU p' = false ∧ p' ≠ machine_base.E) → (* if an uninitialized capability is loaded into the PC, the instruction fails *)
     isU p = true -> (a1 <= e)%a →
     withinBounds ((p, g), b, a1, a) = true →
     (a' + 1)%a = Some a'' →
@@ -131,7 +134,7 @@ Section cap_lang_rules.
         ∗ r2 ↣ᵣ inl zoff
         ∗ a ↣ₐ inr ((p',g'),b',e',a').
   Proof.
-    iIntros (Hinstr Hvpc HU Hwb Hwb2 Hpca' Hincr Hlt Hnclose)
+    iIntros (Hinstr Hvpc [HnU He] HU Hwb Hwb2 Hpca' Hincr Hlt Hnclose)
             "(#Hspec & Hj & >HPC & >Hi & >Hr1 & >Hr2 & >Ha)".
     iDestruct (map_of_regs_3 with "HPC Hr1 Hr2") as "[Hmap (%&%&%) ]".
     iDestruct (spec_memMap_resource_2ne_apply with "Hi Ha") as "[Hmem %]"; auto.
@@ -157,7 +160,9 @@ Section cap_lang_rules.
        destruct Hfail; simplify_map_eq; first congruence.
        all: erewrite  wb_implies_verify_access in e4;eauto.
        * by exfalso.
-       * simplify_map_eq. eapply (incrementPC_None_inv _ _ _ _ a') in e6; last by simplify_map_eq. congruence.
+       * simplify_map_eq. eapply (incrementPC_None_inv _ p' _ _ _ a') in e6.
+         destruct e6. congruence. 2: by simplify_map_eq.
+         destruct H6 as [?|[?|[?|[?|?]]]];subst; inv HnU. done.
        Unshelve. all:auto.
      }
   Qed.
@@ -166,6 +171,7 @@ Section cap_lang_rules.
   Lemma step_loadU_success_reg_to_PC E K r1 r2 pc_p pc_g pc_b pc_e pc_a w p g b e a a1 p' g' b' e' a' a'' :
     decodeInstrW w = LoadU PC r1 (inr r2)  →
     isCorrectPC (inr ((pc_p,pc_g),pc_b,pc_e,pc_a)) →
+    (isU p' = false ∧ p' ≠ machine_base.E) →
     isU p = true -> withinBounds ((p, g), b, e, a) = true →
     (a' + 1)%a = Some a'' →
     (a + 1)%a = Some a1 ->
@@ -185,7 +191,7 @@ Section cap_lang_rules.
         ∗ r2 ↣ᵣ inl (-1)%Z
         ∗ a ↣ₐ inr ((p',g'),b',e',a').
   Proof.
-    iIntros (Hinstr Hvpc HU Hwb Hpca' Hincr Hnclose)
+    iIntros (Hinstr Hvpc Hnu HU Hwb Hpca' Hincr Hnclose)
             "(#Hspec & Hj & >HPC & >Hi & >Hr1 & >Hr2 & >Ha)".
     iMod (step_loadU_success_reg_to_PC_any with "[$Hr1 $HPC $Hr2 $Hi $Ha $Hspec $Hj]");[..|iFrame];eauto.
     - apply withinBounds_le_addr in Hwb as [Hle Hlt]. solve_addr.
