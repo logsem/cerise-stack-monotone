@@ -33,7 +33,6 @@ Definition soundness_binaryΣ : gFunctors :=
    savedPredΣ (((STS_std_states Addr region_invariants_binary.region_type)
                 * (STS_states * STS_rels)) * (Word * Word))].
 
-(* FIXME: Really we should define a [soundnessG] as well. *)
 Global Instance inG_soundness_binaryΣ Σ : subG soundness_binaryΣ Σ → inG Σ (authR cfgUR).
 Proof. solve_inG. Qed.
 
