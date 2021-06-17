@@ -983,7 +983,7 @@ Section opsem.
     | _ =>
     match (reg φ) !r! r_stk with
     | inr (Stk d URWLX b e a) =>
-      if (Addr_le_dec b a) then
+      if (Addr_lt_dec b a) then
       (* We know that d = length (callstack φ) *)
       match (a + (100 + length rargs))%a with
       | Some a' => match (pca + (length (call_instrs rf rargs)))%a with
@@ -993,7 +993,7 @@ Section opsem.
                      match push_words (stk φ) a ([inr (Regular (pcp, pcg, pcb, pce, ^(pca' + -1)%a))] ++ (map (fun r => ((reg φ) !r! r)) (list_difference all_registers [PC; r_stk])) ++ [inr (Stk d URWLX b e ^(a + 32)%a)] ++ ([inl (encodeInstr (Mov (R 1 eq_refl) (inr PC))); inl (encodeInstr (Lea (R 1 eq_refl) (inl (- 1)%Z))); inl (encodeInstr (Load r_stk (R 1 eq_refl)))] ++ List.map inl pop_env_instrs ++ [inl (encodeInstr (LoadU PC r_stk (inl (- 1)%Z)))])) with
                      | Some saved_stk =>
                        match push_words ∅ ^(a + 99)%a ([inr (Ret b ^(a + 99)%a ^(a + 33)%a)] ++ (map (fun r => ((reg φ) !r! r)) rargs)) with
-                       | Some new_stk => (NextI, (<[PC := updatePcPerm ((reg φ !r! rf))]> (<[r_stk := inr (Stk (d + 1) URWLX ^(a + 99)%a e ^(a + (100 + length rargs))%a)]> (<[rf := (reg φ) !r! rf]> (gset_to_gmap (inl 0%Z) (list_to_set all_registers)))), new_stk, mem φ, (saved_regs, saved_stk)::callstack φ))
+                       | Some new_stk => (NextI, (<[PC := updatePcPerm ((reg φ !r! rf))]> (<[r_stk := inr (Stk (d + 1) URWLX ^(a + 99)%a e ^(a + (100 + length rargs))%a)]> (<[rf := (reg φ) !r! rf]> (gset_to_gmap (inl 0%Z) (list_to_set all_registers)))), mem φ, new_stk, (saved_regs, clear_stk saved_stk ^(a + 99)%a)::callstack φ))
                        | None => (Failed, φ)
                        end
                      | None => (Failed, φ)
