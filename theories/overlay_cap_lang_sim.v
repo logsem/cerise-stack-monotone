@@ -407,16 +407,39 @@ Section overlay_to_cap_lang.
                          end
     end.
 
+  Lemma interp_updatePcPerm_regular:
+    forall c h stk cs,
+      interp (inr (Regular c)) h stk cs ->
+      forall stk' cs', interp (lang.updatePcPerm (inr (Regular c))) h stk' cs'.
+  Proof.
+    destruct c as [ [ [ [p g] b] e] a]; intros.
+    simpl. simpl in H0. destruct p; auto.
+  Qed.
+
+  Lemma interp_call_preserved:
+    forall w h stk cs,
+      is_reasonable w ->
+      interp w h stk cs ->
+      forall new_stk reg' stk',
+        interp w h new_stk ((reg', stk')::cs).
+  Proof.
+    destruct w; auto.
+    destruct c; simpl; intros; auto.
+    - inv H0.
+    - inv H0.
+  Qed.
+
   (* w is legally stored at address a *)
   Definition canBeStored (w: base.Word) (a: Addr): Prop :=
-    match w with
+    lang.canStoreU URWLX a w = true.
+  (*  match w with
     | inl _ => True
-    | inr (Regular (p, g, b, e, a)) => match g with
+    | inr (Regular (p, g, b, e, _)) => match g with
                                        | Monotone => (lang.canReadUpTo w <= a)%a
                                        | _ => True
                                        end
     | inr _ => (lang.canReadUpTo w <= a)%a
-    end.
+    end.*)
 
   Inductive sim_cs: bool -> base.Mem -> list Stackframe -> machine_base.Mem -> Prop :=
   | sim_cs_nil:
@@ -3383,7 +3406,200 @@ Section overlay_to_cap_lang.
                       + assert (d2 < length cs) by (eapply stack_is_Some; eauto).
                         simpl; destruct (nat_eq_dec d1 (length cs)); [lia|]. auto.
                       + simpl; destruct (nat_eq_dec d2 (length cs)); [lia|]. auto. }
-              + 
+              + econstructor; eauto.
+                * intros. destruct (reg_eq_dec PC r); [subst r; rewrite lookup_insert| rewrite lookup_insert_ne //].
+                  { eexists; split; [reflexivity|].
+                    assert (Hwrf_reasonable: is_reasonable wrf).
+                    { generalize (Hreasonable rf ltac:(eapply elem_of_cons; left; auto)).
+                      rewrite /base.RegLocate Hwrf //. }
+                    destruct wrf; simpl in Hwrf_reasonable; [simpl; auto|].
+                    destruct c0; [|inv Hwrf_reasonable..].
+                    eapply interp_updatePcPerm_regular; eauto. }
+                  destruct (reg_eq_dec call.r_stk r); [subst r; rewrite lookup_insert|rewrite lookup_insert_ne //].
+                  { eexists; split; [reflexivity|]. simpl.
+                    split; [lia|]. split; [destruct Hinterpwstk as [? [? ?] ]; auto|].
+                    intros. assert (Hwretargslen: length wretargs = 1 + length rargs) by (rewrite /wretargs app_length map_length //).
+                    generalize (@push_words_lookup_spec wretargs ∅ ^(a2 + 99)%a e new_stk ltac:(clear -Hastkend Hrange2 H6 Ha1b Hwretargslen; rewrite Hwretargslen; inv H6; solve_addr) Hnew_stk).
+                    intros [YY _].
+                    assert (x = ^(^(a2 + 99)%a + (Z.to_nat (z_of x - z_of ^(a2 + 99)%a)))%a) as ->.
+                    { clear -H1; solve_addr. }
+                    erewrite YY; [|rewrite Hwretargslen; clear -H1 Hastkend; solve_addr].
+                    erewrite list_lookup_lookup_total_lt; eauto.
+                    rewrite Hwretargslen; clear -H1 Hastkend; solve_addr. }
+                  destruct (reg_eq_dec rf r); [subst r; rewrite lookup_insert|rewrite lookup_insert_ne //].
+                  { eexists; split; [reflexivity|].
+                    eapply interp_call_preserved; eauto.
+                    generalize (Hreasonable rf ltac:(eapply elem_of_cons; left; auto)).
+                    rewrite /base.RegLocate Hwrf //. }
+                  exists (inl 0%Z); split; [|simpl; auto].
+                  eapply lookup_gset_to_gmap_Some; split; auto.
+                  eapply elem_of_list_to_set. eapply all_registers_correct.
+                * assert (Hwretargslen: length wretargs = 1 + length rargs) by (rewrite /wretargs app_length map_length //).
+                  generalize (@push_words_lookup_spec wretargs ∅ ^(a2 + 99)%a e new_stk ltac:(clear -Hastkend Hrange2 H6 Ha1b Hwretargslen; rewrite Hwretargslen; inv H6; solve_addr) Hnew_stk).
+                  intros [YY YZ].
+                  intros. destruct (Addr_lt_dec a3 ^(a2 + 99)%a).
+                  { erewrite YZ in H1; auto. rewrite lookup_empty in H1; inv H1. }
+                  destruct (Addr_le_dec ^(^(a2 + 99) + length wretargs)%a a3).
+                  { erewrite YZ in H1; auto. rewrite lookup_empty in H1; inv H1. }
+                  assert (a3 = ^(^(a2 + 99)%a + (Z.to_nat (z_of a3 - z_of ^(a2 + 99)%a)))%a) as ZZ.
+                  { clear -n n0; solve_addr. }
+                  assert (a3 < astkend)%a.
+                  { rewrite Hwretargslen in n0; clear -n0 Hastkend Hrange2 H6. inv H6. solve_addr. }
+                  clear n0.
+                  assert (Z.to_nat (a3 - ^(a2 + 99)%a) < length wretargs).
+                  { rewrite Hwretargslen; clear -Hrange2 H6 n H2 Hastkend; inv H6. solve_addr. }
+                  rewrite ZZ in H1. rewrite YY in H1; auto.
+                  destruct (Z.to_nat (a3 - ^(a2 + 99)%a)).
+                  { simpl in H1. inv H1. split.
+                    - replace (^(^(a2 + 99) + 0%nat)%a) with ^(a2 + 99)%a by (clear; solve_addr).
+                      replace mem2''' with (ac, mem2''').2 by reflexivity.
+                      rewrite -Hpush3. erewrite push_words_no_check_spec; [rewrite lookup_insert /= //| rewrite map_length..].
+                      + instantiate (1 := e). clear -Hastkend H6 Ha1b Hrange2; inv H6; solve_addr.
+                      + left. clear -Hastkend H6 Ha1b Hrange2; inv H6; solve_addr.
+                    - split; [|rewrite /canBeStored /lang.canStoreU /=; clear; eapply leb_addr_spec; solve_addr].
+                      rewrite /interp. eexists. eexists.
+                      split; [rewrite lookup_insert_ne; auto; rewrite lookup_insert; reflexivity|].
+                      split; [clear -Hastkend; solve_addr|].
+                      split; [do 5 eexists; split; [rewrite lookup_insert; reflexivity|]|].
+                      + split; [inv H6; auto|]. destruct (clear_stk_spec saved_stk ^(a2 + 99)%a) as [A B].
+                        rewrite B; [|clear -Hastkend; solve_addr].
+                        assert (^(a2 +length saved_words) < astkend)%a. 
+                        { rewrite /saved_words !app_length !map_length call.pop_env_instrs_length /=. 
+                          clear -Hastkend. solve_addr. }
+                        generalize (@push_words_lookup_spec saved_words stk a2 _ saved_stk H1 Hsaved_stk).
+                        intros [AA BB].
+                        assert (a2 = ^(a2 + 0)%a) as -> by (clear; solve_addr).
+                        rewrite (AA 0 ltac:(rewrite /saved_words !app_length !map_length call.pop_env_instrs_length /=; lia)). simpl.
+                        eexists; split; [reflexivity|]. clear -Hpcalt' Hpcaeq'; solve_addr.
+                      + split; [clear -Hstkrange1 Hastkend; solve_addr|].
+                        split; [clear -Hastkend Hrange2; solve_addr|].
+                        split; [clear; solve_addr|].
+                        split.
+                        { intros. assert (∃ ri : RegName, list_difference all_registers [PC; call.r_stk] !! i = Some ri) as [ri Hri] by (erewrite list_lookup_lookup_total_lt; simpl; eauto).
+                          eexists. split; eauto.
+                          rewrite lookup_insert_ne; [|intro; subst ri; eapply elem_of_list_lookup_2 in Hri; eapply elem_of_list_difference in Hri; destruct Hri as [_ Hri]; eapply Hri; eapply elem_of_cons; left; auto].
+                          rewrite lookup_insert_ne; [|intro; subst ri; eapply elem_of_list_lookup_2 in Hri; eapply elem_of_list_difference in Hri; destruct Hri as [_ Hri]; eapply Hri; eapply elem_of_cons; right; eapply elem_of_cons; left; auto].
+                          destruct (clear_stk_spec saved_stk ^(a2 + 99)%a) as [QQ WW].
+                          erewrite WW; [|clear -H1 Hastkend; solve_addr].
+                          assert (^(a2 + length saved_words) < astkend)%a. 
+                          { rewrite /saved_words !app_length !map_length call.pop_env_instrs_length /=. 
+                            clear -Hastkend. solve_addr. }
+                          generalize (@push_words_lookup_spec saved_words stk a2 _ saved_stk H4 Hsaved_stk). intros [AA BB].
+                          assert (UU: length saved_words = 99) by (rewrite /saved_words !app_length !map_length call.pop_env_instrs_length /= //).
+                          rewrite UU in AA.
+                          rewrite AA; [|clear -H1; lia].
+                          rewrite /saved_words lookup_app_r; [|simpl; lia].
+                          rewrite lookup_app_l; [|rewrite map_length /=; lia].
+                          simpl length. replace (S i - 1) with i by lia.
+                          erewrite list_lookup_fmap. rewrite Hri /=.
+                          destruct (Hregsdef ri) as [? [X _] ]. rewrite !X. reflexivity. }
+                          destruct (clear_stk_spec saved_stk ^(a2 + 99)%a) as [QQ WW].
+                          erewrite WW; [|clear -Hastkend; solve_addr].
+                          assert (^(a2 + length saved_words) < astkend)%a. 
+                          { rewrite /saved_words !app_length !map_length call.pop_env_instrs_length /=. 
+                            clear -Hastkend. solve_addr. }
+                          generalize (@push_words_lookup_spec saved_words stk a2 _ saved_stk H1 Hsaved_stk). intros [AA BB].
+                          assert (UU: length saved_words = 99) by (rewrite /saved_words !app_length !map_length call.pop_env_instrs_length /= //).
+                          rewrite UU in AA.
+                          rewrite (AA 32 ltac:(lia)). rewrite /saved_words lookup_app_r; [|clear; simpl; lia].
+                          rewrite lookup_app_r; [|rewrite map_length /=; lia].
+                          rewrite map_length lookup_app_l; [|simpl; lia].
+                          split; [simpl; auto|].
+                          rewrite /is_return. intros.
+                          exists ^(^(a2 + 33) + i)%a.
+                          split; [clear -Hastkend H4; solve_addr|].
+                          split; [clear -Hastkend H4; solve_addr|].
+                          rewrite WW; [|clear -Hastkend H4; solve_addr].
+                          assert (^(^(a2 + 33) + i)%a = ^(a2 + (Z.to_nat (33 + i)))%a) as -> by (clear -Hastkend H4; solve_addr).
+                          rewrite AA; [|lia].
+                          rewrite /saved_words (lookup_app_r [inr _]); [|simpl; lia].
+                          rewrite (lookup_app_r (map _ _)); [|rewrite map_length /=; lia].
+                          rewrite (lookup_app_r [inr _]); [|rewrite map_length /=; lia].
+                          rewrite map_length. assert ((Z.to_nat (33 + i) - length [inr (Regular (p, g, b, e, ^(pca' + -1)%a))] - length (list_difference all_registers [PC; call.r_stk]) - length [inr (Stk (length cs) URWLX a0 a1 ^(a2 + 32)%a)]) = i) as -> by (simpl; lia).
+                          reflexivity. }
+                  { generalize H1; intro CC.
+                    rewrite app_length map_length /= in H3.
+                    assert (Hn0: n0 < length rargs) by lia. clear H3.
+                    simpl in H1. assert (Hrn0: exists rn0, rargs !! n0 = Some rn0).
+                    { erewrite list_lookup_lookup_total_lt; eauto. }
+                    destruct Hrn0 as [rn0 Hrn0]. rewrite list_lookup_fmap Hrn0 /= in H1.
+                    replace mem2''' with (ac, mem2''').2 by reflexivity.
+                    rewrite -Hpush3. assert (a3 = ^(^(a2 + 100)%a + n0)%a) as -> by (clear -ZZ Hastkend Hn0; solve_addr).
+                    erewrite push_words_no_check_in; [| rewrite map_length; instantiate (1 := e); clear -Hastkend H6 Ha1b Hrange2; inv H6; solve_addr| rewrite map_length; auto].
+                    rewrite list_lookup_fmap Hrn0 /=.
+                    rewrite /base.RegLocate.
+                    split; [inv H1; auto|].
+                    generalize (Hregsdef rn0). intros [w0 [Hw0 Hw0'] ].
+                    rewrite Hw0 in H1; inv H1.
+                    assert (Hreasonablew0: is_reasonable w).
+                    { eapply elem_of_list_lookup_2 in Hrn0.
+                      generalize (Hreasonable rn0 ltac:(eapply elem_of_cons; right; auto)).
+                      rewrite /base.RegLocate Hw0 //. }
+                    split; [eapply (interp_call_preserved Hreasonablew0 Hw0'); eauto|].
+                    generalize (push_words_canStoreU Hnew_stk CC).
+                    rewrite -ZZ. auto. }
+                * econstructor; eauto.
+                  { intros r. destruct (reg_eq_dec PC r); [subst r; rewrite lookup_insert|rewrite lookup_insert_ne //].
+                    - eexists; split; [eauto|]. simpl. auto.
+                    - destruct (reg_eq_dec call.r_stk r); [subst r; rewrite lookup_insert|rewrite lookup_insert_ne //].
+                      + eexists; split; eauto. simpl.
+                        destruct Hinterpwstk as [? [? DD] ].
+                        split; auto. split; auto.
+                        intros. simpl in DD. destruct (addr_eq_dec x a2).
+                        * subst x. destruct (clear_stk_spec saved_stk ^(a2 + 99)%a) as [QQ WW].
+                          rewrite WW; [|clear -Hastkend; solve_addr].
+                          assert (SS: (^(a2 + length saved_words) < astkend)%a). 
+                          { rewrite /saved_words !app_length !map_length call.pop_env_instrs_length /=. 
+                            clear -Hastkend. solve_addr. }
+                          generalize (@push_words_lookup_spec saved_words stk a2 _ saved_stk SS Hsaved_stk). intros [AA BB].
+                          replace a2 with ^(a2 + 0)%a by (clear; solve_addr).
+                          rewrite (AA 0); [|rewrite /saved_words !app_length map_length /=; lia].
+                          simpl. eauto.
+                        * destruct (clear_stk_spec saved_stk ^(a2 + 99)%a) as [QQ WW].
+                          rewrite WW; [|clear -Hastkend H3 n0; solve_addr].
+                          assert (SS: (^(a2 + length saved_words) < astkend)%a). 
+                          { rewrite /saved_words !app_length !map_length call.pop_env_instrs_length /=. 
+                            clear -Hastkend. solve_addr. }
+                          generalize (@push_words_lookup_spec saved_words stk a2 _ saved_stk SS Hsaved_stk). intros [AA BB].
+                          rewrite BB; [|left; clear -H3 n0; solve_addr].
+                          eapply DD. clear -H3 n0; solve_addr.
+                      + destruct (Hregsdef r) as [wr [Hr Hinterpr] ].
+                        eexists; split; eauto.
+                        assert (exists i, (list_difference all_registers [PC; call.r_stk]) !! i = Some r) as [i Hi].
+                        { eapply elem_of_list_lookup. eapply elem_of_list_difference.
+                          split; [apply all_registers_correct|].
+                          eapply not_elem_of_cons; split; auto.
+                          eapply not_elem_of_cons; split; auto.
+                          apply not_elem_of_nil. }
+                        generalize Hi; intros EE. eapply list_lookup_alt in EE.
+                        destruct EE as [EE _].
+                        assert (JJ: saved_words !! (S i) = Some wr).
+                        { rewrite /saved_words lookup_app_r; [|simpl; lia].
+                          rewrite lookup_app_l; [|rewrite map_length /=; simpl in EE; lia].
+                          simpl length. replace (S i - 1) with i by lia.
+                          erewrite list_lookup_fmap. rewrite Hi /= Hr //. }
+                        generalize (push_words_canStoreU Hsaved_stk JJ).
+                        simpl in EE. intro FF.
+                        destruct wr; simpl; auto.
+                        destruct c0; simpl; simpl in Hinterpr; auto.
+                        destruct Hinterpr as [? [? ?] ].
+                        do 2 (split; auto). 
+                      
+
+                        
+                        
+
+              + admit.
+              + admit.
+              + auto.
+              
+
+
+
+
+
+
+
 
                         
 
