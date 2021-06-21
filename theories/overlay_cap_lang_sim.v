@@ -1894,6 +1894,37 @@ Section overlay_to_cap_lang.
   | sim_val_next:
       sim_val lang.NextIV NextIV.
 
+  Lemma stack_cons_length:
+    forall cs reg stk,
+      stack (length cs) ((reg, stk)::cs) = Some stk.
+  Proof.
+    intros; rewrite /stack /=; fold stack.
+    match goal with |- (match ?A with | left _ => _ | right _ => _ end) = Some ?D => destruct A end; auto. elim n. reflexivity.
+  Qed.
+
+  Lemma sim_cs_call_preserve:
+    forall cs h mem mem' bound
+      (Hstkgood: forall a, (a < bound)%a -> mem' !! a = mem !! a)
+      (Hcslt: forall d stk, stack d cs = Some stk -> forall a, is_Some (stk !! a) -> (a < bound)%a),
+    sim_cs true h cs mem ->
+    sim_cs true h cs mem'.
+  Proof.
+    induction cs; intros.
+    - eapply sim_cs_nil.
+    - inv H0; econstructor; eauto.
+      + intros. generalize (Hstksim _ _ H0).
+        intros. destruct H1 as [? [? ?] ].
+        split; auto. rewrite Hstkgood; auto.
+        eapply Hcslt; [|eexists; exact H0].
+        instantiate (1 := length cs).
+        rewrite stack_cons_length //.
+      + eapply IHcs; eauto.
+        intros. generalize (proj1 (stack_is_Some _ _) ltac:(eexists; eapply H0)).
+        intros. eapply (Hcslt d); eauto.
+        rewrite /stack. destruct (nat_eq_dec d (length cs)); [lia|].
+        fold stack; auto.
+  Qed.
+
   Lemma overlay_to_cap_lang_fsim:
     forall (c: overlay_component),
       is_program e_stk _ _ _ _ lang.can_address_only lang.pwlW lang.is_global c ->
@@ -3691,59 +3722,86 @@ Section overlay_to_cap_lang.
                             { exists (Z.to_nat (z_of x - z_of a2)). clear -Hx Hcan Hastkend AQ RR; split; solve_addr. }
                             rewrite AA; [|rewrite /saved_words !app_length !map_length call.pop_env_instrs_length /=; clear -Hk AQ; lia].
                             rewrite list_lookup_lookup_total_lt; [|rewrite /saved_words !app_length !map_length call.pop_env_instrs_length /=; clear -Hk AQ; lia]. eauto.
-                        + 
-
-                            
-
-
-
-
-                      
-
-                        
-                        
-
-              + admit.
-              + admit.
-              + auto.
-              
-
-
-
-
-
-
-
-
-                        
-
-
-
-                      
-
-
-                
-
-
-
-
-
-                        
-
-
-                        
-
-
-
-
-
-
-
-
-
-
-          
-          admit.
+                        + replace mem2'' with (ab, mem2'').2 by reflexivity.
+                          rewrite - Hpush2. assert (exists k, k < 66 /\ a3 = ^(^(a2 + 33)%a + k)%a /\ j = 33 + k) as [k [GG3 [GG4 GG5] ] ].
+                          { exists (Z.to_nat (z_of a3 - z_of ^(a2 + 33)%a)).
+                            clear -GG1 GG2 AQ Hastkend; split; [|split]; solve_addr. }
+                          rewrite GG4. erewrite push_words_no_check_in; [|rewrite !map_length /=; instantiate (1 := e); clear -Hastkend H6 Ha1b Hrange2 GG3; inv H6; solve_addr| rewrite map_length !app_length map_length call.pop_env_instrs_length /=; exact GG3].
+                          rewrite /saved_words lookup_app_r in H1; [|simpl; clear -AQ; lia].
+                          rewrite lookup_app_r in H1; [|rewrite map_length /=; clear -AQ; lia].
+                          rewrite map_length lookup_app_r in H1; [|simpl; clear -AQ; lia].
+                          simpl length in H1. replace (j - 1 - 31 - 1) with k in H1 by (clear -GG5; lia).
+                          rewrite 2!map_app map_map.
+                          match goal with H1: ?X !! k = Some w |- context [?Y !! k] => assert (map translate_word X = Y) as <- end.
+                          { reflexivity. }
+                          erewrite list_lookup_fmap. rewrite H1. split; auto.
+                          assert (exists nw, w = inl nw) as [nw ->]; [|split; simpl; auto; rewrite /canBeStored /= //].
+                          { match goal with H1: ?X !! k = Some w |- _ => assert (@list_filter (Z + base.Cap) (fun w => match w with inl _ => True | _ => False end) ltac:(destruct x; [left; auto|right; intro Z; elim Z; auto]) X = X) by reflexivity end.
+                            rewrite -H2 in H1. eapply elem_of_list_lookup_2 in H1.
+                            eapply elem_of_list_filter in H1. destruct H1 as [Q _].
+                            destruct w; eauto. elim Q; auto. } } }
+                  { assert (Hhgood: forall a, is_Some (h !! a) -> mem2''' !! a = mem2 !! a).
+                    { intros x Hx. generalize (Hstkdisjheap _ Hx). intros Hxx.
+                      replace mem2''' with (ac, mem2''').2 by reflexivity.
+                      rewrite -Hpush3. destruct (Hinterpwstk) as [_ [Hstkbound ?] ].
+                      erewrite push_words_no_check_spec; [|instantiate (1:=e); rewrite map_length; clear -Hastkend Hrange2 Ha1b H6; inv H6; solve_addr |right; rewrite map_length; clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                      rewrite lookup_insert_ne; [|clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                      rewrite lookup_insert_ne; [|clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                      replace mem2'' with (ab, mem2'').2 by reflexivity.
+                      rewrite -Hpush2. erewrite push_words_no_check_spec; [|instantiate (1:=e); rewrite map_length !app_length map_length call.pop_env_instrs_length /=; clear -Hastkend Hrange2 Ha1b H6; inv H6; solve_addr |right; rewrite map_length !app_length map_length call.pop_env_instrs_length /=; clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                      rewrite lookup_insert_ne; [|clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                      replace mem2' with (aa, mem2').2 by reflexivity.
+                      rewrite -Hpush1. erewrite push_words_no_check_spec; [|instantiate (1:=e); rewrite !map_length /=; clear -Hastkend Hrange2 Ha1b H6; inv H6; solve_addr |right; rewrite !map_length /=; clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                      rewrite lookup_insert_ne; [|clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                      reflexivity. }
+                    assert (Hcslt: forall dx stkx, stack dx cs = Some stkx -> forall x, is_Some (stkx !! x) -> (x < a0)%a).
+                    { intros. generalize (proj1 (stack_is_Some _ _) ltac:(eexists; apply H1)).
+                      intros Hxlt.
+                      apply (Hstkdisj dx (length cs) Hxlt stkx stk ltac:(rewrite /stack; destruct (nat_eq_dec dx (length cs)); [lia|fold stack; rewrite H1; auto]) ltac:(rewrite /stack; destruct (nat_eq_dec (length cs) (length cs)); [|lia]; auto) x a0 H2).
+                      destruct Hinterpwstk as [? [? XX] ]. eapply XX.
+                      simpl. clear -Hstkrange1. solve_addr. }
+                    assert (Hstkgood: forall a, (a < a0)%a -> mem2''' !! a = mem2 !! a).
+                    { intros x Hx. replace mem2''' with (ac, mem2''').2 by reflexivity.
+                      rewrite -Hpush3. erewrite push_words_no_check_spec; [|instantiate (1:=e); rewrite map_length; clear -Hastkend Hrange2 Ha1b H6; inv H6; solve_addr |left; clear -Hx Hstkrange1; solve_addr].
+                      rewrite lookup_insert_ne; [|clear -Hx Hstkrange1; solve_addr].
+                      rewrite lookup_insert_ne; [|clear -Hx Hstkrange1; solve_addr].
+                      replace mem2'' with (ab, mem2'').2 by reflexivity.
+                      rewrite -Hpush2. erewrite push_words_no_check_spec; [|instantiate (1:=e); rewrite map_length !app_length map_length call.pop_env_instrs_length /=; clear -Hastkend Hrange2 Ha1b H6; inv H6; solve_addr |left; clear -Hx Hstkrange1; solve_addr].
+                      rewrite lookup_insert_ne; [|clear -Hx Hstkrange1; solve_addr].
+                      replace mem2' with (aa, mem2').2 by reflexivity.
+                      rewrite -Hpush1. erewrite push_words_no_check_spec; [|instantiate (1:=e); rewrite !map_length /=; clear -Hastkend Hrange2 Ha1b H6; inv H6; solve_addr |left; clear -Hx Hstkrange1; solve_addr].
+                      rewrite lookup_insert_ne; [|clear -Hx Hstkrange1; solve_addr].
+                      reflexivity. }
+                    eapply sim_cs_call_preserve; eauto. }
+              + intros. destruct (reg_eq_dec PC r); [subst r| rewrite lookup_insert_ne // in H1; rewrite lookup_insert_ne //].
+                { rewrite lookup_insert in H1; rewrite lookup_insert.
+                  assert (Hwrf_reasonable: is_reasonable wrf).
+                  { generalize (Hreasonable rf ltac:(eapply elem_of_cons; left; auto)).
+                    rewrite /base.RegLocate Hwrf //. }
+                  inv H1. destruct wrf; simpl; auto. destruct c0; inv Hwrf_reasonable; auto.
+                  destruct c0 as [ [ [ [pp gg] bb] ee] qq]. destruct pp; simpl; auto. }
+                destruct (reg_eq_dec call.r_stk r); [subst r| rewrite lookup_insert_ne // in H1; rewrite lookup_insert_ne //].
+                { rewrite lookup_insert; rewrite lookup_insert in H1.
+                  inv H1; simpl; auto. }
+                destruct (reg_eq_dec rf r); [subst r; rewrite lookup_insert; rewrite lookup_insert in H1; inv H1; simpl; auto| rewrite lookup_insert_ne // in H1; rewrite lookup_insert_ne //].
+                eapply lookup_gset_to_gmap_Some in H1. destruct H1.
+                eapply lookup_gset_to_gmap_Some; split; auto. inv H2; auto.
+              + assert (Hhgood: forall a, is_Some (h !! a) -> mem2''' !! a = mem2 !! a).
+                { intros x Hx. generalize (Hstkdisjheap _ Hx). intros Hxx.
+                  replace mem2''' with (ac, mem2''').2 by reflexivity.
+                  rewrite -Hpush3. destruct (Hinterpwstk) as [_ [Hstkbound ?] ].
+                  erewrite push_words_no_check_spec; [|instantiate (1:=e); rewrite map_length; clear -Hastkend Hrange2 Ha1b H6; inv H6; solve_addr |right; rewrite map_length; clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                  rewrite lookup_insert_ne; [|clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                  rewrite lookup_insert_ne; [|clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                  replace mem2'' with (ab, mem2'').2 by reflexivity.
+                   rewrite -Hpush2. erewrite push_words_no_check_spec; [|instantiate (1:=e); rewrite map_length !app_length map_length call.pop_env_instrs_length /=; clear -Hastkend Hrange2 Ha1b H6; inv H6; solve_addr |right; rewrite map_length !app_length map_length call.pop_env_instrs_length /=; clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                  rewrite lookup_insert_ne; [|clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                  replace mem2' with (aa, mem2').2 by reflexivity.
+                  rewrite -Hpush1. erewrite push_words_no_check_spec; [|instantiate (1:=e); rewrite !map_length /=; clear -Hastkend Hrange2 Ha1b H6; inv H6; solve_addr |right; rewrite !map_length /=; clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                  rewrite lookup_insert_ne; [|clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
+                  reflexivity. }
+                intros. rewrite (Hhgood _ ltac:(eexists; apply H1)). auto.
+              + auto. }
       + (* NextI case *)
         assert (K = [] /\ f1 = lang.NextI) as [-> ->].
         { destruct K; [simpl in H1; inv H1; auto|]. rewrite cons_is_app in H1.
