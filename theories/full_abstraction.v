@@ -505,6 +505,79 @@ Section Compile_fully_abstract.
     apply Hwfcomp.
   Qed.
 
+  Lemma cap_lang_cons_is_app:
+    forall K (a: cap_lang.ectx_item), a :: K = K ++ [a].
+  Proof.
+    induction K.
+    - reflexivity.
+    - simpl. intros; destruct a, a0.
+      rewrite IHK. reflexivity.
+  Qed.
+
+  Lemma cap_lang_fill_inv_instr:
+    forall (K: list (ectxi_language.ectx_item cap_lang.cap_ectxi_lang)) cf e1,
+      ectxi_language.fill K e1 = cap_lang.Instr cf ->
+      K = [] /\ e1 = cap_lang.Instr cf.
+  Proof.
+    destruct K; [simpl; auto|].
+    rewrite (cap_lang_cons_is_app K e) /=.
+    intros. rewrite ectxi_language.fill_app in H0.
+    destruct e; simpl in H0; inv H0.
+  Qed.
+
+  Lemma cap_lang_fill_inv_instr':
+    forall (K: list (ectxi_language.ectx_item cap_lang.cap_ectxi_lang)) cf e1,
+      ectxi_language.fill K e1 = cap_lang.Seq (cap_lang.Instr cf) ->
+      (K = [] /\ e1 = cap_lang.Seq (cap_lang.Instr cf)) \/ (K = [cap_lang.SeqCtx] /\ e1 = cap_lang.Instr cf).
+  Proof.
+    destruct K; [simpl; auto|].
+    rewrite (cap_lang_cons_is_app K e) /=.
+    intros. rewrite ectxi_language.fill_app in H0.
+    destruct e; simpl in H0; inv H0. right.
+    destruct K; [simpl; auto|].
+    rewrite (cap_lang_cons_is_app K e) /= in H2.
+    rewrite ectxi_language.fill_app in H2.
+    destruct e; simpl in H2; inv H2.
+  Qed.
+
+  Lemma cap_lang_determ:
+    forall s1 s2 s2' s2'',
+    sim e_stk s1 s2 ->
+    erased_step s2 s2' ->
+    erased_step s2 s2'' ->
+    s2' = s2''.
+  Proof.
+    intros. inv H0. inv H1; inv H2.
+    inv H0; inv H1. inv H4; inv H5. simpl in *.
+    inv H2; inv H0. destruct t1; simpl in H3; [|destruct t1; simpl in H3; inv H3].
+    destruct t0; simpl in H2; [|destruct t0; simpl in H2; inv H2].
+    inv H3. inv H2. simpl. inv Hsexpr.
+    - symmetry in H3. eapply cap_lang_fill_inv_instr in H3.
+      destruct H3 as [-> ->]. simpl in H1.
+      symmetry in H1. eapply cap_lang_fill_inv_instr in H1.
+      destruct H1 as [-> ->]. simpl.
+      generalize (cap_lang.cap_lang_determ _ _ _ _ _ _ _ _ _ _ H4 H6).
+      destruct 1 as [-> [-> [-> ->] ] ]. reflexivity.
+    - symmetry in H3. eapply cap_lang_fill_inv_instr in H3.
+      destruct H3 as [-> ->]. simpl in H1.
+      symmetry in H1. eapply cap_lang_fill_inv_instr in H1.
+      destruct H1 as [-> ->]. simpl.
+      generalize (cap_lang.cap_lang_determ _ _ _ _ _ _ _ _ _ _ H4 H6).
+      destruct 1 as [-> [-> [-> ->] ] ]. reflexivity.
+    - symmetry in H0. eapply cap_lang_fill_inv_instr' in H0.
+      destruct H0 as [ [-> ->]|[-> ->] ].
+      + simpl in H1. symmetry in H1. eapply cap_lang_fill_inv_instr' in H1.
+        destruct H1 as [ [-> ->]|[-> ->] ].
+        * generalize (cap_lang.cap_lang_determ _ _ _ _ _ _ _ _ _ _ H4 H6).
+          destruct 1 as [-> [-> [-> ->] ] ]. reflexivity.
+        * inv H4. inv H6.
+      + simpl in H1. symmetry in H1. eapply cap_lang_fill_inv_instr' in H1.
+        destruct H1 as [ [-> ->]|[-> ->] ].
+        * inv H4; inv H6.
+        * generalize (cap_lang.cap_lang_determ _ _ _ _ _ _ _ _ _ _ H4 H6).
+          destruct 1 as [-> [-> [-> ->] ] ]. reflexivity.
+  Qed.      
+
   (* Definition of fully abstract specialized for the overlay and base capability machine semantics *)
   Definition fully_abstract := is_fully_abstract lang.overlay_lang cap_lang.cap_lang b_stk nat _ _ base.Word machine_base.Word lang.can_address_only lang.pwlW lang.is_global cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global (lang.initial_state b_stk e_stk) (cap_lang.initial_state call.r_stk b_stk e_stk).
 
