@@ -778,11 +778,8 @@ Definition initial_state `{MachineParameters} (r_stk: RegName) (b_stk e_stk: Add
 Definition can_address_only (w: Word) (addrs: gset Addr): Prop :=
   match w with
   | inl _ => True
-  | inr (p, _, b, e, _) =>
-    match p with
-    | O | E => True
-    | _ => forall a, (b <= a < e)%a -> a ∈ addrs
-    end
+  | inr (_, _, b, e, _) =>
+    forall a, (b <= a < e)%a -> a ∈ addrs
   end.
 
 Definition pwlW (w: Word): bool :=
