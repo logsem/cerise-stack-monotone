@@ -111,7 +111,7 @@ Section Compile_fully_abstract.
 
   Lemma decompile_compile:
     forall comp,
-    well_formed_comp b_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global (compile comp) ->
+    well_formed_comp e_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global (compile comp) ->
     decompile (compile comp) = comp.
   Proof.
     intros. destruct comp; simpl.
@@ -142,8 +142,8 @@ Section Compile_fully_abstract.
 
   Lemma decompile_preserves_well_formed_comp:
     forall comp,
-      well_formed_comp b_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global comp ->
-      well_formed_comp b_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global (decompile comp).
+      well_formed_comp e_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global comp ->
+      well_formed_comp e_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global (decompile comp).
   Proof.
     destruct comp; intros.
     - inv H0. inv Hwf_pre.
@@ -190,8 +190,8 @@ Section Compile_fully_abstract.
 
   Lemma compile_preserves_well_formed_comp:
     forall comp,
-      well_formed_comp b_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global comp ->
-      well_formed_comp b_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global (compile comp).
+      well_formed_comp e_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global comp ->
+      well_formed_comp e_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global (compile comp).
   Proof.
     destruct comp; intros.
     - inv H0. inv Hwf_pre.
@@ -315,8 +315,8 @@ Section Compile_fully_abstract.
 
   Lemma decompile_preserves_link:
     forall context comp prog,
-      link b_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global context comp prog ->
-      link b_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global (decompile context) (decompile comp) (decompile prog).
+      link e_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global context comp prog ->
+      link e_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global (decompile context) (decompile comp) (decompile prog).
   Proof.
     intros. inv H0; simpl decompile.
     - destruct comp1 as [ [ms1 imp1] exp1].
@@ -398,8 +398,8 @@ Section Compile_fully_abstract.
 
   Lemma compile_preserves_link:
     forall context comp prog,
-      link b_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global context comp prog ->
-      link b_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global (compile context) (compile comp) (compile prog).
+      link e_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global context comp prog ->
+      link e_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global (compile context) (compile comp) (compile prog).
   Proof.
     intros. inv H0; simpl compile.
     - destruct comp1 as [ [ms1 imp1] exp1].
@@ -481,8 +481,8 @@ Section Compile_fully_abstract.
 
   Lemma decompile_preserves_is_context:
     forall context comp prog,
-      is_context b_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global context comp prog ->
-      is_context b_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global (decompile context) (decompile comp) (decompile prog).
+      is_context e_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global context comp prog ->
+      is_context e_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global (decompile context) (decompile comp) (decompile prog).
   Proof.
     intros. inv H0. econstructor.
     destruct His_program as [Hlink His_program].
@@ -494,8 +494,8 @@ Section Compile_fully_abstract.
 
   Lemma compile_preserves_is_context:
     forall context comp prog,
-      is_context b_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global context comp prog ->
-      is_context b_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global (compile context) (compile comp) (compile prog).
+      is_context e_stk nat nat_eq_dec nat_countable base.Word lang.can_address_only lang.pwlW lang.is_global context comp prog ->
+      is_context e_stk nat nat_eq_dec nat_countable Word cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global (compile context) (compile comp) (compile prog).
   Proof.
     intros. inv H0. econstructor.
     destruct His_program as [Hlink His_program].
@@ -540,46 +540,143 @@ Section Compile_fully_abstract.
     destruct e; simpl in H2; inv H2.
   Qed.
 
-  Lemma cap_lang_determ:
-    forall s1 s2 s2' s2'',
-    sim e_stk s1 s2 ->
-    erased_step s2 s2' ->
-    erased_step s2 s2'' ->
-    s2' = s2''.
+  Lemma cap_lang_initial_state_preserves:
+    forall comp s,
+      rtc erased_step (cap_lang.initial_state call.r_stk b_stk e_stk comp) s ->
+      exists cf, s.1 = [cap_lang.Seq (cap_lang.Instr cf)] \/ (s.1 = [cap_lang.Instr cf] /\ (cf = cap_lang.Failed \/ cf = cap_lang.Halted)).
   Proof.
-    intros. inv H0. inv H1; inv H2.
-    inv H0; inv H1. inv H4; inv H5. simpl in *.
-    inv H2; inv H0. destruct t1; simpl in H3; [|destruct t1; simpl in H3; inv H3].
-    destruct t0; simpl in H2; [|destruct t0; simpl in H2; inv H2].
-    inv H3. inv H2. simpl. inv Hsexpr.
-    - symmetry in H3. eapply cap_lang_fill_inv_instr in H3.
-      destruct H3 as [-> ->]. simpl in H1.
-      symmetry in H1. eapply cap_lang_fill_inv_instr in H1.
-      destruct H1 as [-> ->]. simpl.
-      generalize (cap_lang.cap_lang_determ _ _ _ _ _ _ _ _ _ _ H4 H6).
-      destruct 1 as [-> [-> [-> ->] ] ]. reflexivity.
-    - symmetry in H3. eapply cap_lang_fill_inv_instr in H3.
-      destruct H3 as [-> ->]. simpl in H1.
-      symmetry in H1. eapply cap_lang_fill_inv_instr in H1.
-      destruct H1 as [-> ->]. simpl.
-      generalize (cap_lang.cap_lang_determ _ _ _ _ _ _ _ _ _ _ H4 H6).
-      destruct 1 as [-> [-> [-> ->] ] ]. reflexivity.
-    - symmetry in H0. eapply cap_lang_fill_inv_instr' in H0.
-      destruct H0 as [ [-> ->]|[-> ->] ].
-      + simpl in H1. symmetry in H1. eapply cap_lang_fill_inv_instr' in H1.
-        destruct H1 as [ [-> ->]|[-> ->] ].
-        * generalize (cap_lang.cap_lang_determ _ _ _ _ _ _ _ _ _ _ H4 H6).
-          destruct 1 as [-> [-> [-> ->] ] ]. reflexivity.
-        * inv H4. inv H6.
-      + simpl in H1. symmetry in H1. eapply cap_lang_fill_inv_instr' in H1.
-        destruct H1 as [ [-> ->]|[-> ->] ].
-        * inv H4; inv H6.
-        * generalize (cap_lang.cap_lang_determ _ _ _ _ _ _ _ _ _ _ H4 H6).
-          destruct 1 as [-> [-> [-> ->] ] ]. reflexivity.
-  Qed.      
+    intros. eapply rtc_nsteps in H0. destruct H0 as [n H0].
+    revert s H0. induction n; intros.
+    - inv H0. destruct comp; eauto.
+      exists cap_lang.Executable. left. simpl.
+      destruct p as [[? ?] ?]. reflexivity.
+    - eapply nsteps_inv_r in H0. destruct H0 as [s' [H0 H1]].
+      destruct s' as [x y].
+      destruct (IHn _ H0) as [cf [A | [A B]]].
+      + simpl in A; subst x. inv H1. inv H2.
+        destruct t1; [|simpl in H1; destruct t1; inv H1].
+        simpl in H1. destruct t2; [|simpl in H1; inv H1].
+        inv H1. inv H4. simpl in *. symmetry in H1.
+        eapply cap_lang_fill_inv_instr' in H1.
+        destruct H1 as [[-> ->] | [-> ->]].
+        * simpl. inv H3; simpl; eauto.
+        * simpl; inv H3; simpl; eauto.
+      + simpl in A; subst x. inv H1. inv H2.
+        destruct t1; [|simpl in H1; destruct t1; inv H1].
+        simpl in H1. destruct t2; [|simpl in H1; inv H1].
+        simpl. inv H4. simpl in *. inv H1.
+        symmetry in H3. eapply cap_lang_fill_inv_instr in H3.
+        destruct H3 as [-> ->]. destruct B as [-> | ->]; inv H5; simpl; eauto.
+  Qed.
+
+  Lemma cap_lang_initial_state_determ:
+    forall comp,
+      determ (cap_lang.initial_state call.r_stk b_stk e_stk comp).
+  Proof.
+    intros. red; intros. eapply cap_lang_initial_state_preserves in H0.
+    destruct s' as [x y]. simpl in H0. destruct H0 as [cf [-> | [-> A]]].
+    - inv H1; inv H2. inv H0; inv H1.
+      destruct t0; [simpl in H0|destruct t0; simpl in H0; inv H0].
+      destruct t3; [|simpl in H0; inv H0].
+      destruct t1; [simpl in H2|destruct t1; simpl in H2; inv H2].
+      destruct t2; [|simpl in H2; inv H2].
+      simpl. inv H0; inv H2.
+      inv H4; inv H5. simpl in *.
+      symmetry in H0, H1.
+      eapply cap_lang_fill_inv_instr' in H0.
+      eapply cap_lang_fill_inv_instr' in H1.
+      destruct H0 as [[-> ->]|[-> ->]].
+      + destruct H1 as [[-> ->]|[-> ->]]; simpl; auto.
+        * inv H2; inv H4; auto.
+        * inv H2; inv H4; auto.
+      + destruct H1 as [[-> ->]|[-> ->]]; simpl; auto.
+        * inv H2; inv H4; auto.
+        * inv H2; inv H4; auto. 
+          destruct (cap_lang.step_deterministic _ _ _ _ _ _ H0 H1) as [-> ->]; auto.
+    - inv H1; inv H2. inv H0; inv H1.
+      destruct t0; [simpl in H0|destruct t0; simpl in H0; inv H0].
+      destruct t3; [|simpl in H0; inv H0].
+      destruct t1; [simpl in H2|destruct t1; simpl in H2; inv H2].
+      destruct t2; [|simpl in H2; inv H2].
+      simpl. inv H0; inv H2.
+      inv H4; inv H5. simpl in *.
+      symmetry in H0, H1.
+      eapply cap_lang_fill_inv_instr in H0.
+      eapply cap_lang_fill_inv_instr in H1.
+      destruct H0 as [-> ->]. destruct H1 as [-> ->].
+      simpl. destruct A as [-> | ->]; inv H2; inv H4; auto.
+  Qed.
+
+  Lemma overlay_lang_safe:
+    forall s1 s2,
+    sim e_stk s1 s2 ->
+    (exists s1', erased_step s1 s1') \/ (exists v, final_state s1 v).
+  Proof.
+    intros. inv H0.
+    inv Hsexpr; simpl.
+    - right. eexists. eexists. split; eauto.
+    - right. eexists. eexists. split; eauto.
+    - inv H0; left.
+      + destruct (lang.normal_always_step (reg1, h, stk, cs)) as [cf [φ Hstep] ].
+        eexists. econstructor. econstructor; eauto.
+        * instantiate (2 := []). instantiate (3 := []). reflexivity.
+        * econstructor; eauto.
+          { instantiate (2 := [lang.SeqCtx]); reflexivity. }
+          { simpl. econstructor 1; eauto. }
+      + eexists. econstructor. econstructor; eauto.
+        * instantiate (2 := []). instantiate (3 := []). reflexivity.
+        * econstructor; eauto.
+          { instantiate (2 := []); reflexivity. }
+          { econstructor. }
+      + eexists. econstructor. econstructor; eauto.
+        * instantiate (2 := []). instantiate (3 := []). reflexivity.
+        * econstructor; eauto.
+          { instantiate (2 := []); reflexivity. }
+          { econstructor. }
+      + eexists. econstructor. econstructor; eauto.
+        * instantiate (2 := []). instantiate (3 := []). reflexivity.
+        * econstructor; eauto.
+          { instantiate (2 := []); reflexivity. }
+          { econstructor. }
+  Qed.
+
+  Lemma sim_final_state:
+    ∀ (s : cfg lang.overlay_lang) (s' : cfg cap_lang.cap_lang) 
+    (v' : val cap_lang.cap_lang),
+    final_state s' v'
+    → sim e_stk s s'
+      → ∃ v0 : val lang.overlay_lang, final_state s v0 ∧ sim_val v0 v'.
+  Proof.
+    intros. destruct H0. destruct s'. simpl in H0.
+    destruct H0 as [-> X].
+    destruct x; inv X. destruct c; inv H2.
+    - inv H1. inv Hsexpr.
+      eexists; split; simpl; [|econstructor]. eexists; split; eauto.
+    - inv H1. inv Hsexpr.
+      eexists; split; simpl; [|econstructor]. eexists; split; eauto.
+    - inv H1. inv Hsexpr.
+  Qed.
+
+  Lemma sim_val_determ:
+    forall v v1 v2,
+    sim_val v v1 ->
+    sim_val v v2 ->
+    v1 = v2.
+  Proof.
+    intros; inv H0; inv H1; auto.
+  Qed.
+
+  Lemma sim_val_determ':
+    forall v v1 v2,
+    sim_val v1 v ->
+    sim_val v2 v ->
+    v1 = v2.
+  Proof.
+    intros; inv H0; inv H1; auto.
+  Qed.
 
   (* Definition of fully abstract specialized for the overlay and base capability machine semantics *)
-  Definition fully_abstract := is_fully_abstract lang.overlay_lang cap_lang.cap_lang b_stk nat _ _ base.Word machine_base.Word lang.can_address_only lang.pwlW lang.is_global cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global (lang.initial_state b_stk e_stk) (cap_lang.initial_state call.r_stk b_stk e_stk).
+  Definition fully_abstract := is_fully_abstract lang.overlay_lang cap_lang.cap_lang e_stk nat _ _ base.Word machine_base.Word lang.can_address_only lang.pwlW lang.is_global cap_lang.can_address_only cap_lang.pwlW cap_lang.is_global (lang.initial_state b_stk e_stk) (cap_lang.initial_state call.r_stk b_stk e_stk).
 
   Theorem compile_fully_abstract:
     fully_abstract compile.
@@ -592,16 +689,66 @@ Section Compile_fully_abstract.
       rewrite decompile_compile; [|inv H2; destruct His_program as [A B]; inv A; auto].
       intro Hcontext2.
       generalize (H0 _ _ _ Hcontext1 Hcontext2). intros X.
+      generalize (@overlay_to_cap_lang_fsim b_stk e_stk stk_pos H (decompile p1) ltac:(inv Hcontext1; destruct His_program; auto)). intros Hsim1.
+      generalize (@overlay_to_cap_lang_fsim b_stk e_stk stk_pos H (decompile p2) ltac:(inv Hcontext2; destruct His_program; auto)). intros Hsim2.
+      generalize (fsim_backwards lang.overlay_lang cap_lang.cap_lang (lang.initial_state b_stk e_stk (decompile p1)) (cap_lang.initial_state call.r_stk b_stk e_stk (compile (decompile p1))) (sim e_stk) sim_val ltac:(eapply cap_lang_initial_state_determ) overlay_lang_safe Hsim1 sim_final_state).
+      intro Hbsim1.
+      generalize (fsim_backwards lang.overlay_lang cap_lang.cap_lang (lang.initial_state b_stk e_stk (decompile p2)) (cap_lang.initial_state call.r_stk b_stk e_stk (compile (decompile p2))) (sim e_stk) sim_val ltac:(eapply cap_lang_initial_state_determ) overlay_lang_safe Hsim2 sim_final_state).
+      intro Hbsim2.
+      rewrite !compile_decompile in Hsim1, Hbsim1, Hsim2, Hbsim2.
       split; intros.
-      + destruct H3 as [s1 [step1 Hfinal1] ].
-        deterministic
-        generalize (fsim_backwards lang.overlay_lang cap_lang.cap_lang cap_lang.cap_lang_determ).
-      generalize fsim_terminates.
-      generalize (@overlay_to_cap_lang_fsim b_stk e_stk stk_pos H).
-
-
-
-
-
+      + destruct H3 as [s1 [Hstep1 Hfinal1] ].
+        generalize (fsim_terminates _ _ _ _ _ _ Hbsim1 _ _ Hstep1 Hfinal1).
+        intros [s1' [v1' [Hstep1' Hfinal1']]]. rewrite /Terminates.
+        generalize (proj1 (X v1') ltac:(eexists; split; [eapply Hstep1'| eapply Hfinal1'])).
+        intros [s2' [Hstep2' Hfinal2']].
+        eapply fsim_tc_fsim in Hsim2.
+        generalize (fsim_terminates _ _ _ _ _ _ Hsim2 _ _ Hstep2' Hfinal2').
+        intros [ss [vv [XX YY]]]. eexists; split; eauto.
+        destruct YY; destruct Hfinal1'. simpl in H6.
+        replace v with vv by (eapply sim_val_determ; eauto). auto.
+      + destruct H3 as [s2 [Hstep2 Hfinal2]].
+        generalize (fsim_terminates _ _ _ _ _ _ Hbsim2 _ _ Hstep2 Hfinal2).
+        intros [s2' [v2' [Hstep2' Hfinal2']]]. rewrite /Terminates.
+        generalize (proj2 (X v2') ltac:(eexists; split; [eapply Hstep2'| eapply Hfinal2'])).
+        intros [s1' [Hstep1' Hfinal1']].
+        eapply fsim_tc_fsim in Hsim1.
+        generalize (fsim_terminates _ _ _ _ _ _ Hsim1 _ _ Hstep1' Hfinal1').
+        intros [ss [vv [XX YY]]]. eexists; split; eauto.
+        destruct YY; destruct Hfinal2'. simpl in H6.
+        replace v with vv by (eapply sim_val_determ; eauto). auto.
+    - red; intros. generalize (compile_preserves_is_context _ _ _ H1).
+      intros Hcontext1.
+      generalize (compile_preserves_is_context _ _ _ H2).
+      intros Hcontext2.
+      generalize (H0 _ _ _ Hcontext1 Hcontext2). intros X.
+      generalize (@overlay_to_cap_lang_fsim b_stk e_stk stk_pos H p1 ltac:(inv H1; destruct His_program; auto)). intros Hsim1.
+      generalize (@overlay_to_cap_lang_fsim b_stk e_stk stk_pos H p2 ltac:(inv H2; destruct His_program; auto)). intros Hsim2.
+      generalize (fsim_backwards lang.overlay_lang cap_lang.cap_lang (lang.initial_state b_stk e_stk p1) (cap_lang.initial_state call.r_stk b_stk e_stk (compile p1)) (sim e_stk) sim_val ltac:(eapply cap_lang_initial_state_determ) overlay_lang_safe Hsim1 sim_final_state).
+      intro Hbsim1.
+      generalize (fsim_backwards lang.overlay_lang cap_lang.cap_lang (lang.initial_state b_stk e_stk p2) (cap_lang.initial_state call.r_stk b_stk e_stk (compile p2)) (sim e_stk) sim_val ltac:(eapply cap_lang_initial_state_determ) overlay_lang_safe Hsim2 sim_final_state).
+      intro Hbsim2.
+      eapply fsim_tc_fsim in Hsim1.
+      eapply fsim_tc_fsim in Hsim2.
+      split; intros.
+      + destruct H3 as [s1 [Hstep1 Hfinal1] ].
+        generalize (fsim_terminates _ _ _ _ _ _ Hsim1 _ _ Hstep1 Hfinal1).
+        intros [s1' [v1' [Hstep1' [Hfinal1' Hval1']]]].
+        generalize (proj1 (X v1') ltac:(eexists; split; eauto)).
+        intros [s2' [Hstep2' Hfinal2']].
+        generalize (fsim_terminates _ _ _ _ _ _ Hbsim2 _ _ Hstep2' Hfinal2').
+        intros [s2 [v2 [Hstep2 [Hfinal2 Hval2]]]].
+        eexists; split; eauto. simpl in Hval2.
+        replace v with v2; eauto. eapply sim_val_determ'; eauto.
+      + destruct H3 as [s2 [Hstep2 Hfinal2] ].
+        generalize (fsim_terminates _ _ _ _ _ _ Hsim2 _ _ Hstep2 Hfinal2).
+        intros [s2' [v2' [Hstep2' [Hfinal2' Hval2']]]].
+        generalize (proj2 (X v2') ltac:(eexists; split; eauto)).
+        intros [s1' [Hstep1' Hfinal1']].
+        generalize (fsim_terminates _ _ _ _ _ _ Hbsim1 _ _ Hstep1' Hfinal1').
+        intros [s1 [v1 [Hstep1 [Hfinal1 Hval1]]]].
+        eexists; split; eauto. simpl in Hval1.
+        replace v with v1; eauto. eapply sim_val_determ'; eauto.
+  Qed.
 
 End Compile_fully_abstract.

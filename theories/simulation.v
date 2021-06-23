@@ -84,66 +84,60 @@ Section simulation.
       eapply rtc_transitive; eauto.
   Qed.
 
-  Definition safe `{L: language} (s: cfg L): Prop :=
-    forall s', rtc erased_step s s' -> (exists s'', erased_step s' s'') \/ (exists v, final_state s' v).
+  Definition determ `{L: language} (s: cfg L): Prop :=
+    forall s', rtc erased_step s s' -> (forall s1 s2, erased_step s' s1 -> erased_step s' s2 -> s1 = s2).
 
-  Lemma safe_preserves:
+  Lemma determ_step_preserves:
     forall L (s s': cfg L),
-      safe s ->
-      rtc erased_step s s' ->
-      safe s'.
+      erased_step s s' ->
+      determ s ->
+      determ s'.
   Proof.
     intros. red; intros.
-    eapply H. eapply rtc_transitive; eauto.
+    eapply H0; [eapply rtc_l; eauto|eauto..].
   Qed.
 
-  Definition deterministic (L: language): Prop :=
-    forall (s1 s2 s2': cfg L),
-      erased_step s1 s2 ->
-      erased_step s1 s2' ->
-      s2 = s2'.
-
   Lemma fsim_backwards:
-    forall L1 L2 (Hdeterm: deterministic L2) (initial_state1: cfg L1) (initial_state2: cfg L2) fsim fsim_val,
+    forall L1 L2 (initial_state1: cfg L1) (initial_state2: cfg L2) (fsim: cfg L1 -> cfg L2 -> Prop) fsim_val (Hdeterm: determ initial_state2)
+    (Hsafe: forall s1 s2, fsim s1 s2 -> (exists s1', erased_step s1 s1') \/ (exists v, final_state s1 v)),
       forward_simulation_tc initial_state1 initial_state2 fsim fsim_val ->
       (forall s s' v', final_state s' v' -> fsim s s' -> exists v, final_state s v /\ fsim_val v v') ->
-      safe initial_state1 ->
-      forward_simulation initial_state2 initial_state1 (fun s1 s2 => safe s2 /\ exists n κs s1', nsteps n s1 κs s1' /\ fsim s2 s1') (flip fsim_val).
+      forward_simulation initial_state2 initial_state1 (fun s1 s2 => determ s1 /\ exists n κs s1', nsteps n s1 κs s1' /\ fsim s2 s1') (flip fsim_val).
   Proof.
     intros. econstructor.
     - split; auto. exists O, [], initial_state2. split; [econstructor|eapply fsim_tc_init_states; eauto].
-    - intros. destruct H2 as [C [n [κs [s1'' [A B]]]]].
+    - intros. destruct H1 as [C [n [κs [s1'' [A B]]]]].
       inversion A; subst; clear A.
-      + destruct (C s1' (rtc_refl _ _)).
-        * destruct H2 as [s'' D]. generalize D; intros D'.
+      + destruct (Hsafe _ _ B).
+        * destruct H1 as [s'' D]. generalize D; intros D'.
           eapply fsim_tc_step in D'; eauto.
           destruct D' as [s1''' [E F]].
           inversion E; subst; clear E.
-          { assert (s2 = s1''') by (eapply Hdeterm; eauto). subst s2.
-            exists s''. split; [eapply rtc_once; eauto|].
-            split; [eapply safe_preserves; eauto; eapply rtc_once; eauto|].
+          { assert (s2 = s1''') by (eapply C; eauto; eapply rtc_refl).
+            subst s2. exists s''. split; [eapply rtc_once; eauto|].
+            split; [eapply determ_step_preserves; eauto|].
             exists 0, [], s1'''. split; auto. econstructor. }
-          { assert (s2 = y) by (eapply Hdeterm; eauto). subst s2.
+          { assert (s2 = y) by (eapply C; eauto; eapply rtc_refl). subst s2.
             exists s''. split; [eapply rtc_once; eauto|].
-            split; [eapply safe_preserves; eauto; eapply rtc_once; eauto|].
-            eapply tc_rtc in H4. eapply erased_steps_nsteps in H4.
-            destruct H4 as [n [κs A]].
+            eapply tc_rtc in H3. eapply erased_steps_nsteps in H3.
+            destruct H3 as [n [κs A]].
+            split; [eapply determ_step_preserves; eauto|].
             exists n, κs, s1'''. split; auto. }
-        * destruct H2. eapply fsim_tc_final_states in B; eauto.
+        * destruct H1. eapply fsim_tc_final_states in B; eauto.
           destruct B as [v' [D E]].
           assert (exists κs, nsteps (S 0) s1'' κs s2).
-          { inversion H3. exists (x0 ++ []). econstructor; eauto.
+          { inversion H2. exists (x0 ++ []). econstructor; eauto.
             eapply nsteps_refl. }
-          destruct H4 as [κs F].
+          destruct H3 as [κs F].
           eapply final_state_stuck in D; eauto.
           destruct D as [? ?]; congruence.
       + exists s1'. split; [eapply rtc_refl|].
-        split; auto. assert (s2 = ρ2).
-        { eapply Hdeterm; eauto. econstructor; eauto. }
-        subst ρ2. eauto.
-    - intros. destruct H3 as [C [n [κs [s1' [A B]]]]].
+        assert (s2 = ρ2).
+        { eapply C; eauto; [eapply rtc_refl|]. econstructor; eauto. }
+        subst ρ2. split; eauto. eapply determ_step_preserves; eauto.
+    - intros. destruct H2 as [C [n [κs [s1' [A B]]]]].
       eapply final_state_stuck in A; eauto. destruct A as [A A'].
-      subst s1'. eapply H0 in H2; eauto.
+      subst s1'. eapply H0 in H1; eauto.
   Qed.
 
 End simulation.
