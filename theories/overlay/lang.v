@@ -734,7 +734,7 @@ Section opsem.
       | inr (Ret _ _ _) => (Failed, φ)
       | inr (Stk d p b e a) =>
         if perm_eq_dec p E then (Failed, φ)
-        else updatePC (update_reg φ dst (inr (Stk d (promote_perm p) b e a)))
+        else updatePC (update_reg φ dst (inr (Stk d (promote_perm p) b (min a e) a)))
       | inl _ => (Failed, φ)
       end
     end.
