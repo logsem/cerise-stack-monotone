@@ -239,12 +239,14 @@ Section opsem.
         else (Failed, φ)
       | inr (Ret b e a) => (Failed, φ)
       | inr (Stk d p b e a) =>
+        if writeAllowed p && withinBounds ((p, Monotone), b, e, a) && canStore p a (RegLocate (reg φ) src) then
         if nat_eq_dec d (length (callstack φ)) then
           updatePC (update_stk φ a (RegLocate (reg φ) src))
         else match update_stack φ d a (RegLocate (reg φ) src) with
              | None => (Failed, φ)
              | Some φ' => updatePC φ'
              end
+        else (Failed, φ)
       end
     | Store dst (inl n) =>
       match RegLocate (reg φ) dst with
@@ -254,12 +256,14 @@ Section opsem.
         if writeAllowed p && withinBounds ((p, g), b, e, a) then updatePC (update_mem φ a (inl n)) else (Failed, φ)
       | inr (Ret b e a) => (Failed, φ)
       | inr (Stk d p b e a) =>
+        if writeAllowed p && withinBounds ((p, Monotone), b, e, a) then
         if nat_eq_dec d (length (callstack φ)) then
           updatePC (update_stk φ a (inl n))
         else match update_stack φ d a (inl n) with
              | None => (Failed, φ)
              | Some φ' => updatePC φ'
              end
+        else (Failed, φ)
       end
     | Mov dst (inl n) => updatePC (update_reg φ dst (inl n))
     | Mov dst (inr src) => updatePC (update_reg φ dst (RegLocate (reg φ) src))

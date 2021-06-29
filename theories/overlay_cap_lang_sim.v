@@ -366,7 +366,7 @@ Section overlay_to_cap_lang.
     match w with
     | inl n => True
     | inr (Regular _) => lang.pwlW w = false /\ lang.can_address_only w (dom _ h)
-    | inr (Stk d p b e a) => d = length cs /\ (e <= e_stk)%a /\ forall x, (b <= x < addr_reg.min e (lang.canReadUpTo w))%a -> exists w, stk !! x = Some w
+    | inr (Stk d p b e a) => d = length cs /\ (e <= e_stk)%a /\ (forall d' stk', stack d' cs = Some stk' -> forall a', is_Some (stk' !! a') -> (a' < b)%a) /\ forall x, (b <= x < addr_reg.min e (lang.canReadUpTo w))%a -> exists w, stk !! x = Some w
     | inr (Ret b e a) => match cs with
                          | [] => False
                          | (reg', stk')::cs' =>
@@ -406,17 +406,35 @@ Section overlay_to_cap_lang.
     - inv H0.
   Qed.
 
+  Lemma interp_heap_extend:
+    forall w x y h stk cs,
+      interp w h stk cs ->
+      interp w (<[x:=y]> h) stk cs.
+  Proof.
+    intros. destruct w; auto.
+    destruct c; auto.
+    simpl in H0. simpl. destruct H0.
+    split; auto.
+    destruct c as [ [ [ [p g] b] e] a].
+    intros. apply H1 in H2. set_solver.
+  Qed.
+
+  Lemma interp_stack_extend:
+    forall w x y h stk cs,
+      interp w h stk cs ->
+      interp w h (<[x:=y]> stk) cs.
+  Proof.
+    intros. destruct w; auto.
+    destruct c; auto.
+    simpl in H0. simpl. destruct H0 as [? [? [? ?] ] ].
+    do 3 (split; auto).
+    intros. apply H3 in H4.
+    destruct (addr_eq_dec x x0); [subst x0; rewrite lookup_insert; eauto|rewrite lookup_insert_ne; auto].
+  Qed.
+
   (* w is legally stored at address a *)
   Definition canBeStored (w: base.Word) (a: Addr): Prop :=
     lang.canStoreU URWLX a w = true.
-  (*  match w with
-    | inl _ => True
-    | inr (Regular (p, g, b, e, _)) => match g with
-                                       | Monotone => (lang.canReadUpTo w <= a)%a
-                                       | _ => True
-                                       end
-    | inr _ => (lang.canReadUpTo w <= a)%a
-    end.*)
 
   Inductive sim_cs: bool -> base.Mem -> list Stackframe -> machine_base.Mem -> Prop :=
   | sim_cs_nil:
@@ -425,7 +443,7 @@ Section overlay_to_cap_lang.
   | sim_cs_cons_true:
       forall reg stk cs h m
         (Hregsdef: forall r, exists w, reg !! r = Some w /\ interp w h stk cs)
-        (Hstkdisjheap: forall a, is_Some (h !! a) -> (e_stk <= a)%a)
+        (Hstkdisjheap: forall a, is_Some (stk !! a) -> (a < e_stk)%a)
         (Hstksim: forall a w, stk !! a = Some w -> m !! a = Some (translate_word w) /\ interp w h stk cs /\ canBeStored w a)
 (*        (Hcontiguous: exists b_stk e_stk a_stk, reg !! call.r_stk = Some (inr (Stk (length cs) URWLX b_stk e_stk a_stk)) /\ dom (gset _) stk = list_to_set (region_addrs b_stk ^(a_stk + 98)%a))*)
         (Hcs: sim_cs true h cs m),
@@ -434,12 +452,31 @@ Section overlay_to_cap_lang.
       (* false indicates topmost frame *)
       forall reg stk cs h m
         (Hregsdef: forall r, exists w, reg !! r = Some w /\ interp w h stk cs)
-        (Hstkdisjheap: forall a, is_Some (h !! a) -> (e_stk <= a)%a)
+        (Hstkdisjheap: forall a, is_Some (stk !! a) -> (a < e_stk)%a)
         (Hstksim: forall a w, stk !! a = Some w -> m !! a = Some (translate_word w) /\ interp w h stk cs /\ canBeStored w a)
         (* This is the only difference, for the topmost frame, the shape of the stack is not frozen yet *)
 (*        (Hcontiguous: exists b_stk e_stk, dom (gset _) stk = list_to_set (region_addrs b_stk e_stk))*)
         (Hcs: sim_cs true h cs m),
         sim_cs false h ((reg, stk)::cs) m.
+
+  Lemma sim_cs_heap_extend:
+    forall cs h m a wa,
+      (e_stk <= a)%a ->
+      sim_cs true h cs m ->
+      sim_cs true (<[a:=wa]> h) cs (<[a:=translate_word wa]> m).
+  Proof.
+    induction cs; intros; auto.
+    - econstructor.
+    - inv H1. econstructor; eauto.
+      + intros. destruct (Hregsdef r) as [wr [Hwr ?] ].
+        eexists; split; eauto. apply interp_heap_extend; auto.
+      + intros. generalize (Hstkdisjheap a ltac:(eexists; apply H1)). intro D.
+        generalize (Hstksim _ _ H1). intro T.
+        destruct T as [? [? ?] ].
+        split; [|split; [apply interp_heap_extend; auto|auto] ].
+        rewrite lookup_insert_ne; auto.
+        clear -H0 D; solve_addr.
+  Qed.
 
   Inductive invariants: language.cfg overlay_lang -> language.cfg cap_lang -> Prop :=
   | invariants_intro:
@@ -590,8 +627,8 @@ Section overlay_to_cap_lang.
                 { subst r; rewrite lookup_insert; eexists; split; eauto.
                   simpl. destruct (AA PC) as [wpc [ZA ZB] ].
                   rewrite X2 in ZA; inv ZA. simpl in ZB.
-                  destruct ZB as [ZB1 [ZB3 ZB2] ]; split; auto.
-                  split; auto.
+                  destruct ZB as [ZB1 [ZB3 [ZB4 ZB2] ] ]; split; auto.
+                  split; auto. split; auto.
                   intros. apply ZB2. destruct X1' as [? [? [? [? ?] ] ] ].
                   destruct p0; auto; congruence. }
                 { rewrite lookup_insert_ne; auto. }
@@ -684,7 +721,7 @@ Section overlay_to_cap_lang.
             rewrite /= /RegLocate Hwsrc' /update_reg /= in H2.
             simpl. destruct (readAllowed p0 && ((a0 <=? a2)%a && (a2 <? a1)%a)) eqn:Hcond; cycle 1.
             * inv H1; inv H2; auto.
-            * simpl in Hinterpsrc. destruct Hinterpsrc as [Hn [Hbound1 Hdom] ].
+            * simpl in Hinterpsrc. destruct Hinterpsrc as [Hn [Hbound1 [HQW Hdom] ] ].
               match goal with |- context [(if ?X then _ else _)  = _] => destruct X as [_|ZZ]; [|elim ZZ; auto] end.
               eexists; split; eauto.
               rewrite /base.MemLocate /= in H1.
@@ -768,9 +805,9 @@ Section overlay_to_cap_lang.
               { econstructor; eauto. intros rr.
                 destruct (reg_eq_dec PC rr); [subst rr; rewrite lookup_insert; eauto| rewrite lookup_insert_ne; eauto].
                 eexists; split; eauto.
-                simpl. destruct Hinterpaa as [? [? ?] ].
-                do 2 (split; auto).
-                intros; eapply H3. simpl.
+                simpl. destruct Hinterpaa as [? [? [? ?] ] ].
+                do 3 (split; auto).
+                intros; eapply H5. simpl.
                 destruct X2 as [? [? [? [? ?] ] ] ].
                 destruct ppp; try congruence; auto. }
               { intros rr; destruct (reg_eq_dec PC rr); [subst rr; rewrite !lookup_insert; inversion 1; auto|rewrite !lookup_insert_ne; auto]. }
@@ -831,9 +868,9 @@ Section overlay_to_cap_lang.
               { econstructor; eauto. intros rr.
                 destruct (reg_eq_dec PC rr); [subst rr; rewrite lookup_insert; eauto| rewrite lookup_insert_ne; eauto].
                 eexists; split; eauto.
-                simpl. destruct Hinterpaa as [? [? ?] ].
-                do 2 (split; auto).
-                intros; eapply H3. simpl.
+                simpl. destruct Hinterpaa as [? [? [? ?] ] ].
+                do 3 (split; auto).
+                intros; eapply H5. simpl.
                 destruct X2 as [? [? [? [? ?] ] ] ].
                 destruct ppp; try congruence; auto. }
               { intros rr; destruct (reg_eq_dec PC rr); [subst rr; rewrite !lookup_insert; inversion 1; auto|rewrite !lookup_insert_ne; auto]. }
@@ -854,7 +891,185 @@ Section overlay_to_cap_lang.
               destruct (reg_eq_dec dst rr); [subst rr; rewrite lookup_insert; eauto| rewrite lookup_insert_ne; auto].
             * intros rr. destruct (reg_eq_dec PC rr); [subst rr; rewrite !lookup_insert; inversion 1; auto| rewrite !(lookup_insert_ne _ PC); auto].
               destruct (reg_eq_dec dst rr); [subst rr; rewrite !lookup_insert; inversion 1; auto| rewrite !lookup_insert_ne; auto]. }
-    - (* Store *) admit.
+    - (* Store *)
+      destruct (Hregsdef dst) as [wdst [Hwdst Hinterpdst] ].
+      generalize (Hsregs _ _ Hwdst). intros Hwdst'.
+      assert (exists wsrc, word_of_argument reg1 src = wsrc /\ interp wsrc h stk cs) as [wsrc [Hwsrc Hinterpsrc] ].
+      { destruct src; [simpl; eexists; split; eauto; simpl; auto|].
+        destruct (Hregsdef r) as [? [? ?] ]. simpl.
+        rewrite /base.RegLocate H0. eauto. }
+      assert (rules_base.word_of_argument reg2 src = Some (translate_word wsrc)) as Hwsrc'.
+      { destruct src; [inv Hwsrc; simpl; auto|].
+        destruct (Hregsdef r) as [? [? ?] ]. rewrite /= /base.RegLocate H0 in Hwsrc.
+        inv Hwsrc; eapply Hsregs; eauto. }
+      assert (AA: match wdst with
+                  | inr (Regular (pp, gg, bb, ee, aa)) =>
+                    if (writeAllowed pp) && ((bb <=? aa)%a && (aa <? ee)%a) && (lang.canStore pp aa wsrc) then
+                      match incrementPC reg1 with
+                      | Some reg1'' => c1 = lang.NextI /\ c2 = NextI /\ reg1'' = reg1' /\ h' = (<[aa:=wsrc]> h) /\ stk' = stk /\ cs' = cs /\ incrementPC' reg2 = Some reg2' /\ mem2' = (<[aa:=translate_word wsrc]> mem2)
+                      | None => c1 = lang.Failed /\ c2 = Failed
+                      end
+                    else c1 = lang.Failed /\ c2 = Failed
+                  | inr (Stk dd pp bb ee aa) =>
+                    if (writeAllowed pp) && ((bb <=? aa)%a && (aa <? ee)%a) && (lang.canStore pp aa wsrc) then
+                      match incrementPC reg1 with
+                      | Some reg1'' => c1 = lang.NextI /\ c2 = NextI /\ reg1'' = reg1' /\ h' = h /\ (stk' = if nat_eq_dec dd (length cs) then <[aa:=wsrc]> stk else stk) /\ (if nat_eq_dec dd (length cs) then cs' = cs else update_callstack cs dd aa wsrc = Some cs') /\ incrementPC' reg2 = Some reg2' /\ mem2' = (<[aa:=translate_word wsrc]> mem2)
+                      | None => c1 = lang.Failed /\ c2 = Failed
+                      end
+                    else c1 = lang.Failed /\ c2 = Failed
+                  | _ => c1 = lang.Failed /\ c2 = Failed
+                  end).
+      { rewrite /= /base.RegLocate Hwdst in H1.
+        rewrite /= /RegLocate Hwdst' in H2.
+        assert (match wdst with
+         | inl _ => (lang.Failed, (reg1, h, stk, cs))
+         | inr c =>
+             match c with
+             | Regular c0 =>
+                 let (p0, a) := c0 in
+                 let (p1, e) := p0 in
+                 let (p2, b) := p1 in
+                 let (p, _) := p2 in
+                 if writeAllowed p && ((b <=? a)%a && (a <? e)%a) && lang.canStore p a wsrc
+                 then
+                  lang.updatePC
+                    (base.update_mem (reg1, h, stk, cs) a wsrc)
+                 else (lang.Failed, (reg1, h, stk, cs))
+             | Stk d p b e a =>
+                if writeAllowed p && ((b <=? a)%a && (a <? e)%a) && lang.canStore p a wsrc then
+                 if nat_eq_dec d (length cs)
+                 then lang.updatePC (update_stk (reg1, h, stk, cs) a wsrc)
+                 else
+                  match update_stack (reg1, h, stk, cs) d a wsrc with
+                  | Some φ' => lang.updatePC φ'
+                  | None => (lang.Failed, (reg1, h, stk, cs))
+                  end
+                else (lang.Failed, (reg1, h, stk, cs))
+             | Ret _ _ _ => (lang.Failed, (reg1, h, stk, cs))
+             end
+         end = (c1, (reg1', h', stk', cs')) /\ match translate_word wdst with
+         | inl _ => (Failed, (reg2, mem2))
+         | inr c =>
+             let (p0, a) := c in
+             let (p1, e) := p0 in
+             let (p2, b) := p1 in
+             let (p, _) := p2 in
+             if writeAllowed p && ((b <=? a)%a && (a <? e)%a) && canStore p a (translate_word wsrc)
+             then updatePC (update_mem (reg2, mem2) a (translate_word wsrc))
+             else (Failed, (reg2, mem2))
+         end = (c2, (reg2', mem2'))) as [X1 X2].
+        { destruct src; [inv Hwsrc; inv Hwsrc'; simpl in H2; simpl; auto|].
+          - destruct wdst; simpl in H2; simpl; auto.
+            destruct c; simpl; simpl in H2; try (rewrite andb_true_r); auto.
+            destruct c as [ [ [ [pp gg] bb] ee] aa]; rewrite andb_true_r; auto.
+          - simpl in Hwsrc; simpl in Hwsrc'.
+            rewrite /base.RegLocate in Hwsrc. rewrite Hwsrc in H1.
+            rewrite /RegLocate in Hwsrc'. rewrite Hwsrc' in H2. auto. }
+        clear H1 H2.
+        destruct wdst; [simpl in X2; inv X1; inv X2; auto|].
+        destruct c; [|simpl in X2|simpl in X2; inv X1; inv X2; auto].
+        - destruct c as [ [ [ [pp gg] bb] ee] aa].
+          simpl in X2. assert (YY: lang.canStore pp aa wsrc = canStore pp aa (translate_word wsrc)).
+          { clear. destruct wsrc; auto. destruct c; auto. }
+          rewrite -YY in X2. destruct (writeAllowed pp && ((bb <=? aa)%a && (aa <? ee)%a) && lang.canStore pp aa wsrc) eqn:Hconds; [|inv X1; inv X2; auto].
+          rewrite /base.update_mem /= in X1.
+          rewrite /update_mem /= in X2.
+          generalize (Hsregs _ _ HPC). intros HPC'.
+          destruct (incrementPC reg1) as [reg1''|] eqn:Hincrement1.
+          { erewrite incrementPC_success_updatePC in X1; eauto.
+            eapply incrementPC_success_incrementPC' in HPC; eauto.
+            destruct HPC as [reg2'' HX].
+            rewrite HX.
+            eapply rules_base.incrementPC_success_updatePC in HX.
+            destruct HX as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
+          { erewrite incrementPC_fail_updatePC in X1; eauto.
+            inv X1; split; auto.
+            eapply incrementPC_fail_incrementPC' in HPC; eauto.
+            erewrite rules_base.incrementPC_fail_updatePC in X2; eauto.
+            inv X2; auto. }
+        - assert (YY: lang.canStore p0 a2 wsrc = canStore p0 a2 (translate_word wsrc)).
+          { clear. destruct wsrc; auto. destruct c; auto. }
+          rewrite -YY in X2. destruct (writeAllowed p0 && ((a0 <=? a2)%a && (a2 <? a1)%a) && lang.canStore p0 a2 wsrc) eqn:Hconds; [|inv X1; inv X2; auto].
+          rewrite /base.update_mem /= in X1.
+          rewrite /update_mem /= in X2.
+          generalize (Hsregs _ _ HPC). intros HPC'.
+          destruct (incrementPC reg1) as [reg1''|] eqn:Hincrement1.
+          { (* TODO: generalize here *)
+            simpl in Hinterpdst. destruct Hinterpdst as [TT Hinterpdst].
+            destruct (nat_eq_dec n (length cs)) as [_|RR]; [|elim RR; auto].
+            rewrite /update_stk /= in X1.
+            erewrite incrementPC_success_updatePC in X1; eauto.
+            eapply incrementPC_success_incrementPC' in HPC; eauto.
+            destruct HPC as [reg2'' HX].
+            rewrite HX.
+            eapply rules_base.incrementPC_success_updatePC in HX.
+            destruct HX as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
+          { simpl in Hinterpdst. destruct Hinterpdst as [TT Hinterpdst].
+            destruct (nat_eq_dec n (length cs)) as [_|RR]; [|elim RR; auto].
+            rewrite /update_stk /= in X1.
+            erewrite incrementPC_fail_updatePC in X1; eauto.
+            inv X1; split; auto.
+            eapply incrementPC_fail_incrementPC' in HPC; eauto.
+            erewrite rules_base.incrementPC_fail_updatePC in X2; eauto.
+            inv X2; auto. } }
+      destruct wdst.
+      { destruct AA as [-> ->]. econstructor.
+        - eapply sim_expr_exec_inv in Hsexpr. subst K.
+          simpl. repeat econstructor.
+        - rewrite can_step_fill /can_step /=; intros [A | A]; discriminate. }
+      destruct c; cycle 2.
+      { destruct AA as [-> ->]. econstructor.
+        - eapply sim_expr_exec_inv in Hsexpr. subst K.
+          simpl. repeat econstructor.
+        - rewrite can_step_fill /can_step /=; intros [A | A]; discriminate. }
+      { destruct c as [ [ [ [pp gg] bb] ee] aa].
+        destruct (writeAllowed pp && ((bb <=? aa)%a && (aa <? ee)%a) && lang.canStore pp aa wsrc) eqn:Hconds; cycle 1.
+        { destruct AA as [-> ->]. econstructor.
+          - eapply sim_expr_exec_inv in Hsexpr. subst K.
+            simpl. repeat econstructor.
+          - rewrite can_step_fill /can_step /=; intros [A | A]; discriminate. }
+        erewrite !andb_true_iff in Hconds. destruct Hconds as [ [Hcond1 Hcond2] Hcond3].
+        erewrite leb_addr_spec in Hcond2. erewrite ltb_addr_spec in Hcond2.
+        destruct (incrementPC reg1) as [reg1''|] eqn:Hincrement1; cycle 1.
+        { destruct AA as [-> ->]. econstructor.
+          - eapply sim_expr_exec_inv in Hsexpr. subst K.
+            simpl. repeat econstructor.
+          - rewrite can_step_fill /can_step /=; intros [A | A]; discriminate. }
+        destruct AA as [-> [-> [-> [-> [-> [-> [Hincrement2 ->] ] ] ] ] ] ].
+        econstructor; eauto.
+        - eapply sim_expr_exec_inv in Hsexpr. subst K.
+          repeat econstructor.
+        - intros _. eapply incrementPC_inv_Some in Hincrement1.
+          rewrite HPC in Hincrement1. destruct Hincrement1 as [ap1 [Hap1 [-> TT] ] ].
+          eapply rules_base.incrementPC_Some_inv in Hincrement2.
+          rewrite (Hsregs _ _ HPC) /= in Hincrement2.
+          destruct Hincrement2 as [? [? [? [? [? [? [XXX [Hap1' [-> XY] ] ] ] ] ] ] ] ]; inv XXX.
+          rewrite Hap1 in Hap1'; inv Hap1'.
+          econstructor; eauto.
+          + econstructor; eauto.
+            * intros rr. destruct (reg_eq_dec PC rr); [subst rr; rewrite lookup_insert|rewrite lookup_insert_ne; auto].
+              { destruct (Hregsdef PC) as [wpc [Hwpc HinterpPC] ].
+                rewrite HPC in Hwpc; inv Hwpc.
+                simpl in HinterpPC; destruct HinterpPC.
+                eexists; split; eauto. simpl; split; auto.
+                intros. apply H3 in H5. clear -H5; set_solver. }
+              destruct (Hregsdef rr) as [wrr [Hwrr Hinterprr] ].
+              eexists; split; eauto. apply interp_heap_extend; auto.
+            * intros. generalize (Hstkdisjheap a ltac:(eexists; apply H0)).
+              simpl in Hinterpdst. destruct Hinterpdst as [? ?].
+              generalize (H5 aa ltac:(clear -Hcond2; solve_addr)).
+              intros. apply Hdisj in H6.
+              assert (aa <> a) by (clear -H6 H7; solve_addr).
+              rewrite !lookup_insert_ne; auto. apply Hstksim in H0.
+              destruct H0 as [? [? ?] ]; do 2 (split; auto).
+              apply interp_heap_extend; auto.
+            * admit.
+          + admit.
+          + admit.
+          + admit. }
+      { admit. }
     - (* Lt *)
       assert (match (lang.z_of_argument reg1 r1, lang.z_of_argument reg1 r2) with
               | (Some n1, Some n2) => 
@@ -1512,8 +1727,8 @@ Section overlay_to_cap_lang.
                 + eexists; split; simpl; eauto.
                 + rewrite lookup_insert_ne //. destruct (reg_eq_dec dst rr); [subst rr; rewrite lookup_insert|].
                   * eexists; split; simpl; eauto.
-                    simpl in Hinterpdst. destruct Hinterpdst as [? [? ?] ].
-                    do 2 (split; auto). simpl. intros; apply H5; auto.
+                    simpl in Hinterpdst. destruct Hinterpdst as [? [? [? ?] ] ].
+                    do 3 (split; auto). simpl. intros; apply H6; auto.
                     destruct p0; simpl in HisU; try congruence; auto.
                   * rewrite lookup_insert_ne //.
               - intros rr. destruct (reg_eq_dec PC rr); [subst rr; rewrite !lookup_insert; inversion 1; simpl; auto|].
@@ -1550,9 +1765,9 @@ Section overlay_to_cap_lang.
                 + eexists; split; simpl; eauto.
                 + rewrite lookup_insert_ne //. destruct (reg_eq_dec dst rr); [subst rr; rewrite lookup_insert|].
                   * eexists; split; simpl; eauto.
-                    destruct Hinterpdst as [? [? ?] ].
-                    do 2 (split; auto). simpl; intros; eapply H5.
-                    simpl. clear -HisU H6 l; destruct p0; try congruence; auto; solve_addr.
+                    destruct Hinterpdst as [? [? [? ?] ] ].
+                    do 3 (split; auto). simpl; intros; eapply H6.
+                    simpl. clear -HisU H7 l; destruct p0; try congruence; auto; solve_addr.
                   * rewrite lookup_insert_ne //.
               - intros rr. destruct (reg_eq_dec PC rr); [subst rr; rewrite !lookup_insert; inversion 1; simpl; auto|].
                 rewrite !(lookup_insert_ne _ PC); auto.
@@ -1810,11 +2025,11 @@ Section overlay_to_cap_lang.
                 * destruct (reg_eq_dec dst rr); [subst rr; rewrite lookup_insert|rewrite lookup_insert_ne; auto].
                   eexists; split; eauto. simpl. simpl in Hinterpdst.
                   destruct (decodePermPair nn) as [px gx] eqn:Hpermpair.
-                  destruct Hinterpdst as [? [? ?] ]. split; auto.
-                  split; auto. simpl. intros; apply H2.
+                  destruct Hinterpdst as [? [? [? ?] ] ]. split; auto.
+                  split; auto. split; auto. simpl. intros; apply H3.
                   rewrite /PermPairFlowsTo /= in Hflowsto.
                   eapply andb_true_iff in Hflowsto; destruct Hflowsto.
-                  clear -H5 H3; destruct px; destruct p0; simpl in H5; try congruence; solve_addr.
+                  clear -H6 H5; destruct px; destruct p0; simpl in H6; try congruence; solve_addr.
               + intros rr. destruct (reg_eq_dec PC rr); [subst rr; rewrite !lookup_insert; inversion 1; auto| rewrite !(lookup_insert_ne _ PC); auto].
                 destruct (reg_eq_dec dst rr); [subst rr; rewrite !lookup_insert; inversion 1; auto| rewrite !lookup_insert_ne; auto].
                 simpl. destruct (decodePermPair) as [px gx]; simpl; repeat f_equal.
@@ -2124,15 +2339,18 @@ Section overlay_to_cap_lang.
                 * eexists; split; eauto.
                 * destruct (reg_eq_dec dst rr); [subst rr; rewrite lookup_insert|rewrite lookup_insert_ne;auto].
                   eexists; split; eauto.
-                  destruct Hinterpdst as [QQ [WW ZZ] ].
+                  destruct Hinterpdst as [QQ [WW [TT ZZ] ] ].
                   split; auto. apply andb_true_iff in HisWithin.
                   destruct HisWithin. apply leb_addr_spec in H0.
                   apply leb_addr_spec in H3.
                   split; [clear -H3 WW; solve_addr|].
-                  intros. apply ZZ.
-                  assert ((addr_reg.min aa2 (lang.canReadUpTo (inr (Stk n p0 aa1 aa2 a2))) <= addr_reg.min a1 (lang.canReadUpTo (inr (Stk n p0 a0 a1 a2))))%a).
-                  { clear -H3. destruct p0; simpl; solve_addr. }
-                  clear -H5 H0 H6. solve_addr.
+                  split; auto. 
+                  { intros. eapply TT in H6; eauto.
+                    clear -H0 H6; solve_addr. }
+                  { intros. apply ZZ.
+                    assert ((addr_reg.min aa2 (lang.canReadUpTo (inr (Stk n p0 aa1 aa2 a2))) <= addr_reg.min a1 (lang.canReadUpTo (inr (Stk n p0 a0 a1 a2))))%a).
+                    { clear -H3. destruct p0; simpl; solve_addr. }
+                    clear -H5 H0 H6. solve_addr. }
               + intros rr. destruct (reg_eq_dec PC rr); [subst rr; rewrite !lookup_insert| rewrite !(lookup_insert_ne _ PC); auto].
                 * inversion 1; auto.
                 * destruct (reg_eq_dec dst rr); [subst rr; rewrite !lookup_insert|rewrite !(lookup_insert_ne _ dst); auto].
@@ -2687,7 +2905,7 @@ Section overlay_to_cap_lang.
             destruct (Addr_le_dec a0 a); [|inv Hverify].
             destruct (Addr_lt_dec a a2); [|inv Hverify].
             destruct (Addr_le_dec a2 a1); inv Hverify; auto. }
-          destruct Hinterpsrc as [T1 [T2 T3] ].
+          destruct Hinterpsrc as [T1 [T2 [T4 T3] ] ].
           simpl.
           match goal with |- context [(if ?Q then _ else _) = _] => destruct Q as [_|KK]; [auto|elim KK; auto] end.
           exists stk. split; auto.
@@ -2772,8 +2990,8 @@ Section overlay_to_cap_lang.
               { econstructor; eauto. intros rr.
                 destruct (reg_eq_dec PC rr); [subst rr; rewrite lookup_insert; eauto| rewrite lookup_insert_ne; eauto].
                 eexists; split; eauto.
-                simpl. destruct Hinterpaa as [? [? ?] ].
-                do 2 (split; auto).
+                simpl. destruct Hinterpaa as [? [? [HH ?] ] ].
+                do 3 (split; auto).
                 intros; eapply H2. simpl.
                 destruct X2 as [? [? [? [? ?] ] ] ].
                 destruct ppp; try congruence; auto. }
@@ -2845,8 +3063,8 @@ Section overlay_to_cap_lang.
               { econstructor; eauto. intros rr.
                 destruct (reg_eq_dec PC rr); [subst rr; rewrite lookup_insert; eauto| rewrite lookup_insert_ne; eauto].
                 eexists; split; eauto.
-                simpl. destruct Hinterpaa as [? [? ?] ].
-                do 2 (split; auto).
+                simpl. destruct Hinterpaa as [? [? [HH ?] ] ].
+                do 3 (split; auto).
                 intros; eapply H2. simpl.
                 destruct X2 as [? [? [? [? ?] ] ] ].
                 destruct ppp; try congruence; auto. }
@@ -3026,8 +3244,9 @@ Section overlay_to_cap_lang.
                 * eexists; split; simpl; eauto.
                 * rewrite lookup_insert_ne //.
                   destruct (reg_eq_dec dst rr); [subst rr; rewrite lookup_insert|rewrite lookup_insert_ne; auto].
-                  eexists; split; eauto. destruct Hinterpdst as [? [? ?] ]; simpl; auto.
+                  eexists; split; eauto. destruct Hinterpdst as [? [? [HH ?] ] ]; simpl; auto.
                   split; auto. split; [clear -H1; solve_addr|].
+                  split; auto.
                   intros; eapply H2. simpl. clear -H3. 
                   destruct p0; simpl in H3; solve_addr.
               + intros rr. destruct (reg_eq_dec PC rr); [subst rr; rewrite !lookup_insert; inversion 1; simpl; auto|].
@@ -3622,6 +3841,7 @@ Section overlay_to_cap_lang.
             { subst r. rewrite lookup_insert. eauto.
               eexists; split; eauto. simpl. split; auto.
               split; [solve_addr|].
+              split; [intros; try congruence|].
               intros. solve_addr. }
             { rewrite lookup_insert_ne; auto.
               destruct (reg_eq_dec r PC).
@@ -3638,11 +3858,8 @@ Section overlay_to_cap_lang.
                 exists (inl 0%Z). split; [|simpl; auto].
                 rewrite lookup_gset_to_gmap_Some. split; auto.
                 eapply all_registers_s_correct. }
-          * intros. inv Hwfcomp. inv Hwf_pre. eapply Hdisjstk.
-            eapply elem_of_gmap_dom; auto.
-          * intros. rewrite lookup_empty in H1; inv H1.
-(*          * exists b_stk, b_stk. rewrite region_addrs_empty; [|clear; solve_addr].
-            simpl. rewrite dom_empty_L. reflexivity.*)
+          * intros. rewrite lookup_empty in H1. destruct H1; congruence.
+          * intros. rewrite lookup_empty in H1. inv H1.
           * econstructor. }
         { intros. destruct (reg_eq_dec r call.r_stk).
           * subst r. rewrite lookup_insert in H1.
@@ -4349,7 +4566,7 @@ Section overlay_to_cap_lang.
               assert (Ha1b: (a1 <= b)%a).
               { simpl in HinterpPC. destruct HinterpPC as [A B].
                 generalize (B b ltac:(clear -H6; inv H6; solve_addr)). intro C.
-                eapply elem_of_gmap_dom in C. generalize (Hstkdisjheap _ C). intros.
+                generalize (Hdisj _ C). intros.
                 simpl in Hinterpwstk. destruct Hinterpwstk as [? [X ?] ].
                 clear -X H1; solve_addr. }
               rewrite /update_reg /=. eapply rtc_transitive.
@@ -4384,7 +4601,7 @@ Section overlay_to_cap_lang.
                       destruct (Hsh ai _ ltac:(eauto)) as [X1 X2].
                       rewrite -Hinstri lookup_insert_ne. 
                       rewrite X1 //.
-                      generalize (Hstkdisjheap ai ltac:(eexists; eauto)).
+                      generalize (Hdisj ai ltac:(eapply elem_of_dom; eexists; eauto)).
                       simpl in Hinterpwstk. destruct Hinterpwstk as [? [X ?] ].
                       clear -Hastkend Hrange2 X. solve_addr.
                   + intros. destruct (Hregsdef r) as [wrr [Hwrr ?] ]. eauto.
@@ -5044,7 +5261,7 @@ Section overlay_to_cap_lang.
             assert (Ha1b: (a1 <= b)%a).
             { simpl in HinterpPC. destruct HinterpPC as [A B].
               generalize (B b ltac:(clear -H6; inv H6; solve_addr)). intro C.
-              eapply elem_of_gmap_dom in C. generalize (Hstkdisjheap _ C). intros.
+              generalize (Hdisj _ C). intros.
               simpl in Hinterpwstk. destruct Hinterpwstk as [? [X ?] ].
               clear -X H1; solve_addr. }
             econstructor.
@@ -5071,7 +5288,7 @@ Section overlay_to_cap_lang.
                         intros [_ XY]. destruct H5. generalize (XY a4 ltac:(left; clear -n0; solve_addr)).
                         rewrite H2. rewrite lookup_empty. congruence. }
                         clear -Hlower Hhigher; solve_addr.
-                    - destruct Hinterpwstk as [_ [ZZ YZ] ].
+                    - destruct Hinterpwstk as [_ [ZZ [TY YZ] ] ].
                       generalize (YZ a0 ltac:(simpl; clear -Hstkrange1 Hastkend Hrange2; solve_addr)).
                       intros YY.
                       generalize (Hstkdisj d1 (length cs) ltac:(lia) stk1 stk ltac:(rewrite /stack; destruct (nat_eq_dec d1 (length cs)); [elim n0; auto|]; auto) ltac:(rewrite /stack; destruct (nat_eq_dec (length cs) (length cs)); [reflexivity|congruence]) a3 a0 H4 YY).
@@ -5106,7 +5323,7 @@ Section overlay_to_cap_lang.
                       destruct (Addr_lt_dec a4 a2).
                       + rewrite (HH a4 ltac:(left; auto)) in H3.
                         apply (Hstkdisj d1 d2 H1 stk1 stk ltac:(rewrite /stack; destruct (nat_eq_dec d1 (length cs)); [elim n1; auto|]; auto) ltac:(rewrite /stack; destruct (nat_eq_dec d2 (length cs)); [reflexivity|congruence]) a3 a4 H4 ltac:(eexists; eapply H3)).
-                      + destruct Hinterpwstk as [_ [ZZ YZ] ].
+                      + destruct Hinterpwstk as [_ [ZZ [TY YZ] ] ].
                         generalize (YZ a0 ltac:(simpl; clear -Hstkrange1 Hastkend Hrange2; solve_addr)).
                         intros YY.
                         generalize (Hstkdisj d1 (length cs) ltac:(lia) stk1 stk ltac:(rewrite /stack; destruct (nat_eq_dec d1 (length cs)); [elim n1; auto|]; auto) ltac:(rewrite /stack; destruct (nat_eq_dec (length cs) (length cs)); [reflexivity|congruence]) a3 a0 H4 YY).
@@ -5126,10 +5343,20 @@ Section overlay_to_cap_lang.
                     eapply interp_updatePcPerm_regular; eauto. }
                   destruct (reg_eq_dec call.r_stk r); [subst r; rewrite lookup_insert|rewrite lookup_insert_ne //].
                   { eexists; split; [reflexivity|]. simpl.
-                    split; [lia|]. split; [destruct Hinterpwstk as [? [? ?] ]; auto|].
+                    split; [lia|]. split; [destruct Hinterpwstk as [? [? [QQ ?] ] ]; auto|].
+                    split; [destruct Hinterpwstk as [? [? [QQ ?] ] ]; auto|].
+                    { intros. destruct (nat_eq_dec d' (length cs)).
+                      - subst d'. assert (stk' = clear_stk saved_stk ^(a2 + 99)%a).
+                        clear -H4. congruence.
+                        clear H4. subst stk'.
+                        destruct (clear_stk_spec saved_stk ^(a2 + 99)%a) as [R1 R2].
+                        destruct (Addr_lt_dec a' ^(a2 + 99)%a); auto.
+                        erewrite R1 in H5. destruct H5; congruence.
+                        clear -n0; solve_addr.
+                      - eapply QQ in H5; eauto. clear -Hstkrange1 H5; solve_addr. }
                     intros. assert (Hwretargslen: length wretargs = 1 + length rargs) by (rewrite /wretargs app_length map_length //).
                     generalize (@push_words_lookup_spec wretargs ∅ ^(a2 + 99)%a e new_stk ltac:(clear -Hastkend Hrange2 H6 Ha1b Hwretargslen; rewrite Hwretargslen; inv H6; solve_addr) Hnew_stk).
-                    intros [YY _].
+                    intros [YY PP].
                     assert (x = ^(^(a2 + 99)%a + (Z.to_nat (z_of x - z_of ^(a2 + 99)%a)))%a) as ->.
                     { clear -H1; solve_addr. }
                     erewrite YY; [|rewrite Hwretargslen; clear -H1 Hastkend; solve_addr].
@@ -5143,6 +5370,15 @@ Section overlay_to_cap_lang.
                   exists (inl 0%Z); split; [|simpl; auto].
                   eapply lookup_gset_to_gmap_Some; split; auto.
                   eapply elem_of_list_to_set. eapply all_registers_correct.
+                * assert (Hwretargslen: length wretargs = 1 + length rargs) by (rewrite /wretargs app_length map_length //).
+                  generalize (@push_words_lookup_spec wretargs ∅ ^(a2 + 99)%a e new_stk ltac:(clear -Hastkend Hrange2 H6 Ha1b Hwretargslen; rewrite Hwretargslen; inv H6; solve_addr) Hnew_stk).
+                  intros [YY YZ].
+                  intros. destruct Hinterpwstk as [W1 [W2 W3] ].
+                  destruct (Addr_le_dec ^(^(a2 + 99)%a + length wretargs)%a a3).
+                  { rewrite YZ in H1; auto. rewrite lookup_empty in H1.
+                    destruct H1; congruence. }
+                  rewrite Hwretargslen in n. clear -Hastkend Hrange2 W2 n.
+                  solve_addr.
                 * assert (Hwretargslen: length wretargs = 1 + length rargs) by (rewrite /wretargs app_length map_length //).
                   generalize (@push_words_lookup_spec wretargs ∅ ^(a2 + 99)%a e new_stk ltac:(clear -Hastkend Hrange2 H6 Ha1b Hwretargslen; rewrite Hwretargslen; inv H6; solve_addr) Hnew_stk).
                   intros [YY YZ].
@@ -5252,8 +5488,8 @@ Section overlay_to_cap_lang.
                     - eexists; split; [eauto|]. simpl. auto.
                     - destruct (reg_eq_dec call.r_stk r); [subst r; rewrite lookup_insert|rewrite lookup_insert_ne //].
                       + eexists; split; eauto. simpl.
-                        destruct Hinterpwstk as [? [? DD] ].
-                        split; auto. split; auto.
+                        destruct Hinterpwstk as [? [? [EE DD] ] ].
+                        split; auto. split; auto. split; auto.
                         intros. simpl in DD. destruct (addr_eq_dec x a2).
                         * subst x. destruct (clear_stk_spec saved_stk ^(a2 + 99)%a) as [QQ WW].
                           rewrite WW; [|clear -Hastkend; solve_addr].
@@ -5291,8 +5527,8 @@ Section overlay_to_cap_lang.
                         simpl in EE. intro FF.
                         destruct wr; simpl; auto.
                         destruct c0; simpl; simpl in Hinterpr; auto.
-                        destruct Hinterpr as [? [? ?] ].
-                        do 2 (split; auto). intros x XX.
+                        destruct Hinterpr as [? [? [CC ?] ] ].
+                        do 3 (split; auto). intros x XX.
                         generalize (H3 x XX). intros [wx Hwx].
                         simpl in FF. destruct (clear_stk_spec saved_stk ^(a2 + 99)%a) as [QQ WW].
                         apply leb_addr_spec in FF.
@@ -5310,6 +5546,12 @@ Section overlay_to_cap_lang.
                           destruct H4 as [j [HH GG] ].
                           rewrite GG (AA j HH).
                           rewrite list_lookup_lookup_total_lt; eauto. }
+                  { intros. destruct (clear_stk_spec saved_stk ^(a2 + 99)%a) as [QQ WW].
+                    destruct Hinterpwstk as [X1 [X2 [X3 X4] ] ].
+                    destruct (Addr_lt_dec a3 ^(a2 + 99)%a) as [FF|FF].
+                    - clear -X2 FF Hastkend Hrange2. solve_addr.
+                    - rewrite QQ in H1. destruct H1; congruence.
+                      clear -FF; solve_addr. }
                   { intros. destruct (clear_stk_spec saved_stk ^(a2 + 99)%a) as [QQ WW].
                     destruct (Addr_lt_dec a3 ^(a2 + 99)%a) as [FF|FF]; [|rewrite QQ in H1; [inv H1|clear -FF; solve_addr] ].
                     rewrite WW in H1; auto.
@@ -5334,7 +5576,7 @@ Section overlay_to_cap_lang.
                       do 2 (split; auto).
                       destruct w; auto.
                       destruct c0; simpl in W; simpl; auto.
-                      destruct W as [W1 [W2 W3] ]. do 2 (split; auto).
+                      destruct W as [W1 [W2 [W4 W3] ] ]. do 3 (split; auto).
                       intros x T. generalize (W3 _ T); intros [wx T'].
                       rewrite /canBeStored /= in E. apply leb_addr_spec in E.
                       rewrite WW; [|clear -FF E T; solve_addr].
@@ -5360,8 +5602,8 @@ Section overlay_to_cap_lang.
                           * subst j. rewrite GG2 lookup_insert.
                             simpl in H1. inv H1.
                             split; auto. split; [|rewrite /canBeStored /=; apply leb_addr_spec; clear; solve_addr].
-                            simpl. destruct Hinterpwstk as [? [? ?] ].
-                            do 2 (split; auto). simpl in H3.
+                            simpl. destruct Hinterpwstk as [? [? [II ?] ] ].
+                            do 3 (split; auto). simpl in H3.
                             intros x Hx. destruct (Addr_lt_dec x a2) as [PP|PP].
                             { rewrite WW; [|clear -PP; solve_addr].
                               rewrite BB; [|left; auto]. eapply H3. clear -Hx PP; solve_addr. }
@@ -5389,8 +5631,8 @@ Section overlay_to_cap_lang.
                             destruct (Hregsdef r) as [wr [Hwr Hinterpwr] ].
                             rewrite Hwr. destruct wr; auto.
                             destruct c0; simpl in Hinterpwr; simpl; auto.
-                            destruct Hinterpwr as [F1 [F2 F3] ].
-                            do 2 (split; auto). rewrite Hwr /= in Hcan.
+                            destruct Hinterpwr as [F1 [F2 [F4 F3] ] ].
+                            do 3 (split; auto). rewrite Hwr /= in Hcan.
                             apply leb_addr_spec in Hcan. intros x Hx.
                             rewrite WW; [|clear -Hx Hcan AQ Hastkend; solve_addr].
                             destruct (Addr_lt_dec x a2) as [RR|RR].
@@ -5419,7 +5661,8 @@ Section overlay_to_cap_lang.
                             eapply elem_of_list_filter in H1. destruct H1 as [Q _].
                             destruct w; eauto. elim Q; auto. } } }
                   { assert (Hhgood: forall a, is_Some (h !! a) -> mem2''' !! a = mem2 !! a).
-                    { intros x Hx. generalize (Hstkdisjheap _ Hx). intros Hxx.
+                    { intros x Hx. eapply elem_of_dom in Hx.
+                      generalize (Hdisj _ Hx). intros Hxx.
                       replace mem2''' with (ac, mem2''').2 by reflexivity.
                       rewrite -Hpush3. destruct (Hinterpwstk) as [_ [Hstkbound ?] ].
                       erewrite push_words_no_check_spec; [|instantiate (1:=e); rewrite map_length; clear -Hastkend Hrange2 Ha1b H6; inv H6; solve_addr |right; rewrite map_length; clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
@@ -5465,7 +5708,8 @@ Section overlay_to_cap_lang.
                 eapply lookup_gset_to_gmap_Some in H1. destruct H1.
                 eapply lookup_gset_to_gmap_Some; split; auto. inv H2; auto.
               + assert (Hhgood: forall a, is_Some (h !! a) -> mem2''' !! a = mem2 !! a).
-                { intros x Hx. generalize (Hstkdisjheap _ Hx). intros Hxx.
+                { intros x Hx. apply elem_of_dom in Hx.
+                  generalize (Hdisj _ Hx). intros Hxx.
                   replace mem2''' with (ac, mem2''').2 by reflexivity.
                   rewrite -Hpush3. destruct (Hinterpwstk) as [_ [Hstkbound ?] ].
                   erewrite push_words_no_check_spec; [|instantiate (1:=e); rewrite map_length; clear -Hastkend Hrange2 Ha1b H6; inv H6; solve_addr |right; rewrite map_length; clear -Hastkend Hrange2 Hxx Hstkbound; solve_addr].
