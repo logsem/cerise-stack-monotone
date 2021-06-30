@@ -803,6 +803,7 @@ Section overlay_to_cap_lang.
               rewrite Hincrement2.
               eapply rules_base.incrementPC_success_updatePC in Hincrement2.
               destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+              instantiate (1 := mem2) in Z3.
               rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto.
           + rewrite /= /base.RegLocate Hwsrc /base.update_reg /= in H1.
             rewrite /= /RegLocate Hwsrc' /update_reg /= in H2.
@@ -837,6 +838,7 @@ Section overlay_to_cap_lang.
               rewrite Hincrement2.
               eapply rules_base.incrementPC_success_updatePC in Hincrement2.
               destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+              instantiate (1 := mem2) in Z3.
               rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto. }
       destruct (Hregsdef src) as [wsrc [Hwsrc Hinterp1] ].
       generalize (Hsregs _ _ Hwsrc); intros Hwsrc'.
@@ -1069,6 +1071,7 @@ Section overlay_to_cap_lang.
             rewrite HX.
             eapply rules_base.incrementPC_success_updatePC in HX.
             destruct HX as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            instantiate (1 := (<[aa:=translate_word wsrc]> mem2)) in Z3.
             rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
           { erewrite incrementPC_fail_updatePC in X1; eauto.
             inv X1; split; auto.
@@ -1092,6 +1095,7 @@ Section overlay_to_cap_lang.
             rewrite HX.
             eapply rules_base.incrementPC_success_updatePC in HX.
             destruct HX as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            instantiate (1 := <[a2:=translate_word wsrc]> mem2) in Z3.
             rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
           { simpl in Hinterpdst. destruct Hinterpdst as [TT Hinterpdst].
             destruct (nat_eq_dec n (length cs)) as [_|RR]; [|elim RR; auto].
@@ -1291,6 +1295,7 @@ Section overlay_to_cap_lang.
               rewrite HX.
               eapply rules_base.incrementPC_success_updatePC in HX.
               destruct HX as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+              instantiate (1 := mem2) in Z3.
               rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto.
             * erewrite incrementPC_fail_updatePC in H1; eauto.
               inv H1; split; auto.
@@ -1399,6 +1404,7 @@ Section overlay_to_cap_lang.
               rewrite HX.
               eapply rules_base.incrementPC_success_updatePC in HX.
               destruct HX as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+              instantiate (1 := mem2) in Z3.
               rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto.
             * erewrite incrementPC_fail_updatePC in H1; eauto.
               inv H1; split; auto.
@@ -1507,6 +1513,7 @@ Section overlay_to_cap_lang.
               rewrite HX.
               eapply rules_base.incrementPC_success_updatePC in HX.
               destruct HX as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+              instantiate (1 := mem2) in Z3.
               rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto.
             * erewrite incrementPC_fail_updatePC in H1; eauto.
               inv H1; split; auto.
@@ -1674,6 +1681,7 @@ Section overlay_to_cap_lang.
                     rewrite Hincrement2.
                     eapply rules_base.incrementPC_success_updatePC in Hincrement2.
                     destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+                    instantiate (1 := mem2) in Z3.
                     rewrite Z3 -Z4 in X2. destruct pp; try congruence; inv X1; inv X2; repeat split; auto.
                 - destruct pp; simpl in HisU; try congruence; inv X1; inv X2; auto. }
               assert (exists w, (<[dst:=inr (Regular (pp, gg, bb, ee, aa'))]> reg1) !! PC = Some w /\ (<[dst:=inr (pp, gg, bb, ee, aa')]> reg2) !! PC = Some (translate_word w)) as [wpc [HY HZ] ].
@@ -1690,6 +1698,7 @@ Section overlay_to_cap_lang.
               rewrite Hincrement2.
               eapply rules_base.incrementPC_success_updatePC in Hincrement2.
               destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+              instantiate (1 := mem2) in Z3.
               rewrite Z3 -Z4 in X2. destruct pp; simpl in HisU; try congruence; inv X1; inv X2; repeat split; auto.
             * simpl in Hc'; inv Hc'. destruct (perm_eq_dec p0 E).
               { subst p0. inv X1; inv X2; auto. }
@@ -1713,6 +1722,7 @@ Section overlay_to_cap_lang.
                     rewrite Hincrement2.
                     eapply rules_base.incrementPC_success_updatePC in Hincrement2.
                     destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+                    instantiate (1 := mem2) in Z3.
                     rewrite Z3 -Z4 in X2. destruct p0; try congruence; inv X1; inv X2; repeat split; auto.
                 - destruct p0; simpl in HisU; try congruence; inv X1; inv X2; auto. }
               assert (exists w, (<[dst:=inr (Stk n p0 a0 a1 aa')]> reg1) !! PC = Some w /\ (<[dst:=inr (p0, Monotone, a0, a1, aa')]> reg2) !! PC = Some (translate_word w)) as [wpc [HY HZ] ].
@@ -1729,6 +1739,7 @@ Section overlay_to_cap_lang.
               rewrite Hincrement2.
               eapply rules_base.incrementPC_success_updatePC in Hincrement2.
               destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+              instantiate (1 := mem2) in Z3.
               rewrite Z3 -Z4 in X2. destruct p0; simpl in HisU; try congruence; inv X1; inv X2; repeat split; auto. }
       destruct (lang.z_of_argument reg1 r) as [nn|] eqn:Harg1; cycle 1.
       { destruct AA as [-> ->]. econstructor.
@@ -2024,6 +2035,7 @@ Section overlay_to_cap_lang.
                 rewrite Hincrement2.
                 eapply rules_base.incrementPC_success_updatePC in Hincrement2.
                 destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+                instantiate (1 := mem2) in Z3.
                 rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
         { destruct (perm_eq_dec p0 E).
           - subst p0. simpl in H1, H2; rewrite /base.RegLocate Hwdst in H1; rewrite /RegLocate Hwdst' /= in H2.
@@ -2072,6 +2084,7 @@ Section overlay_to_cap_lang.
                 rewrite Hincrement2.
                 eapply rules_base.incrementPC_success_updatePC in Hincrement2.
                 destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+                instantiate (1 := mem2) in Z3.
                 rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. } }
       clear H1 H2. destruct (Hregsdef dst) as [wdst [Hwdst Hinterpdst] ].
       rewrite Hwdst in AA.
@@ -2362,6 +2375,7 @@ Section overlay_to_cap_lang.
                 rewrite Hincrement2.
                 eapply rules_base.incrementPC_success_updatePC in Hincrement2.
                 destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+                instantiate (1 := mem2) in Z3.
                 rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
             * destruct (perm_eq_dec p0 E); [inv X1; inv X2; auto|].
               replace lang.isWithin with isWithin in X1 by reflexivity.
@@ -2379,6 +2393,7 @@ Section overlay_to_cap_lang.
                 rewrite Hincrement2.
                 eapply rules_base.incrementPC_success_updatePC in Hincrement2.
                 destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+                instantiate (1 := mem2) in Z3.
                 rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. } }
       destruct (Hregsdef dst) as [wdst [Hwdst Hinterpdst] ].
       rewrite Hwdst in AA. destruct wdst as [|cdst].
@@ -2558,6 +2573,7 @@ Section overlay_to_cap_lang.
           rewrite Hincrement2.
           eapply rules_base.incrementPC_success_updatePC in Hincrement2.
           destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+          instantiate (1 := mem2) in Z3.
           rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
       destruct AA as [nn AA]. destruct (incrementPC (<[dst:=inl nn]> reg1)) as [reg1''|] eqn:Hincrement1; cycle 1.
         + destruct AA as [-> ->]. econstructor.
@@ -2626,6 +2642,7 @@ Section overlay_to_cap_lang.
           rewrite Hincrement2.
           eapply rules_base.incrementPC_success_updatePC in Hincrement2.
           destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+          instantiate (1 := mem2) in Z3.
           rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
       destruct (Hregsdef r) as [wr [Hwr Hinterpwr] ].
       rewrite Hwr in AA. destruct wr as [nr|cr].
@@ -2700,6 +2717,7 @@ Section overlay_to_cap_lang.
           rewrite Hincrement2.
           eapply rules_base.incrementPC_success_updatePC in Hincrement2.
           destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+          instantiate (1 := mem2) in Z3.
           rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
       destruct (Hregsdef r) as [wr [Hwr Hinterpwr] ].
       rewrite Hwr in AA. destruct wr as [nr|cr].
@@ -2776,6 +2794,7 @@ Section overlay_to_cap_lang.
           rewrite Hincrement2.
           eapply rules_base.incrementPC_success_updatePC in Hincrement2.
           destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+          instantiate (1 := mem2) in Z3.
           rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
       destruct (Hregsdef r) as [wr [Hwr Hinterpwr] ].
       rewrite Hwr in AA. destruct wr as [nr|cr].
@@ -2852,6 +2871,7 @@ Section overlay_to_cap_lang.
           rewrite Hincrement2.
           eapply rules_base.incrementPC_success_updatePC in Hincrement2.
           destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+          instantiate (1 := mem2) in Z3.
           rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
       destruct (Hregsdef r) as [wr [Hwr Hinterpwr] ].
       rewrite Hwr in AA. destruct wr as [nr|cr].
@@ -2928,6 +2948,7 @@ Section overlay_to_cap_lang.
           rewrite Hincrement2.
           eapply rules_base.incrementPC_success_updatePC in Hincrement2.
           destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+          instantiate (1 := mem2) in Z3.
           rewrite Z3 -Z4 in X2. inv X1; inv X2; repeat split; auto. }
       destruct (Hregsdef r) as [wr [Hwr Hinterpwr] ].
       rewrite Hwr in AA. destruct wr as [nr|cr].
@@ -3062,6 +3083,7 @@ Section overlay_to_cap_lang.
             rewrite Hincrement2.
             eapply rules_base.incrementPC_success_updatePC in Hincrement2.
             destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            instantiate (1 := mem2) in Z3.
             rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto. }
         - rewrite /= /base.RegLocate Hwsrc /= in H1; rewrite /= /RegLocate Hwsrc' /= in H2.
           destruct (isU p0) eqn:HisU; [|inv H1; inv H2; auto].
@@ -3106,6 +3128,7 @@ Section overlay_to_cap_lang.
             rewrite Hincrement2.
             eapply rules_base.incrementPC_success_updatePC in Hincrement2.
             destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            instantiate (1 := mem2) in Z3.
             rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto. } }
       clear H1 H2. destruct wsrc.
       { destruct AA as [-> ->]. econstructor; eauto.
@@ -3366,6 +3389,7 @@ Section overlay_to_cap_lang.
             rewrite Hincrement2.
             eapply rules_base.incrementPC_success_updatePC in Hincrement2.
             destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            instantiate (1 := <[aa:=translate_word wsrc]> mem2) in Z3.
             rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto.
           - rewrite /base.update_reg /base.update_mem /= in H1.
             rewrite /update_reg /update_mem /= in H2.
@@ -3380,6 +3404,7 @@ Section overlay_to_cap_lang.
             rewrite Hincrement2.
             eapply rules_base.incrementPC_success_updatePC in Hincrement2.
             destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            instantiate (1 := <[aa':=translate_word wsrc]> mem2) in Z3.
             rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto. }
         { assert (UU: z_of_argument reg2 offs = lang.z_of_argument reg1 offs).
           { destruct offs; simpl; auto.
@@ -3424,6 +3449,7 @@ Section overlay_to_cap_lang.
             rewrite Hincrement2.
             eapply rules_base.incrementPC_success_updatePC in Hincrement2.
             destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            instantiate (1 := <[a2:=translate_word wsrc]> mem2) in Z3.
             rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto.
           - rewrite /base.update_reg /base.update_mem /update_stk /= in H1.
             rewrite /update_reg /update_mem /= in H2.
@@ -3439,6 +3465,7 @@ Section overlay_to_cap_lang.
             rewrite Hincrement2.
             eapply rules_base.incrementPC_success_updatePC in Hincrement2.
             destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            instantiate (1 := <[aa':=translate_word wsrc]> mem2) in Z3.
             rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto. } }
       clear H1 H2. destruct wdst.
       { destruct AA as [-> ->]. econstructor; eauto.
@@ -3837,6 +3864,7 @@ Section overlay_to_cap_lang.
             rewrite Hincrement2.
             eapply rules_base.incrementPC_success_updatePC in Hincrement2.
             destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            instantiate (1 := mem2) in Z3.
             rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto.
         - destruct (perm_eq_dec p0 E); [inv H1; inv H2; auto|].
           rewrite /base.update_reg /= in H1.
@@ -3854,6 +3882,7 @@ Section overlay_to_cap_lang.
             rewrite Hincrement2.
             eapply rules_base.incrementPC_success_updatePC in Hincrement2.
             destruct Hincrement2 as [p' [g' [b' [e' [a' [a'' [Z1 [Z2 [Z3 [Z4 Z5] ] ] ] ] ] ] ] ] ].
+            instantiate (1 := mem2) in Z3.
             rewrite Z3 -Z4 in H2. inv H1; inv H2; repeat split; auto. }
       clear H1 H2. destruct (Hregsdef dst) as [wdst [Hwdst Hinterpdst] ].
       generalize (Hsregs _ _ Hwdst); intros Hwdst'.
@@ -3963,7 +3992,6 @@ Section overlay_to_cap_lang.
                 rewrite !(lookup_insert_ne _ PC) //.
                 destruct (reg_eq_dec dst rr); [subst rr; rewrite !lookup_insert|rewrite !lookup_insert_ne; auto].
                 inversion 1; auto. }
-  Unshelve. all: apply ∅.
   Qed.
 
   Lemma foldl_pop_instrs_acc:
