@@ -725,7 +725,13 @@ Section opsem.
                                               end
                                        | None => (Failed, φ)
                                        end
-                                     else updatePC (update_mem φ a' w)
+                                     else if nat_eq_dec d (length (callstack φ))  
+                                         then
+                                           updatePC (update_stk φ a' w)
+                                         else match update_stack φ d a' w with
+                                              | None => (Failed, φ)
+                                              | Some φ' => updatePC φ'
+                                              end
                                    else (Failed, φ)
                        end
         end
