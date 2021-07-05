@@ -16,7 +16,7 @@ Definition updatePC (φ: ExecConf): Conf :=
   match RegLocate (reg φ) PC with
   | inr (Regular ((p, g), b, e, a)) =>
     match (a + 1)%a with
-    | Some a' => 
+    | Some a' =>
       match p with
       | E | URWLX | URWX | URWL | URW => (Failed, φ)
       | _ => let φ' := (update_reg φ PC (inr (Regular ((p, g), b, e, a')))) in (NextI, φ')
@@ -25,7 +25,7 @@ Definition updatePC (φ: ExecConf): Conf :=
     end
   | inr (Stk d p b e a) =>
     match (a + 1)%a with
-    | Some a' => 
+    | Some a' =>
       match p with
       | E | URWLX | URWX | URWL | URW => (Failed, φ)
       | _ => let φ' := (update_reg φ PC (inr (Stk d p b e a'))) in
@@ -42,12 +42,6 @@ Definition updatePcPerm (w: base.Word): base.Word :=
   | inr (Stk d E b e a) => inr (Stk d RX b e a)
   | _ => w
   end.
-
-(*Fixpoint jmp_ret (d: nat) (cs: list Stackframe) :=
-  match cs with
-  | sf::cs => if nat_eq_dec d (length cs) then Some (sf, cs) else jmp_ret d cs
-  | [] => None
-  end.*)
 
 Fixpoint stack (d: nat) (cs: list Stackframe) :=
   match cs with
@@ -725,7 +719,7 @@ Section opsem.
                                               end
                                        | None => (Failed, φ)
                                        end
-                                     else if nat_eq_dec d (length (callstack φ))  
+                                     else if nat_eq_dec d (length (callstack φ))
                                          then
                                            updatePC (update_stk φ a' w)
                                          else match update_stack φ d a' w with
@@ -749,7 +743,6 @@ Section opsem.
       end
     end.
 
-  (* TODO: define *)
   Definition clear_regs (reg: base.Reg) (l: list RegName) :=
     foldr (fun r reg => <[r := inl 0%Z]> reg) reg l.
 
@@ -847,12 +840,7 @@ Section opsem.
     | inr _ => Fail
     end.
 
-  (* Simplification for now: do not allow passing stack derived capabilities *)
-  (* Definition is_reasonable (cs: list Stackframe) (a: Addr) (w: base.Word): Prop := 
-     match cs with
-     | [] => True
-     | (reg, sf):: cs => *)
-  Definition is_reasonable (w: base.Word): Prop :=
+  Definition is_safe (w: base.Word): Prop :=
     match w with
     | inl _ => True
     | inr (Stk d p b e a) => False
@@ -860,8 +848,8 @@ Section opsem.
     | inr (Regular _) => True
     end.
 
-  Lemma is_reasonable_dec:
-    forall w, Decision (is_reasonable w).
+  Lemma is_safe_dec:
+    forall w, Decision (is_safe w).
   Proof.
     destruct w.
     - left; simpl; auto.
@@ -882,7 +870,7 @@ Section opsem.
       (a' < e)%a /\
       (forall i, (i < (141 + length rargs))%nat ->
             exists a_i, (a + i)%a = Some a_i /\ (call_instrs rf rargs) !! i = m !! a_i) /\
-      (forall r, r ∈ rf::rargs -> is_reasonable (regs !r! r)).
+      (forall r, r ∈ rf::rargs -> is_safe (regs !r! r)).
 
   Lemma is_call_determ:
     forall regs rf1 rf2 rargs1 rargs2 m a e,
@@ -1014,7 +1002,7 @@ Section opsem.
       | None => (Failed, φ) (* Not enough space to push everything on the stack *)
       end
       else (Failed, φ)
-    | _ => 
+    | _ =>
       (* Won't be able to store the return capability if not URWLX *)
       (Failed, φ)
     end
@@ -1149,10 +1137,10 @@ Section opsem.
             rewrite call_instrs_length; auto. eapply fin_to_nat_lt.
         - right; intros [a_i' [A B]].
           inversion A. }
-      assert (Decision (∀ r : RegName, r ∈ rf::rargs → is_reasonable (regs !r! r))).
+      assert (Decision (∀ r : RegName, r ∈ rf::rargs → is_safe (regs !r! r))).
       { clear. induction (rf::rargs).
         - left. intros. inversion H.
-        - destruct (is_reasonable_dec (regs !r! a)).
+        - destruct (is_safe_dec (regs !r! a)).
           + destruct IHl.
             * left. intros. eapply elem_of_cons in H.
               destruct H; [subst a|]; auto.

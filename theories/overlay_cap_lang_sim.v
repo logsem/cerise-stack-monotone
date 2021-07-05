@@ -394,7 +394,7 @@ Section overlay_to_cap_lang.
 
   Lemma interp_call_preserved:
     forall w h stk cs,
-      is_reasonable w ->
+      is_safe w ->
       interp w h stk cs ->
       forall new_stk reg' stk',
         interp w h new_stk ((reg', stk')::cs).
@@ -8854,7 +8854,7 @@ Section overlay_to_cap_lang.
               + econstructor; eauto.
                 * intros. destruct (reg_eq_dec PC r); [subst r; rewrite lookup_insert| rewrite lookup_insert_ne //].
                   { eexists; split; [reflexivity|].
-                    assert (Hwrf_reasonable: is_reasonable wrf).
+                    assert (Hwrf_reasonable: is_safe wrf).
                     { generalize (Hreasonable rf ltac:(eapply elem_of_cons; left; auto)).
                       rewrite /base.RegLocate Hwrf //. }
                     destruct wrf; simpl in Hwrf_reasonable; [simpl; auto|].
@@ -8994,7 +8994,7 @@ Section overlay_to_cap_lang.
                     split; [inv H1; auto|].
                     generalize (Hregsdef rn0). intros [w0 [Hw0 Hw0'] ].
                     rewrite Hw0 in H1; inv H1.
-                    assert (Hreasonablew0: is_reasonable w).
+                    assert (Hreasonablew0: is_safe w).
                     { eapply elem_of_list_lookup_2 in Hrn0.
                       generalize (Hreasonable rn0 ltac:(eapply elem_of_cons; right; auto)).
                       rewrite /base.RegLocate Hw0 //. }
@@ -9214,7 +9214,7 @@ Section overlay_to_cap_lang.
                     eapply sim_cs_call_preserve; eauto. }
               + intros. destruct (reg_eq_dec PC r); [subst r| rewrite lookup_insert_ne // in H1; rewrite lookup_insert_ne //].
                 { rewrite lookup_insert in H1; rewrite lookup_insert.
-                  assert (Hwrf_reasonable: is_reasonable wrf).
+                  assert (Hwrf_reasonable: is_safe wrf).
                   { generalize (Hreasonable rf ltac:(eapply elem_of_cons; left; auto)).
                     rewrite /base.RegLocate Hwrf //. }
                   inv H1. destruct wrf; simpl; auto. destruct c0; inv Hwrf_reasonable; auto.
