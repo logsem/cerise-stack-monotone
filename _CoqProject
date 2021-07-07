@@ -18,6 +18,8 @@ theories/overlay/call.v
 theories/overlay/lang.v
 theories/machine_run.v
 theories/region.v
+theories/overlay_cap_lang_sim.v
+theories/full_abstraction.v
 theories/multiple_updates.v
 theories/region_invariants.v
 theories/region_invariants_transitions.v
