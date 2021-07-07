@@ -23,7 +23,7 @@ those, two options:
 ```
     # Add the coq-released repo (skip if you already have it)
     opam repo add coq-released https://coq.inria.fr/opam/released
-    # Install Coq 8.9.1 (skip if already installed)
+    # Install Coq 8.12.0 (skip if already installed)
     opam install coq.8.12.0
     opam update
     opam install coq-iris.3.3.0
@@ -48,8 +48,14 @@ development takes around XXh to compile. In particular, the files
 can each take up to 25 minutes to compile.
 
 It is possible to run `make fundamental` to only build files up to the
-Fundamental Theorem (and `make fundamental-binary` to build up until the binary FTLR). 
-This usually takes up 20 minutes.
+Fundamental Theorem (and `make fundamental-binary` to build up until the binary
+FTLR, or `make full-abstraction` to build up until the full abstraction
+theorem). This usually takes up 20 minutes.
+
+## Checking for admits
+
+The command `make check-admitted` will grep for `'admit\|Admitted\|ADMITTED'` in
+the Coq files.
 
 # Documentation
 
@@ -125,7 +131,7 @@ The organization of the `theories/` folder is as follows.
 
 ## Binary Model
 
-## Case studies: Integrity
+### Case studies: Integrity
 
 In the `examples` folder:
 
@@ -144,7 +150,7 @@ In the `examples` folder:
 
 - `awkward_example{_u}{_preamble}{_adequacty}.v`:
 
-## Case studies: Confidentiality
+### Case studies: Confidentiality
 
 In the `binary_model/examples_binary` folder:
 
@@ -207,4 +213,4 @@ In the model:
 | sharedResources | region                  |
 | Temporary       | Monotemporary           |
 
-In `scall_u.v` : the scall macro is slightly unfolded, as it does not include the part of the calling convention which stores local state on the stack. That part is inlined into the examples. 
+In `scall_u.v` : the scall macro is slightly unfolded, as it does not include the part of the calling convention which stores local state on the stack. That part is inlined into the examples.
