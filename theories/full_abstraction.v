@@ -250,7 +250,6 @@ Section Compile_fully_abstract.
     destruct (m1 !! i), (m2 !! i); auto.
   Qed.
 
-  (* I hate Coq *)
   Lemma backtranslate_resolve_imports:
     forall imp exp ms
       (Himpdisj: forall s1 s2 a, (s1, a) ∈ imp -> (s2, a) ∈ imp -> s1 = s2),

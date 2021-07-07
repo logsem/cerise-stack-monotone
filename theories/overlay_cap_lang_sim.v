@@ -444,7 +444,6 @@ Section overlay_to_cap_lang.
         (Hregsdef: forall r, exists w, reg !! r = Some w /\ interp w h stk cs)
         (Hstkdisjheap: forall a, is_Some (stk !! a) -> (a < e_stk)%a)
         (Hstksim: forall a w, stk !! a = Some w -> m !! a = Some (translate_word w) /\ interp w h stk cs /\ canBeStored w a)
-(*        (Hcontiguous: exists b_stk e_stk a_stk, reg !! call.r_stk = Some (inr (Stk (length cs) URWLX b_stk e_stk a_stk)) /\ dom (gset _) stk = list_to_set (region_addrs b_stk ^(a_stk + 98)%a))*)
         (Hcs: sim_cs true h cs m),
         sim_cs true h ((reg, stk)::cs) m
  | sim_cs_cons_false:
@@ -453,8 +452,6 @@ Section overlay_to_cap_lang.
         (Hregsdef: forall r, exists w, reg !! r = Some w /\ interp w h stk cs)
         (Hstkdisjheap: forall a, is_Some (stk !! a) -> (a < e_stk)%a)
         (Hstksim: forall a w, stk !! a = Some w -> m !! a = Some (translate_word w) /\ interp w h stk cs /\ canBeStored w a)
-        (* This is the only difference, for the topmost frame, the shape of the stack is not frozen yet *)
-(*        (Hcontiguous: exists b_stk e_stk, dom (gset _) stk = list_to_set (region_addrs b_stk e_stk))*)
         (Hcs: sim_cs true h cs m),
         sim_cs false h ((reg, stk)::cs) m.
 
@@ -1084,8 +1081,7 @@ Section overlay_to_cap_lang.
           rewrite /update_mem /= in X2.
           generalize (Hsregs _ _ HPC). intros HPC'.
           destruct (incrementPC reg1) as [reg1''|] eqn:Hincrement1.
-          { (* TODO: generalize here *)
-            simpl in Hinterpdst. destruct Hinterpdst as [TT Hinterpdst].
+          { simpl in Hinterpdst. destruct Hinterpdst as [TT Hinterpdst].
             destruct (nat_eq_dec n (length cs)) as [_|RR]; [|elim RR; auto].
             rewrite /update_stk /= in X1.
             erewrite incrementPC_success_updatePC in X1; eauto.
@@ -4784,8 +4780,7 @@ Section overlay_to_cap_lang.
           rewrite /update_mem /= in X2.
           generalize (Hsregs _ _ HPC). intros HPC'.
           destruct (incrementPC reg1) as [reg1''|] eqn:Hincrement1.
-          { (* TODO: generalize here *)
-            simpl in Hinterpdst. destruct Hinterpdst as [TT Hinterpdst].
+          { simpl in Hinterpdst. destruct Hinterpdst as [TT Hinterpdst].
             destruct (nat_eq_dec n (length cs)) as [_|RR]; [|elim RR; auto].
             rewrite /update_stk /= in X1.
             erewrite incrementPC_success_updatePC in X1; eauto.
@@ -9690,8 +9685,6 @@ Local Transparent all_registers.
                     destruct (nat_eq_dec d2 (S (length cs'))); [lia|].
                     exact H3. }
                 { inv Hcs; econstructor; eauto. }
-(*                  destruct Hcontiguous0 as [? [? [? [? ?] ] ] ].
-                  eexists; eexists; eauto. } *)
                 { intros r w X; rewrite lookup_fmap X /= //. } }
           assert ((exists r1 r2, decodeInstrW' (base.MemLocate h a) = Jnz r1 r2) \/ (forall r1 r2, decodeInstrW' (base.MemLocate h a) <> Jnz r1 r2)).
           { clear. destruct (decodeInstrW' (base.MemLocate h a)); eauto. }
@@ -10099,8 +10092,6 @@ Local Transparent all_registers.
                       destruct (nat_eq_dec d2 (S (length cs'))); [lia|].
                       exact H3. }
                   { inv Hcs; econstructor; eauto. }
-  (*                  destruct Hcontiguous0 as [? [? [? [? ?] ] ] ].
-                    eexists; eexists; eauto. } *)
                   { intros r w X; rewrite lookup_fmap X /= //. } } }
           (* Not Jmp nor Jnz so we know we only need one step *)
           set res := exec (decodeInstrW (mem2 !m! a)) (reg2, mem2).
@@ -10479,8 +10470,6 @@ Local Transparent all_registers.
                     destruct (nat_eq_dec d2 (S (length cs'))); [lia|].
                     exact H3. }
                 { inv Hcs; econstructor; eauto. }
-(*                  destruct Hcontiguous0 as [? [? [? [? ?] ] ] ].
-                  eexists; eexists; eauto. } *)
                 { intros r w X; rewrite lookup_fmap X /= //. } }
           assert ((exists r1 r2, decodeInstrW' (base.MemLocate m a) = Jnz r1 r2) \/ (forall r1 r2, decodeInstrW' (base.MemLocate m a) <> Jnz r1 r2)).
           { clear. destruct (decodeInstrW' (base.MemLocate m a)); eauto. }
@@ -10904,8 +10893,6 @@ Local Transparent all_registers.
                       destruct (nat_eq_dec d2 (S (length cs'))); [lia|].
                       exact H3. }
                   { inv Hcs; econstructor; eauto. }
-  (*                  destruct Hcontiguous0 as [? [? [? [? ?] ] ] ].
-                    eexists; eexists; eauto. } *)
                   { intros r w X; rewrite lookup_fmap X /= //. } } }
           (* Not Jmp nor Jnz so we know we only need one step *)
           set res := exec (decodeInstrW (mem2 !m! a)) (reg2, mem2).
