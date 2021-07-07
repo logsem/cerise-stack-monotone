@@ -106,6 +106,7 @@ theories/examples/disjoint_regions_tactics.v
 theories/examples/region_macros.v
 theories/examples/contiguous.v
 theories/examples/stack_macros_helpers.v
+theories/examples/awkward_example_helpers.v
 theories/examples/macros/malloc.v
 theories/examples/macros/req.v
 theories/examples/macros/push_pop.v
@@ -117,6 +118,7 @@ theories/examples/macros/assert.v
 theories/examples/macros/checkint.v
 theories/examples/macros/checkra.v
 theories/examples/macros/scall_u.v
+theories/examples/macros/crtcls.v
 theories/examples/macros/macros.v
 theories/examples/downwards_lse.v
 theories/examples/stack_object_helpers.v
