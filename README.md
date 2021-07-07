@@ -1,6 +1,5 @@
 This directory contains the Coq mechanization accompanying the submission
-"Efficient and Provable Local Capability Revocation using Uninitialized
-Capabilities".
+"Le Temps des Cerises: Bringing Temporal Stack Safety to Capability Machines".
 
 # Building the proofs
 
@@ -8,7 +7,7 @@ Capabilities".
 
 You need to have [opam](https://opam.ocaml.org/) >= 2.0 installed.
 
-The development is known to compile with Coq 8.9.1 and Iris 3.2.0. To install
+The development is known to compile with Coq 8.12.0 and Iris 3.3.0. To install
 those, two options:
 
 - **Option 1**: create a fresh *local* opam switch with everything needed:
@@ -24,10 +23,10 @@ those, two options:
 ```
     # Add the coq-released repo (skip if you already have it)
     opam repo add coq-released https://coq.inria.fr/opam/released
-    # Install Coq 8.9.1 (skip if already installed)
-    opam install coq.8.9.1
+    # Install Coq 8.12.0 (skip if already installed)
+    opam install coq.8.12.0
     opam update
-    opam install coq-iris.3.2.0
+    opam install coq-iris.3.3.0
 ```
 
 ### Troubleshooting
@@ -44,12 +43,13 @@ make -jN  # replace N with the number of CPU cores of your machine
 ```
 
 We recommend that you have **32Gb of RAM+swap**. Please be aware that the
-development takes around 1h to compile. In particular, the files
-`theories/examples/awkward_example{,_u}.v` can each take up to 25 minutes to
-compile.
+development takes around XXh to compile. In particular, the files
+`theories/examples/awkward_example_u.v` and `theories/examples/stack_object.v` 
+can each take up to 25 minutes to compile.
 
 It is possible to run `make fundamental` to only build files up to the
-Fundamental Theorem. This usually takes up 20 minutes.
+Fundamental Theorem (and `make fundamental-binary` to build up until the binary FTLR). 
+This usually takes up 20 minutes.
 
 # Documentation
 
@@ -78,14 +78,7 @@ The organization of the `theories/` folder is as follows.
 - `cap_lang.v`: Defines the operational semantics of the machine, and the
   embedding of the capability machine language into Iris.
 
-- `machine_run.v`: Defines an executable version of the operational semantics,
-  allowing to use them as an interpreter to run a concrete machine
-  configuration.
-
-## Program logic
-
-- `monocmra.v`, `mono_ref.v`: Definition of monotonic references in Iris, used
-  to define the points-to predicate for memory addresses.
+## Program logic (Unary)
 
 - `region.v`: Auxiliary definitions to reason about consecutive range of
   addresses and memory words.
@@ -96,10 +89,12 @@ The organization of the `theories/` folder is as follows.
 - `rules.v`: Imports all the Hoare triple rules for each instruction. These
   rules are separated into separate files (located in the `rules/` folder).
 
-## Logical relation
+## Logical relation (Unary)
 
 - `multiple_updates.v`: Auxiliary definitions to reason about multiple updates
   to a world.
+
+- `region_invariants_transitions.v`: 
 
 - `region_invariants.v`: Definitions for standard resources, and the shared
   resources map *sharedResources*. Contains some lemmas for "opening" and
@@ -111,9 +106,10 @@ The organization of the `theories/` folder is as follows.
 - `region_invariants_static.v`: Lemmas for manipulating frozen standard
   resources.
 
-- `region_invariants_uninitialized.v`: Lemmas for manipulating frozen standard
-  singleton resources. These are specifically for manipulating the resources
-  that are related to the interpretation of uninitialized capabilities.
+- `region_invariants_batch_uninitialized.v`: Lemmas for manipulating uninitialized standard
+  resources.
+
+- `region_invariants_allocation.v`:  
 
 - `sts.v`: The definition of *stsCollection*, and associated lemmas.
 
@@ -127,38 +123,39 @@ The organization of the `theories/` folder is as follows.
   (located in the `ftlr/` folder), which are all imported and applied in this
   file.
 
-## Case studies
+## Binary Model
+
+## Case studies: Integrity
 
 In the `examples` folder:
 
-- `stack_macros.v` and `stack_macros_u.v`: Specifications for some useful
-  macros, the former for a RWLX stack and the latter for a URWLX stack.
+- `macros/*` : Specifications for some useful macros
 
-- `scall.v`, `scall_u.v`: Specification of a safe calling convention for a RWLX
-  and URWLX stack respectively. Each specification is split up into two parts:
+- `macros/scall_u.v`: Specification of a safe calling convention for
+  a URWLX Monotone stack. The specification is split up into two parts:
   the prologue is the specification for the code before the jump, the epilogue
   is the specification for the activation record.
 
-- `lse.v` : A small and simple example that relies on local state encapsulation. 
+- `macros/malloc.v`: A simple malloc implementation, and its specification.
 
-- `malloc.v`: A simple malloc implementation, and its specification.
+- `downwards_lse{_preamble}{_adequacty}.v`:
 
-- `awkward_example.v`, `awkward_example_u.v`: The proof of safety for the body
-  of the awkward example (the former using scall with stack clearing, the latter
-  using scallU without stack clearing).
+- `stack_object{_preamble}{_adequacty}.v`:
 
-- `awkward_example_preamble.v`: Proof of safety of the preamble to the awkward
-  example (in which a closure to the body of the awkward example is dynamically
-  allocated). This corresponds to *Lemma 6.2*.
+- `awkward_example{_u}{_preamble}{_adequacty}.v`:
 
-- `awkward_example_adequacy.v`: Proof of correctness of the awkward example
-  against the operational semantics of the machine, *Theorem 6.3*.
+## Case studies: Confidentiality
 
-- `awkward_example_concrete.v`: A concrete instantiation of the correctness
-  theorem of the awkward example on a concrete machine, linked with a concrete
-  "adversarial program". Then, we also prove that this concrete machine
-  configurations indeed runs and gracefully halts.
+In the `binary_model/examples_binary` folder:
 
+- `macros_binary` : Exports all macro specifications for the "spec" side of the
+  binary logical relation
+
+- `confidentiality{_adequacy}{_adequacy_theorem}.v`: 
+
+## Overlay semantics
+
+## Full abstraction
 
 # Differences with the paper
 
@@ -180,10 +177,9 @@ In the model:
 
 | *name in paper* | *name in mechanization* |
 |-----------------|-------------------------|
-| Frozen          | Static                  |
+| Frozen          | Monostatic              |
 | stsCollection   | full_sts_world          |
 | sharedResources | region                  |
+| Temporary       | Monotemporary           |
 
-In `scall.v` and `scall_u.v` : the scall macro is in both cases slightly unfolded, as it does not include the part of the calling convention which stores local state on the stack. That part is inlined into the awkward examples. 
-
-In `awkward_example_u.v`: in the mechanized version of the awkward example (uninitialized version), we clear the local stack frame in two stages: before the second call, we clear the part of the frame which is frozen during the first call, but passed to the adversary during the second call (i.e. a single address at the top of the first local stack frame), and before returning to the caller we clear the rest of the local stack frame (see Section 4.2 for further detail on clearing the local stack frame upon returning to an adversary call). 
+In `scall_u.v` : the scall macro is slightly unfolded, as it does not include the part of the calling convention which stores local state on the stack. That part is inlined into the examples. 
