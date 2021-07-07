@@ -89,21 +89,13 @@ Qed.
 Section awkward_helpers.
   Context {Σ:gFunctors} {memg:memG Σ} {regg:regG Σ}
           {stsg : STSG Addr region_type Σ} {heapg : heapG Σ}
-          `{MonRef: MonRefG (leibnizO _) CapR_rtc Σ} {nainv: logrel_na_invs Σ}
+          {nainv: logrel_na_invs Σ}
           `{MP: MachineParameters}.
 
   Notation STS := (leibnizO (STS_states * STS_rels)).
   Notation STS_STD := (leibnizO (STS_std_states Addr region_type)).
   Notation WORLD := (prodO STS_STD STS).
   Implicit Types W : WORLD.
-
-  Ltac iPrologue prog :=
-    iDestruct prog as "[Hi Hprog]";
-    iApply (wp_bind (fill [SeqCtx])).
-
-  Ltac iEpilogue prog :=
-    iNext; iIntros prog; iSimpl;
-    iApply wp_pure_step_later;auto;iNext.
 
   Lemma updatePcPerm_RX w g b e a :
     inr (RX, g, b, e, a) = updatePcPerm w ->
@@ -114,152 +106,82 @@ Section awkward_helpers.
     destruct c,p,p,p,p;simplify_eq;auto.
   Qed.
 
-  Lemma exec_wp W p g b e a :
-    isCorrectPC (inr (p, g, b, e, a)) ->
-    exec_cond W b e g p interp -∗
-    ∀ r W', future_world g e W W' → ▷ ((interp_expr interp r) W') (inr (p, g, b, e, a)).
-  Proof.
-    iIntros (Hvpc) "Hexec".
-    rewrite /exec_cond /enter_cond.
-    iIntros (r W'). rewrite /future_world.
-    assert (a ∈ₐ[[b,e]])%I as Hin.
-    { rewrite /in_range. inversion Hvpc; subst. auto. }
-    destruct g.
-    - iIntros (Hrelated).
-      iSpecialize ("Hexec" $! a r W' Hin Hrelated).
-      iFrame.
-    - iIntros (Hrelated).
-      iSpecialize ("Hexec" $! a r W' Hin Hrelated).
-      iFrame.
-    - iIntros (Hrelated).
-      iSpecialize ("Hexec" $! a r W' Hin Hrelated).
-      iFrame.
-  Qed.
-
-  (* The following lemma is to assist with a pattern when jumping to unknown valid capablities *)
-  Lemma jmp_or_fail_spec W w φ :
-     (interp W w
-    -∗ (if decide (isCorrectPC (updatePcPerm w)) then
-          (∃ p g b e a, ⌜w = inr (p,g,b,e,a)⌝
-          ∗ □ ∀ r W', future_world g e W W' → ▷ ((interp_expr interp r) W') (updatePcPerm w))
-        else
-          φ FailedV ∗ PC ↦ᵣ updatePcPerm w -∗ WP Seq (Instr Executable) {{ φ }} )).
-  Proof.
-    iIntros "#Hw".
-    destruct (decide (isCorrectPC (updatePcPerm w))).
-    - inversion i.
-      destruct w;inversion H. destruct c,p0,p0,p0; inversion H.
-      destruct H1 as [-> | [-> | ->] ].
-      + destruct p0; simpl in H; simplify_eq.
-        * iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
-          iDestruct (interp_exec_cond with "Hw") as "Hexec";[auto|].
-          iApply exec_wp;auto.
-        * iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
-          rewrite /= fixpoint_interp1_eq /=.
-          iExact "Hw".
-      + destruct p0; simpl in H; simplify_eq.
-        iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
-        iDestruct (interp_exec_cond with "Hw") as "Hexec";[auto|].
-        iApply exec_wp;auto.
-      + destruct p0; simpl in H; simplify_eq.
-        iExists _,_,_,_,_; iSplit;[eauto|]. iModIntro.
-        iDestruct (interp_exec_cond with "Hw") as "Hexec";[auto|].
-        iApply exec_wp;auto.
-    - iIntros "[Hfailed HPC]".
-      iApply (wp_bind (fill [SeqCtx])).
-      iApply (wp_notCorrectPC with "HPC");eauto.
-      iEpilogue "_". iApply wp_value. iFrame.
-  Qed.
-
 
   (* Lemma which splits a list of temp resources into its persistent and non persistent parts *)
    Lemma temp_resources_split l W :
-     ([∗ list] a ∈ l, (∃ (p : Perm) (φ : WORLD * Word → iPropI Σ),
-                          ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝ ∗ temp_resources W φ a p ∗ rel a p φ)
+     ([∗ list] a ∈ l, (∃ (φ : WORLD * Word → iPropI Σ),
+                          ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝ ∗ monotemp_resources W φ a ∗ rel a φ)
                         ∗ ⌜std (revoke W) !! a = Some Revoked⌝) -∗
-     ∃ (ws : list Word), □ ([∗ list] a;w ∈ l;ws, ∃ p φ, ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
-                                                             ∗ ⌜p ≠ O⌝
+     ∃ (ws : list Word), □ ([∗ list] a;w ∈ l;ws, ∃ φ, ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
                                                              ∗ φ (W,w)
-                                                             ∗ rel a p φ
-                                                             ∗ (if pwl p then future_pub_plus_mono φ w
-                                                                else future_priv_mono φ w))
+                                                             ∗ rel a φ
+                                                             ∗ future_pub_a_mono a φ w )
                           ∗ ⌜Forall (λ a, std (revoke W) !! a = Some Revoked) l⌝
-                          ∗ ([∗ list] a;w ∈ l;ws, ∃ p φ, a ↦ₐ[p] w ∗ rel a p φ).
+                          ∗ ([∗ list] a;w ∈ l;ws, ∃ φ, a ↦ₐ w ∗ rel a φ).
    Proof.
-     rewrite /temp_resources.
+     rewrite /monotemp_resources.
      iIntros "Hl".
-     iAssert ([∗ list] a ∈ l, ∃ (v : Word), (∃ (p : Perm) (φ : WORLD * Word → iPropI Σ),
+     iAssert ([∗ list] a ∈ l, ∃ (v : Word), (∃ (φ : WORLD * Word → iPropI Σ),
                             ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
-                            ∗ ⌜p ≠ O⌝
-                            ∗ a ↦ₐ[p] v ∗ (if pwl p then future_pub_plus_mono φ v else future_priv_mono φ v) ∗ φ (W, v)
-                            ∗ rel a p φ ∗ ⌜std (revoke W) !! a = Some Revoked⌝))%I
+                            ∗ a ↦ₐ v ∗ (future_pub_a_mono a φ v) ∗ φ (W, v)
+                            ∗ rel a φ ∗ ⌜std (revoke W) !! a = Some Revoked⌝))%I
        with "[Hl]" as "Hl".
      { iApply (big_sepL_mono with "Hl").
        iIntros (k y Hy) "Hy".
        iDestruct "Hy" as "[Hy Hy']".
-       iDestruct "Hy" as (p φ) "(Hpers & Hv & Hrel)".
-       iDestruct "Hv" as (v) "(Hne & Hy & Hmono & Hφ)".
-       iExists v,p,φ. iFrame.
+       iDestruct "Hy" as (φ) "(Hpers & Hv & Hrel)".
+       iDestruct "Hv" as (v) "(Hy & Hmono & Hφ)".
+       iExists v,φ. iFrame.
      }
      iDestruct (region_addrs_exists with "Hl") as (wps) "Hl".
      iExists wps. iSplit.
-     - iAssert ([∗ list] a;w ∈ l;wps, ∃ p φ, ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
-                                                             ∗ ⌜p ≠ O⌝
+     - iAssert ([∗ list] a;w ∈ l;wps, ∃ φ, ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
                                                              ∗ φ (W,w)
-                                                             ∗ rel a p φ
-                                                             ∗ (if pwl p then future_pub_plus_mono φ w
-                                                                else future_priv_mono φ w))%I
+                                                             ∗ rel a φ
+                                                             ∗ (future_pub_a_mono a φ w))%I
          with "[Hl]" as "Hl".
        { iApply (big_sepL2_mono with "Hl").
          iIntros (k y1 y2 Hy1 Hy2) "Hy".
-         iDestruct "Hy" as (p φ) "(Hpers & Hne & Hy & Hmono & Hφ & Hrel & Hrev)".
-         iExists p,φ. iFrame.
+         iDestruct "Hy" as (φ) "(Hpers & Hy & Hmono & Hφ & Hrel & Hrev)".
+         iExists φ. iFrame.
        }
        iDestruct (region_addrs_exists2 with "Hl") as (ps Hlen) "Hl".
-       iDestruct (region_addrs_exists2 with "Hl") as (φs Hlen') "Hl".
+       (* iDestruct (region_addrs_exists2 with "Hl") as (φs Hlen') "Hl". *)
        iDestruct (big_sepL2_sep with "Hl") as "[Hpers Hl]".
        iDestruct (big_sepL2_length with "Hl") as %Hlength.
        iDestruct (big_sepL2_to_big_sepL_r with "Hpers") as "Hpers";auto.
        iDestruct (big_sepL_forall with "Hpers") as %Hpers.
-       iAssert ([∗ list] y1;y2 ∈ l;zip (zip wps ps) φs, □ (⌜y2.1.2 ≠ O⌝
-                                                 ∗ y2.2 (W, y2.1.1)
-                                                   ∗ rel y1 y2.1.2 y2.2
-                                                     ∗ (if pwl y2.1.2
-                                                        then future_pub_plus_mono y2.2 y2.1.1
-                                                        else future_priv_mono y2.2 y2.1.1)))%I
+       iAssert ([∗ list] y1;y2 ∈ l;(zip wps ps), □ (y2.2 (W, y2.1)
+                                                   ∗ rel y1 y2.2
+                                                     ∗ (future_pub_a_mono y1 y2.2 y2.1)))%I
          with "[Hl]" as "Hl".
        { iApply (big_sepL2_mono with "Hl").
          iIntros (k y1 y2 Hy1 Hy2) "Hy".
-         apply Hpers with (Wv:=(W,y2.1.1)) in Hy2.
-         destruct (pwl y2.1.2) eqn:Hpwl.
-         - iDestruct "Hy" as "#(Hne & Hy & Hrel & Hmono)".
-           iModIntro. iFrame "#".
-         - iDestruct "Hy" as "#(Hne & Hy & Hrel & Hmono)".
-           iModIntro. iFrame "#".
+         apply Hpers with (Wv:=(W,y2.1)) in Hy2.
+         iDestruct "Hy" as "#(Hy & Hrel & Hmono)".
+         iModIntro. iFrame "#".
        }
        iDestruct "Hl" as "#Hl".
        iModIntro. iApply region_addrs_exists2.
-       iExists ps. iSplit;auto. iApply region_addrs_exists2.
-       iExists φs. iSplit;auto.
+       iExists ps. iSplit;auto.
        iApply big_sepL2_sep. iSplit.
        + iApply big_sepL2_to_big_sepL_r;auto. iApply big_sepL_forall. auto.
        + iApply (big_sepL2_mono with "Hl").
          iIntros (k y1 y2 Hy1 Hy2) "Hy".
-         iDestruct "Hy" as "#(Hne & Hy & Hrel & Hmono)".
+         iDestruct "Hy" as "#(Hy & Hrel & Hmono)".
          iFrame "#".
-     - iAssert ([∗ list] a0;c0 ∈ l;wps, (∃ p (φ : WORLD * Word → iPropI Σ),
+     - iAssert ([∗ list] a0;c0 ∈ l;wps, (∃ (φ : WORLD * Word → iPropI Σ),
                                     ⌜∀ Wv : WORLD * Word, Persistent (φ Wv)⌝
-                                    ∗ ⌜p ≠ O⌝
-                                      ∗ a0 ↦ₐ[p] c0
-                                        ∗ (if pwl p then future_pub_plus_mono φ c0 else future_priv_mono φ c0)
+                                      ∗ a0 ↦ₐ c0
+                                        ∗ (future_pub_a_mono a0 φ c0)
                                           ∗ φ (W, c0)
-                                            ∗ rel a0 p φ)
+                                            ∗ rel a0 φ)
                                               ∗ ⌜std (revoke W) !! a0 = Some Revoked⌝)%I
          with "[Hl]" as "Hl".
        { iApply (big_sepL2_mono with "Hl").
          iIntros (k y1 y2 Hy1 Hy2) "Hy".
-         iDestruct "Hy" as (p φ) "(?&?&?&?&?&?&?)".
-         iFrame. iExists _,_. iFrame.
+         iDestruct "Hy" as (φ) "(?&?&?&?&?&?)".
+         iFrame. iExists _. iFrame.
        }
        iDestruct (big_sepL2_sep with "Hl") as "[Hl #Hrev]".
        iDestruct (big_sepL2_length with "Hl") as %Hlength.
@@ -271,7 +193,7 @@ Section awkward_helpers.
            by apply Hrev with (x:=k).
        + iApply (big_sepL2_mono with "Hl").
          iIntros (k y1 y2 Hy1 Hy2) "Hy".
-         iDestruct "Hy" as (p φ) "(?&?&?&?&?&?)". iExists _,_.
+         iDestruct "Hy" as (φ) "(?&?&?&?&?)". iExists _.
          iFrame.
    Qed.
 
@@ -283,8 +205,8 @@ Section awkward_helpers.
    Definition awk_inv i a :=
      (∃ x:bool, sts_state_loc (A:=Addr) i x
            ∗ if x
-             then a ↦ₐ[RWX] inl 1%Z
-             else a ↦ₐ[RWX] inl 0%Z)%I.
+             then a ↦ₐ inl 1%Z
+             else a ↦ₐ inl 0%Z)%I.
 
    Definition awk_rel_pub := λ a b, a = false ∨ b = true.
    Definition awk_rel_priv := λ (a b : bool), True.
