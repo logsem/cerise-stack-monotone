@@ -1,5 +1,5 @@
-This directory contains the Coq mechanization accompanying the submission
-"Le Temps des Cerises: Bringing Temporal Stack Safety to Capability Machines".
+This directory contains the Coq mechanization accompanying the submission "Le
+Temps des Cerises: Bringing Temporal Stack Safety to Capability Machines".
 
 # Building the proofs
 
@@ -18,12 +18,12 @@ those, two options:
 ```
 
 - **Option 2 (manual installation)**: if you already have an opam switch with
-  ocaml >= 4.02.3 and < 4.10:
+  ocaml >= 4.10.0:
 
 ```
     # Add the coq-released repo (skip if you already have it)
     opam repo add coq-released https://coq.inria.fr/opam/released
-    # Install Coq 8.12.0 (skip if already installed)
+    # Install Coq 8.9.1 (skip if already installed)
     opam install coq.8.12.0
     opam update
     opam install coq-iris.3.3.0
@@ -153,9 +153,34 @@ In the `binary_model/examples_binary` folder:
 
 - `confidentiality{_adequacy}{_adequacy_theorem}.v`: 
 
+## Linking
+
+- `linking.v`: Defines the general theory of components, well-formed components,
+  linking and contexts as presented in Appendix A.
+
 ## Overlay semantics
 
-## Full abstraction
+In the `overlay` folder:
+
+- `lang.v`: Defines the overlay semantics. Note that we use a more restrictive
+  definition of *safe* words as explained in Appendix C due to some Coq
+  engineering issues.
+
+- `call.v`: Defines the implementation on the base machine of the call instruction.
+
+## Full abstraction theorem
+
+- `simulation.v`: Defines the general theory of forward simulations and prove
+  additional corollaries.
+  
+- `overlay_cap_lang_sim.v`: Proves the forward simulation between the overlay
+  semantics and the base capability machine. In particular, `sim` is the
+  simulation relation, and `overlay_to_cap_lang_fsim` is the proof of the
+  forward simulation.
+  
+- `full_abstraction.v`: Defines fully abstract compilation, and Theorem
+  `compile_fully_abstract` proves the full abstraction result of Theorem 6.1 in
+  the paper.
 
 # Differences with the paper
 
