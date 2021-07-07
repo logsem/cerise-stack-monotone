@@ -3,6 +3,7 @@ From iris.program_logic Require Import language ectx_language ectxi_language.
 From stdpp Require Import gmap fin_maps list finite.
 From cap_machine Require Export addr_reg machine_base machine_parameters linking.
 From cap_machine.overlay Require Import base call.
+(* From Equations Require Import Equations. *)
 
 Inductive ConfFlag : Type :=
 | Executable
@@ -177,8 +178,8 @@ Section surjective_finite.
     {| enum := remove_dups (f <$> enum A) |}.
   Next Obligation. apply NoDup_remove_dups. Qed.
   Next Obligation.
-    intros y. rewrite elem_of_remove_dups elem_of_list_fmap.
-    destruct (surj f y). eauto using elem_of_enum.
+    intros. rewrite elem_of_remove_dups elem_of_list_fmap.
+    destruct (surj f x). eauto using elem_of_enum.
   Qed.
 End surjective_finite.
 
@@ -839,6 +840,69 @@ Section opsem.
     | inl n => decodeInstrW (inl n)
     | inr _ => Fail
     end.
+
+  (* Definition measure (w: base.Word): nat := *)
+  (*   match w with *)
+  (*   | inr (Stk d p b e a) => Z.to_nat (canReadUpTo w) *)
+  (*   | _ => 0 *)
+  (*   end. *)
+
+  (* Inductive legal: list Stackframe -> Prop := *)
+  (* | legal_nil: *)
+  (*     legal [] *)
+  (* | legal_cons: *)
+  (*     forall reg stk cs *)
+  (*     (Hcons_legal: map_Forall (fun a w => canReadUpTo w <= a)%a stk) *)
+  (*     (Hlegal: legal cs), *)
+  (*     legal ((reg, stk)::cs). *)
+
+  (* Lemma is_legal_dec cs: *)
+  (*   Decision (legal cs). *)
+  (* Proof. *)
+  (*   induction cs. *)
+  (*   - left; constructor. *)
+  (*   - destruct IHcs. *)
+  (*     + destruct a as [reg stk]. *)
+  (*       assert (forall a w, Decision ((fun a w => canReadUpTo w <= a)%a a w)). *)
+  (*       { intros. apply (Addr_le_dec (canReadUpTo w) a). } *)
+  (*       destruct (map_Forall_dec (fun a w => canReadUpTo w <= a)%a stk). *)
+  (*       * left; econstructor; eauto. *)
+  (*       * right. intro Y. inversion Y; subst; clear Y. *)
+  (*         apply n; auto. *)
+  (*     + right. intro Y. apply n. inversion Y; auto. *)
+  (* Qed. *)
+
+  (* Fixpoint region_addrs_aux (b: Addr) (n: nat): list Addr := *)
+  (*   match n with *)
+  (*   | 0 => nil *)
+  (*   | S n => b :: (region_addrs_aux (^(b + 1)%a) n) *)
+  (*   end. *)
+
+  (* Definition region_size : Addr → Addr → nat := *)
+  (*   λ b e, Z.to_nat (e - b). *)
+
+  (* Definition region_addrs (b e: Addr): list Addr := *)
+  (*   region_addrs_aux b (region_size b e). *)
+
+  (* Equations is_safe_generalized (cs: list Stackframe) (w: base.Word): bool by wf (measure w) lt := *)
+  (* is_safe_generalized cs (inr (Stk d p b e a)) := *)
+  (*   if is_legal_dec cs then *)
+  (*     if nat_eq_dec d (length cs) then true *)
+  (*     else match cs !! d with *)
+  (*          | None => false *)
+  (*          | Some (reg, stk) => *)
+  (*            match reg !! r_stk with *)
+  (*            | Some (inr (Stk d' p' b' e' a')) => *)
+  (*              if Addr_lt_dec e a' then *)
+  (*                foldl (fun b a => match stk !! a with | Some w => b && (is_safe_generalized cs w) | _ => false end) true (region_addrs b (addr_reg.min e (canReadUpTo (inr (Stk d p b e a))))) *)
+  (*              else false *)
+  (*            | _ => false *)
+  (*            end *)
+  (*          end *)
+  (*   else false; *)
+  (* is_safe_generalized _ _ := true. *)
+  (* Next Obligation. *)
+  (* (* (* Cannot prove the obligation because Coq forgets that w is within (region_addrs b (addr_reg.min e (canReadUpTo w))) *) *) *)
 
   Definition is_safe (w: base.Word): Prop :=
     match w with
