@@ -7938,8 +7938,6 @@ Section overlay_to_cap_lang.
         fold stack; auto.
   Qed.
 
-  Axiom CHEAT: False.
-
   Lemma all_registers_list_difference_length:
     length (list_difference all_registers [PC; call.r_stk]) = 31.
   Proof. reflexivity. Qed.

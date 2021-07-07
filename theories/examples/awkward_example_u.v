@@ -1374,9 +1374,6 @@ Section awkward_example.
         apply contiguous_between_cons_inv_first in Hcont_code13. clear -Hcont_code13. subst;auto. }
       { rewrite !dom_delete_L !dom_insert_L. apply regmap_full_dom in Hr_all' as ->. clear. set_solver. }
 
-      (* Axiom foo:False. *)
-      (* exfalso;apply foo. } exfalso; apply foo. } exfalso; apply foo. Unshelve. all:exfalso;apply foo. Qed. *)
-
       (* we are reaching the end of the program, in which we return to the caller *)
       (* let's begin by extracting the validity of wret in W *)
       iAssert (▷ (interp W wret ∗ future_pub_a_mono bstk interpC wret))%I as "#(Hret_val & Hret_mono)".
