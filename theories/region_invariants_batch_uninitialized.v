@@ -812,6 +812,45 @@ Section heap.
       + iExists _. iFrame.
   Qed.
 
+  (* The following variant are for parameters that we know are temporary. For simplicity this lemma
+     takes each parameter one at a time *)
+  Lemma uninitialize_to_revoked_cond_states_param a w W E φ :
+    revoke_condition W →
+    W.1 !! a = Some (Uninitialized w) →
+    rel a φ ∗
+    region W ∗ sts_full_world W
+    ={E}=∗
+    region W ∗ sts_full_world (<s[a:=Revoked]s> W)
+    ∗ a ↦ₐ w.
+  Proof.
+    iIntros (Hcond Hforall) "(#Ha & Hr & Hsts)".
+    rewrite region_eq /region_def. iDestruct "Hr" as (M Mρ) "(HM & % & % & Hr)".
+    assert (is_Some (M !! a)) as [x Hx].
+    { apply elem_of_gmap_dom. rewrite -H0. apply elem_of_gmap_dom. eauto. }
+    iDestruct (big_sepM_delete _ _ a with "Hr") as "[Hx Hr]";[eauto|].
+    iDestruct "Hx" as (ρ Hρ) "[Hstate Hx]".
+    iDestruct (sts_full_state_std with "Hsts Hstate") as %Hstate.
+    (* rewrite -revoke_monotone_lookup_same' in Ha;[|rewrite Ha';auto]. *)
+    rewrite rel_eq RELS_eq /rel_def /RELS_def REL_eq /REL_def.
+    iDestruct "Ha" as (γpred) "[HREL Hsaved]".
+    iDestruct (reg_in with "[$HM $HREL]") as %Heqm. rewrite Heqm in Hx.
+    rewrite lookup_insert in Hx.
+    assert (Ha:=Hforall).
+    rewrite Ha in Hstate. inv Hstate.
+    iDestruct "Hx" as (φ' Hpers) "(#Hsaved' & Ha)".
+    iMod (sts_update_std _ _ _ Revoked with "Hsts Hstate") as "[Hsts Hstate]".
+    iDestruct (region_map_delete_nonstatic with "Hr") as "Hr";[rewrite Hρ;auto|].
+    iDestruct (region_map_insert_nonmonostatic Revoked with "Hr") as "Hr";[intros;auto|].
+    iDestruct (big_sepM_insert with "[$Hr Hstate]") as "Hr";[apply lookup_delete| |].
+    { iExists Revoked. iFrame. iSplit;[iPureIntro;apply lookup_insert|].
+      iExists _. iFrame "#". auto. }
+      rewrite insert_delete. inversion Hx. subst.
+    iModIntro. iFrame.
+    iExists _,_. iFrame. rewrite -insert_delete -Heqm. iFrame. iSplit;auto.
+    iPureIntro. rewrite -H1. assert (a ∈ dom (gset Addr) Mρ);[apply elem_of_gmap_dom;eauto|].
+    rewrite dom_insert_L. set_solver+H2.
+  Qed.
+
   Lemma uninitialize_to_revoked_states l W E φ :
     NoDup l →
     Forall (λ a, ∃ w, W.1 !! a = Some (Uninitialized w)) l →
@@ -827,6 +866,21 @@ Section heap.
     eapply Forall_impl;eauto.
     intros a [w Ha]. exists w. rewrite revoke_monotone_lookup_same';auto.
     rewrite Ha. auto.
+  Qed.
+
+  Lemma uninitialize_to_revoked_states_param a w W E φ :
+    W.1 !! a = Some (Uninitialized w) →
+    rel a φ ∗
+    region (revoke W) ∗ sts_full_world (revoke W)
+    ={E}=∗
+    region (revoke W) ∗ sts_full_world (<s[a:=Revoked]s>(revoke W))
+    ∗ a ↦ₐ w.
+  Proof.
+    iIntros (Hforall) "(#Hrel & Hr & Hsts)".
+    iApply uninitialize_to_revoked_cond_states_param;[..|iFrame "∗ #"];auto.
+    apply revoke_conditions_sat.
+    rewrite revoke_monotone_lookup_same';auto.
+    rewrite Hforall. auto.
   Qed.
 
   Lemma related_sts_priv_world_std_update_multiple_Uninit_to_Rev_cond W l :
@@ -910,6 +964,55 @@ Section heap.
          revert Hforall; rewrite Forall_forall =>Hforall. apply Hforall in Hi as [? Hi]. eauto. }
     rewrite -std_update_multiple_revoke_commute;auto.
     iPureIntro. apply related_sts_priv_world_std_update_multiple_Uninit_to_Rev;auto.
+  Qed.
+
+  Lemma uninitialize_to_revoked_cond_param a w W E φ :
+    revoke_condition W →
+    W.1 !! a = Some (Uninitialized w) →
+    rel a φ ∗
+    region W ∗ sts_full_world W
+    ={E}=∗
+    region (<s[a:=Revoked]s> W) ∗ sts_full_world (<s[a:=Revoked]s> W)
+    ∗ a ↦ₐ w.
+  Proof.
+    iIntros (Hdup Hforall) "(#Hrel & Hr & Hsts)".
+    iMod (uninitialize_to_revoked_cond_states_param with "[$Hrel $Hr $Hsts]") as "(Hr & Hsts & $)";auto.
+    rewrite region_eq /region_def. iDestruct "Hr" as (M Mρ) "(HM & % & % & Hr)".
+    iDestruct (monotone_revoke_cond_region_def_mono with "[] [] Hsts Hr") as "[$ Hr]";auto.
+    3: { iExists _,_. iFrame. iModIntro. iSplit;auto. iPureIntro.
+         rewrite dom_insert_L. rewrite -H0. assert (a ∈ dom (gset Addr) W.1);[|set_solver].
+         apply elem_of_gmap_dom. eauto. }
+    { iPureIntro. intros a'. destruct (decide (a = a')).
+      - simplify_map_eq. eauto.
+      - simplify_map_eq. eauto. }
+    iPureIntro.
+    pose proof (related_sts_priv_world_std_update_multiple_Uninit_to_Rev_cond W [a]) as Hrel;auto.
+    apply Hrel;auto. apply Forall_singleton. eauto.
+  Qed.
+
+  Lemma uninitialize_to_revoked_param a w W E φ :
+    W.1 !! a = Some (Uninitialized w) →
+    rel a φ ∗
+    region (revoke W) ∗ sts_full_world (revoke W)
+    ={E}=∗
+    region (revoke (<s[a:=Revoked]s> W)) ∗ sts_full_world (revoke (<s[a:=Revoked]s> W))
+    ∗ a ↦ₐ w.
+  Proof.
+    iIntros (Hforall) "(#Hrel & Hr & Hsts)".
+    iMod (uninitialize_to_revoked_states_param with "[$Hrel $Hr $Hsts]") as "(Hr & Hsts & $)";auto.
+    assert (∀ W, (<s[a:=Revoked]s>W) = std_update_multiple W [a] Revoked) as Heq. auto.
+    rewrite !Heq.
+    rewrite (std_update_multiple_revoke_commute _ [a])//.
+    rewrite region_eq /region_def. iDestruct "Hr" as (M Mρ) "(HM & % & % & Hr)".
+    iDestruct (monotone_revoke_list_region_def_mono with "[] Hsts Hr") as "[$ Hr]".
+    2: { iExists _,_. iFrame. iModIntro. iSplit;auto. iPureIntro. rewrite -std_update_multiple_revoke_commute;auto.
+         simpl. rewrite dom_insert_L. rewrite -H0 /revoke /=.
+         assert (a ∈ dom (gset Addr) (revoke_std_sta W.1)).
+         apply elem_of_gmap_dom. rewrite -revoke_std_sta_lookup_Some. eauto.
+         rewrite /std. apply subseteq_union_1_L. set_solver. }
+    rewrite -std_update_multiple_revoke_commute;auto.
+    iPureIntro. apply related_sts_priv_world_std_update_multiple_Uninit_to_Rev;auto.
+    apply Forall_singleton. eauto.
   Qed.
 
 End heap.

@@ -128,9 +128,9 @@ Section stack_object.
     { split;[|apply related_sts_pub_plus_refl]. simpl.
       split;[rewrite dom_insert_L;set_solver|].
       intros i0 x y Hx Hy. destruct (decide (i = i0));simplify_map_eq.
-      - rewrite lookup_insert in Hy. inversion Hy. eright;[|left].
+      - eright;[|left].
         rewrite decide_True;[|solve_addr]. right. constructor.
-      - rewrite lookup_insert_ne// Hx in Hy. inversion Hy. left. }
+      - left. }
     iSpecialize ("Hmono" $! W _ Hpub with "Hvalid").
     iDestruct (readAllowed_implies_region_conditions with "Hmono") as "Hcond'";auto.
     iDestruct (big_sepL_elem_of with "Hcond'") as "[_ %]";eauto.
@@ -294,6 +294,21 @@ Section stack_object.
     2: { intros. rewrite decide_False in H0;auto. solve_addr. }
     eapply std_rel_pub_rtc_Monotemporary in Hsta;[|eauto]. subst. auto.
   Qed.
+  Lemma related_sts_pub_a_world_monotemporary_le W W' i a :
+    (std W !! i) = Some Monotemporary ->
+    (a <= i)%a →
+    related_sts_a_world W W' a ->
+    (std W' !! i) = Some Monotemporary ∨ (∃ w, (std W' !! i) = Some (Uninitialized w)).
+  Proof.
+    intros Hsta Hcond [ [Hdom1 Hrelated_std] _].
+    assert (is_Some (std W' !! i)) as [y Hy].
+    { apply elem_of_gmap_dom. assert (i ∈ dom (gset Addr) (std W));[apply elem_of_gmap_dom;eauto|]. set_solver. }
+    eapply Hrelated_std in Hsta;[|eauto].
+    apply rtc_implies with _ (λ x y, Rpub x y ∨ Rpubp x y) _ _ in Hsta.
+    2: { intros. rewrite decide_True in H0;auto. }
+    eapply std_rel_pub_plus_rtc_Monotemporary_or_Uninitialized in Hsta;[|eauto].
+    destruct Hsta as [? | [? ?] ];subst;eauto.
+  Qed.
   Lemma related_sts_pub_a_world_uninitialized W W' w i a :
     (std W !! i) = Some (Uninitialized w) ->
     (i < a)%a →
@@ -308,6 +323,21 @@ Section stack_object.
     2: { intros. rewrite decide_False in H0;auto. solve_addr. }
     eapply std_rel_pub_rtc_Uninitialized in Hsta as [Hsta | Hsta];[..|eauto]. subst. auto.
     subst. auto.
+  Qed.
+  Lemma related_sts_pub_a_world_uninitialized_le W W' w i a :
+    (std W !! i) = Some (Uninitialized w) ->
+    (a <= i)%a →
+    related_sts_a_world W W' a ->
+    (std W' !! i) = Some Monotemporary ∨ (∃ w', (std W' !! i) = Some (Uninitialized w')).
+  Proof.
+    intros Hsta Hcond [ [Hdom1 Hrelated_std] _].
+    assert (is_Some (std W' !! i)) as [y Hy].
+    { apply elem_of_gmap_dom. assert (i ∈ dom (gset Addr) (std W));[apply elem_of_gmap_dom;eauto|]. set_solver. }
+    eapply Hrelated_std in Hsta;[|eauto].
+    apply rtc_implies with _ (λ x y, Rpub x y ∨ Rpubp x y) _ _ in Hsta.
+    2: { intros. rewrite decide_True in H0;auto. }
+    eapply std_rel_pub_plus_rtc_Uninitialized in Hsta as [Hsta | [? Hsta] ];[..|eauto]. subst. auto.
+    subst. eauto.
   Qed.
   Lemma related_sts_pub_world_uninitialized W W' w i :
     (std W !! i) = Some (Uninitialized w) ->
