@@ -88,9 +88,9 @@ First is a lookup table for the definitions in the paper.
 | Lemma 4.7                                               | stack\_object.v                   | `stack_object_spec`                                           |
 | Theorem 4.8                                             | stack\_object\_adequacy.v         | `obj_adequacy`                                                |
 | Binary Model                                            | binary\_model/*                   |                                                               |
-| Theorem 6.1                                             |                                   |                                                               |
-| Definition 6.2 (forward simulation)                     |                                   |                                                               |
-| Lemma 6.3                                               |                                   |                                                               |
+| Theorem 6.1                                             | full\_abstraction.v               | `compile_fully_abstract`                                      |
+| Definition 6.2 (forward simulation)                     | simulation.v                      | `forward_simulation`                                          |
+| Lemma 6.3                                               | simulation.v                      | `fsim_terminates`                                             |
 
 Next we describe the file organization of the implementation. 
 
