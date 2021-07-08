@@ -663,8 +663,6 @@ Section Adequacy.
 
 End Adequacy.
 
-Existing Instance subG_MonRefIGΣ.
-
 Theorem awkward_example_adequacy `{MachineParameters} `{memory_layout}
         (m m': Mem) (reg reg': Reg) (es: list cap_lang.expr):
   is_initial_memory m →

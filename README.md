@@ -68,6 +68,32 @@ Note that we have included a copy of the generated html files as a supplemental 
 
 # Organization
 
+First is a lookup table for the definitions in the paper.
+
+| *paper*                                                 | *file* or *folder*                | *name*                                                        |
+|---------------------------------------------------------|-----------------------------------|---------------------------------------------------------------|
+| Machine words, machine state and instructions (Fig 2)   | machine\_base.v                   |                                                               |
+| Permission hierarchy (Fig 4)                            | machine\_base.v                   | `PermFlowsTo`                                                 |
+| Operational semantics: instruction semantics (Fig 5)    | cap\_lang.v                       | `exec`                                                        |
+| Standard State Transition System (Fig 6)                | region\_invariants.v              | `region_type`/`std_rel_{pub}{priv}{pub_plus}`                 |
+| Logical relation (Fig 7)                                | logrel.v                          | `interp`/`interp_expression`/`interp_registers`               |
+| Lemma 4.1 (address relative monotonicity)               | monotone.v                        | `interp_monotone_a`                                           |
+| Lemma 4.2 (address relative weakening)                  | sts.v                             | `related_sts_a_weak_world`                                    |
+| Lemma 4.3 (private monotonicity)                        | monotone.v                        | `interp_monotone_nm`                                          |
+| Theorem 4.4  (FTLR)                                     | fundamental.v                     | `fundamental_from_interp`                                     |
+| Assembly of Listing 7 (Fig 8)                           | downwards\_lse{\_preamble}.v      | `lse_instrs`/`downwards_lse_preamble_instrs`                  |
+| Lemma 4.5                                               | downwards\_lse.v                  | `lse_spec`                                                    |
+| Theorem 4.6                                             | downwards\_lse\_adequacy.v        | `downwards_lse_adequacy`                                      |
+| Assembly of Listing 9 (Fig 9)                           | stack\_object{\_preamble}.v       | `stack_object_passing_instrs`/`stack_object_preamble_instrs`  |
+| Lemma 4.7                                               | stack\_object.v                   | `stack_object_spec`                                           |
+| Theorem 4.8                                             | stack\_object\_adequacy.v         | `obj_adequacy`                                                |
+| Binary Model                                            | binary\_model/*                   |                                                               |
+| Theorem 6.1                                             |                                   |                                                               |
+| Definition 6.2 (forward simulation)                     |                                   |                                                               |
+| Lemma 6.3                                               |                                   |                                                               |
+
+Next we describe the file organization of the implementation. 
+
 The organization of the `theories/` folder is as follows.
 
 ## Operational semantics
@@ -127,15 +153,31 @@ The organization of the `theories/` folder is as follows.
 
 - `monotone.v`: Proof of the monotonicity of the value relation with regards to
   public future worlds, and private future worlds for non local words.
+  Contains *Lemma 4.1* and *Lemma 4.3*.
 
 - `fundamental.v`: Contains *Theorem 4.4: fundamental theorem of logical
   relations*. Each case (one for each instruction) is proved in a separate file
   (located in the `ftlr/` folder), which are all imported and applied in this
   file.
 
-## Binary Model
+## Binary Model (Appendix B)
 
-### Case studies: Integrity
+The binary model is fully contained in the `binary_model` folder.
+
+The binary model uses the same program logic as in the unary model, and a similar 
+family of rules for the specification part of the refinement.
+These rules are all in the `binary_model/rules_binary` folder. In particular, 
+the `binary_model/rules_binary/rules_binary_base.v` file contains the resource 
+algegra used for the specification part of the refinement.
+
+- `region_invariants{_XX}_binary.v`: Binary version of the *sharedResources*.
+
+- `logrel_binary.v`: Binary logical relation.
+
+- `fundamental_binary.v`: Binary fundamental theorem of logical relations.
+  Each case is proved in a separate file located in `binary_model/ftlr_binary/`.
+
+## Case studies: Integrity
 
 In the `examples` folder:
 
@@ -146,22 +188,34 @@ In the `examples` folder:
   the prologue is the specification for the code before the jump, the epilogue
   is the specification for the activation record.
 
-- `macros/malloc.v`: A simple malloc implementation, and its specification.
+- `macros/malloc.v`: A simple malloc implementation, its specification, and
+  a proof that it is valid.
 
-- `downwards_lse{_preamble}{_adequacty}.v`:
+- `downwards_lse{_preamble}{_adequacty}.v`: The assembly definition and proof of 
+  *Listing 7*. The `preamble` file creates the closure, and the `adequacy` file
+  applies the adequacy of Iris weakest preconditions to prove the final theorem,
+  *Theorem 4.6*.
 
-- `stack_object{_preamble}{_adequacty}.v`:
+- `stack_object{_preamble}{_adequacty}.v`: The assembly definition and proof of 
+  *Listing 9*. The `preamble` file creates the closure, and the `adequacy` file
+  applies the adequacy of Iris weakest preconditions to prove the final theorem,
+  *Theorem 4.8*.
 
-- `awkward_example{_u}{_preamble}{_adequacty}.v`:
+- `awkward_example{_u}{_preamble}{_adequacty}.v`: The assembly definition and proof of 
+  *Listing 5*. The `preamble` file creates the closure, and the `adequacy` file
+  applies the adequacy of Iris weakest preconditions to prove the final theorem.
 
-### Case studies: Confidentiality
+## Case studies: Confidentiality
 
 In the `binary_model/examples_binary` folder:
 
 - `macros_binary` : Exports all macro specifications for the "spec" side of the
   binary logical relation
 
-- `confidentiality{_adequacy}{_adequacy_theorem}.v`: 
+- `confidentiality{_adequacy}{_adequacy_theorem}.v`: The assembly definition and 
+  proof of contextual equivalence of *Listing 8*. The adequacy files contain
+  the contextual equivalence statements and proofs. They apply the linking definitions
+  from `linking.v` (see below).
 
 ## Linking
 
@@ -206,16 +260,21 @@ In the operational semantics:
 | Halted            | Instr Halted              |
 | Failed            | Instr Failed              |
 
-For technical reasons (so that Iris considers a single instruction as an atomic step), the execution mode is interweaved with the "Instr Next" mode, which reduces to a value.
-The Seq _ context can then return and continue to the next instruction. The full expression for an executing program is Seq (Instr Executable).
+For technical reasons (so that Iris considers a single instruction as an atomic step), 
+the execution mode is interweaved with the "Instr Next" mode, which reduces to a value.
+The Seq _ context can then return and continue to the next instruction. The full expression 
+for an executing program is Seq (Instr Executable).
 
 In the model:
 
-| *name in paper* | *name in mechanization* |
-|-----------------|-------------------------|
-| Frozen          | Monostatic              |
-| stsCollection   | full_sts_world          |
-| sharedResources | region                  |
-| Temporary       | Monotemporary           |
+| *name in paper*     | *name in mechanization* |
+|---------------------|-------------------------|
+| Frozen              | Monostatic              |
+| stsCollection       | full_sts_world          |
+| sharedResources     | region                  |
+| Temporary           | Monotemporary           |
+| temporal transition | std_rel_pub_plus        |
 
-In `scall_u.v` : the scall macro is slightly unfolded, as it does not include the part of the calling convention which stores local state on the stack. That part is inlined into the examples.
+In `scall_u.v` : the scall macro is slightly unfolded, as it does not include the part of 
+the calling convention which stores local state on the stack. That part is inlined into the 
+examples.
