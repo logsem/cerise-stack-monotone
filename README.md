@@ -43,9 +43,9 @@ make -jN  # replace N with the number of CPU cores of your machine
 ```
 
 We recommend that you have **32Gb of RAM+swap**. Please be aware that the
-development takes around XXh to compile. In particular, the files
+development takes around 2 to 3 hours to compile. In particular, the files
 `theories/examples/awkward_example_u.v` and `theories/examples/stack_object.v` 
-can each take up to 25 minutes to compile.
+can each take up to 30 minutes to compile.
 
 It is possible to run `make fundamental` to only build files up to the
 Fundamental Theorem (and `make fundamental-binary` to build up until the binary
