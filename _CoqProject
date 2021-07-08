@@ -12,8 +12,6 @@
 theories/iris_extra.v
 theories/stdpp_extra.v
 theories/simulation.v
-theories/monocmra.v
-theories/mono_ref.v
 theories/sts.v
 theories/addr_reg.v
 theories/linking.v

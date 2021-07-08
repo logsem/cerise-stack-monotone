@@ -50,7 +50,7 @@ can each take up to 25 minutes to compile.
 It is possible to run `make fundamental` to only build files up to the
 Fundamental Theorem (and `make fundamental-binary` to build up until the binary
 FTLR, or `make full-abstraction` to build up until the full abstraction
-theorem). This usually takes up 20 minutes.
+theorem). Each usually takes up 20 minutes.
 
 ## Checking for admits
 
@@ -89,10 +89,10 @@ The organization of the `theories/` folder is as follows.
 - `region.v`: Auxiliary definitions to reason about consecutive range of
   addresses and memory words.
 
-- `rules_base.v`: Contains some of the core resource algebras for the program
+- `rules/rules_base.v`: Contains some of the core resource algebras for the program
   logic, namely the definition for points to predicates with permissions.
 
-- `rules.v`: Imports all the Hoare triple rules for each instruction. These
+- `rules/rules.v`: Imports all the Hoare triple rules for each instruction. These
   rules are separated into separate files (located in the `rules/` folder).
 
 ## Logical relation (Unary)
@@ -100,7 +100,7 @@ The organization of the `theories/` folder is as follows.
 - `multiple_updates.v`: Auxiliary definitions to reason about multiple updates
   to a world.
 
-- `region_invariants_transitions.v`: 
+- `region_invariants_transitions.v`: Lemmas about standard transitions
 
 - `region_invariants.v`: Definitions for standard resources, and the shared
   resources map *sharedResources*. Contains some lemmas for "opening" and
@@ -112,19 +112,23 @@ The organization of the `theories/` folder is as follows.
 - `region_invariants_static.v`: Lemmas for manipulating frozen standard
   resources.
 
-- `region_invariants_batch_uninitialized.v`: Lemmas for manipulating uninitialized standard
+- `region_invariants_batch_uninitialized.v`: Lemmas for manipulating uninitialized 
+  standard resources.
+
+- `region_invariants_allocation.v`: Lemmas for allocating a range of standard
   resources.
 
-- `region_invariants_allocation.v`:  
+- `sts.v`: The definition of *stsCollection*, and associated lemmas. In particular:
+  priv/pub/temporal future world relations (all these definitions are 
+  parametrized by the standard states and three relations over them transitions. 
+  These are instantiated in `region_invariants.v`)
 
-- `sts.v`: The definition of *stsCollection*, and associated lemmas.
-
-- `logrel.v`: The definition of the logical relation.
+- `logrel.v`: The definition of the unary logical relation.
 
 - `monotone.v`: Proof of the monotonicity of the value relation with regards to
   public future worlds, and private future worlds for non local words.
 
-- `fundamental.v`: Contains *Theorem 6.1: fundamental theorem of logical
+- `fundamental.v`: Contains *Theorem 4.4: fundamental theorem of logical
   relations*. Each case (one for each instruction) is proved in a separate file
   (located in the `ftlr/` folder), which are all imported and applied in this
   file.
@@ -198,11 +202,12 @@ In the operational semantics:
 
 | *name in paper*   | *name in mechanization*   |
 |-------------------|---------------------------|
-| SingleStep        | Instr Executable          |
-| Done Standby      | Instr NextI               |
-| Done Halted       | Instr Halted              |
-| Done Failed       | Instr Failed              |
-| Repeat _          | Seq _                     |
+| Executable        | Instr Executable          |
+| Halted            | Instr Halted              |
+| Failed            | Instr Failed              |
+
+For technical reasons (so that Iris considers a single instruction as an atomic step), the execution mode is interweaved with the "Instr Next" mode, which reduces to a value.
+The Seq _ context can then return and continue to the next instruction. The full expression for an executing program is Seq (Instr Executable).
 
 In the model:
 
