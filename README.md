@@ -1,5 +1,6 @@
 This directory contains the Coq mechanization accompanying the submission "Le
-Temps des Cerises: Bringing Temporal Stack Safety to Capability Machines".
+Temps des Cerises: Efficient Temporal Stack Safety on Capability Machines using
+Directed Capabilities".
 
 # Building the proofs
 
@@ -77,17 +78,11 @@ First is a lookup table for the definitions in the paper.
 | Operational semantics: instruction semantics (Fig 5)    | cap\_lang.v                       | `exec`                                                        |
 | Standard State Transition System (Fig 6)                | region\_invariants.v              | `region_type`/`std_rel_{pub}{priv}{pub_plus}`                 |
 | Logical relation (Fig 7)                                | logrel.v                          | `interp`/`interp_expression`/`interp_registers`               |
-| Lemma 4.1 (address relative monotonicity)               | monotone.v                        | `interp_monotone_a`                                           |
-| Lemma 4.2 (address relative weakening)                  | sts.v                             | `related_sts_a_weak_world`                                    |
-| Lemma 4.3 (private monotonicity)                        | monotone.v                        | `interp_monotone_nm`                                          |
-| Theorem 4.4  (FTLR)                                     | fundamental.v                     | `fundamental_from_interp`                                     |
+| Theorem 4.1  (FTLR)                                     | fundamental.v                     | `fundamental_from_interp`                                     |
 | Assembly of Listing 7 (Fig 8)                           | downwards\_lse{\_preamble}.v      | `lse_instrs`/`downwards_lse_preamble_instrs`                  |
-| Lemma 4.5                                               | downwards\_lse.v                  | `lse_spec`                                                    |
-| Theorem 4.6                                             | downwards\_lse\_adequacy.v        | `downwards_lse_adequacy`                                      |
+| Theorem 4.2                                             | downwards\_lse\_adequacy.v        | `downwards_lse_adequacy`                                      |
 | Assembly of Listing 9 (Fig 9)                           | stack\_object{\_preamble}.v       | `stack_object_passing_instrs`/`stack_object_preamble_instrs`  |
-| Lemma 4.7                                               | stack\_object.v                   | `stack_object_spec`                                           |
-| Theorem 4.8                                             | stack\_object\_adequacy.v         | `obj_adequacy`                                                |
-| Binary Model                                            | binary\_model/*                   |                                                               |
+| Theorem 4.3                                             | stack\_object\_adequacy.v         | `obj_adequacy`                                                |
 | Theorem 6.1                                             | full\_abstraction.v               | `compile_fully_abstract`                                      |
 | Definition 6.2 (forward simulation)                     | simulation.v                      | `forward_simulation`                                          |
 | Lemma 6.3                                               | simulation.v                      | `fsim_terminates`                                             |
@@ -160,7 +155,18 @@ The organization of the `theories/` folder is as follows.
   (located in the `ftlr/` folder), which are all imported and applied in this
   file.
 
-## Binary Model (Appendix B)
+## Proof sketch of the FTLR (Appendix A)
+
+The correspondance between the lemmas and the Coq statements is as follows.
+
+| *paper*                                                 | *file* or *folder*                | *name*                                                        |
+|---------------------------------------------------------|-----------------------------------|---------------------------------------------------------------|
+| Lemma A.1 (address relative monotonicity)               | monotone.v                        | `interp_monotone_a`                                           |
+| Lemma A.2 (address relative weakening)                  | sts.v                             | `related_sts_a_weak_world`                                    |
+| Lemma A.3 (private monotonicity)                        | monotone.v                        | `interp_monotone_nm`                                          |
+| Theorem 4.1  (FTLR)                                     | fundamental.v                     | `fundamental_from_interp`                                     |
+
+## Binary Model (Appendix C)
 
 The binary model is fully contained in the `binary_model` folder.
 
@@ -191,17 +197,17 @@ In the `examples` folder:
 - `macros/malloc.v`: A simple malloc implementation, its specification, and
   a proof that it is valid.
 
-- `downwards_lse{_preamble}{_adequacty}.v`: The assembly definition and proof of 
+- `downwards_lse{_preamble}{_adequacy}.v`: The assembly definition and proof of 
   *Listing 7*. The `preamble` file creates the closure, and the `adequacy` file
   applies the adequacy of Iris weakest preconditions to prove the final theorem,
   *Theorem 4.6*.
 
-- `stack_object{_preamble}{_adequacty}.v`: The assembly definition and proof of 
+- `stack_object{_preamble}{_adequacy}.v`: The assembly definition and proof of 
   *Listing 9*. The `preamble` file creates the closure, and the `adequacy` file
   applies the adequacy of Iris weakest preconditions to prove the final theorem,
   *Theorem 4.8*.
 
-- `awkward_example{_u}{_preamble}{_adequacty}.v`: The assembly definition and proof of 
+- `awkward_example{_u}{_preamble}{_adequacy}.v`: The assembly definition and proof of 
   *Listing 5*. The `preamble` file creates the closure, and the `adequacy` file
   applies the adequacy of Iris weakest preconditions to prove the final theorem.
 
@@ -248,7 +254,8 @@ In the `overlay` folder:
 
 # Differences with the paper
 
-Some definitions have different names from the paper.
+Some definitions have different names from the paper. In particular, _directed
+capabilities_ are called _monotone capabilities_ in the Coq development.
 
 *name in paper => name in mechanization*
 
