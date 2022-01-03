@@ -78,7 +78,7 @@ Definition canStore (p: Perm) (a: Addr) (w: base.Word): bool :=
   | inr (Regular ((_, g), _, _, _)) => match g with
                                       | Global => true
                                       | Local => pwl p
-                                      | Monotone => pwl p && leb_addr (canReadUpTo w) a
+                                      | Directed => pwl p && leb_addr (canReadUpTo w) a
                                       end
   | inr (Stk _ _ _ _ _) | inr (Ret _ _ _) => pwl p && leb_addr (canReadUpTo w) a
   end.
@@ -89,7 +89,7 @@ Definition canStoreU (p: Perm) (a: Addr) (w: base.Word): bool :=
   | inr (Regular ((_, g), _, _, _)) => match g with
                                       | Global => true
                                       | Local => pwlU p
-                                      | Monotone => pwlU p && leb_addr (canReadUpTo w) a
+                                      | Directed => pwlU p && leb_addr (canReadUpTo w) a
                                       end
   | inr (Stk _ _ _ _ _) | inr (Ret _ _ _) => pwlU p && leb_addr (canReadUpTo w) a
   end.
@@ -217,7 +217,7 @@ Section opsem.
         else (Failed, φ)
       | inr (Ret b e a) => (Failed, φ)
       | inr (Stk d p b e a) =>
-        if readAllowed p && withinBounds ((p, Monotone), b, e, a) then
+        if readAllowed p && withinBounds ((p, Directed), b, e, a) then
           match stack d ((reg φ, stk φ)::(callstack φ)) with
           | None => (Failed, φ)
           | Some m => updatePC (update_reg φ dst (MemLocate m a))
@@ -234,7 +234,7 @@ Section opsem.
         else (Failed, φ)
       | inr (Ret b e a) => (Failed, φ)
       | inr (Stk d p b e a) =>
-        if writeAllowed p && withinBounds ((p, Monotone), b, e, a) && canStore p a (RegLocate (reg φ) src) then
+        if writeAllowed p && withinBounds ((p, Directed), b, e, a) && canStore p a (RegLocate (reg φ) src) then
         if nat_eq_dec d (length (callstack φ)) then
           updatePC (update_stk φ a (RegLocate (reg φ) src))
         else match update_stack φ d a (RegLocate (reg φ) src) with
@@ -251,7 +251,7 @@ Section opsem.
         if writeAllowed p && withinBounds ((p, g), b, e, a) then updatePC (update_mem φ a (inl n)) else (Failed, φ)
       | inr (Ret b e a) => (Failed, φ)
       | inr (Stk d p b e a) =>
-        if writeAllowed p && withinBounds ((p, Monotone), b, e, a) then
+        if writeAllowed p && withinBounds ((p, Directed), b, e, a) then
         if nat_eq_dec d (length (callstack φ)) then
           updatePC (update_stk φ a (inl n))
         else match update_stack φ d a (inl n) with
@@ -366,7 +366,7 @@ Section opsem.
       | inr (Stk d p b e a) =>
         match p with
         | E => (Failed, φ)
-        | _ => if PermPairFlowsTo (decodePermPair n) (p, Monotone) then
+        | _ => if PermPairFlowsTo (decodePermPair n) (p, Directed) then
                                 updatePC (update_reg φ dst (inr (Stk d (fst (decodePermPair n)) b e a)))
               else (Failed, φ)
         end
@@ -392,7 +392,7 @@ Section opsem.
         | inl n =>
           match p with
           | E => (Failed, φ)
-          | _ => if PermPairFlowsTo (decodePermPair n) (p, Monotone) then
+          | _ => if PermPairFlowsTo (decodePermPair n) (p, Directed) then
                   updatePC (update_reg φ dst (inr (Stk d (fst (decodePermPair n)) b e a)))
                 else (Failed, φ)
           end
@@ -645,7 +645,7 @@ Section opsem.
       | inr (Regular ((_, g), _, _, _)) => updatePC (update_reg φ dst (inl (encodeLoc g)))
       | inr (Stk _ _ _ _ _)
       | inr (Ret _ _ _) =>
-        updatePC (update_reg φ dst (inl (encodeLoc Monotone)))
+        updatePC (update_reg φ dst (inl (encodeLoc Directed)))
       end
     | IsPtr dst r =>
       match RegLocate (reg φ) r with
@@ -1041,7 +1041,7 @@ Section opsem.
 
   Definition exec_call (φ: ExecConf) (rf: RegName) (rargs: list RegName) pcp pcg (pcb pce pca: Addr): Conf :=
     match pcg with
-    | Monotone => (Failed, φ) (* Can't store PC if it's monotone because we currently assume heap is above stack *)
+    | Directed => (Failed, φ) (* Can't store PC if it's monotone because we currently assume heap is above stack *)
     | _ =>
     match (reg φ) !r! r_stk with
     | inr (Stk d URWLX b e a) =>

@@ -163,7 +163,7 @@ Definition is_initial_memory `{memory_layout} (m: gmap Addr Word) :=
 
 Definition is_initial_registers `{memory_layout} (reg: gmap RegName Word) :=
   reg !! PC = Some (inr (RX, Global, lse_region_start, lse_region_end, lse_preamble_start)) ∧
-  reg !! r_stk = Some (inr (URWLX, Monotone, stack_start, stack_end, stack_start)) ∧
+  reg !! r_stk = Some (inr (URWLX, Directed, stack_start, stack_end, stack_start)) ∧
   reg !! r_t0 = Some (inr (RWX, Global, adv_start, adv_end, adv_start)) ∧
   (∀ (r: RegName), r ∉ ({[ PC; r_stk; r_t0 ]} : gset RegName) →
     ∃ (w:Word), reg !! r = Some w ∧ is_cap w = false).

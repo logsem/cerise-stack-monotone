@@ -14,29 +14,29 @@ Section stack_macros.
 
   Definition pushU_r a1 r_stk r : iProp Σ := (a1 ↦ₐ pushU_r_instr r_stk r)%I.
 
-  Definition isMonotone_word (w:Word) :=
+  Definition isDirected_word (w:Word) :=
     match w with
     | inl _ => false
     | inr (_,l,_,_,_) => match l with
-                        | Monotone => true
+                        | Directed => true
                         | _ => false
                         end
     end.
 
   Lemma pushU_r_spec a1 a2 w w' r p g b e stk_b stk_e stk_a stk_a' φ :
     isCorrectPC (inr ((p,g),b,e,a1)) →
-    withinBounds ((URWLX,Monotone),stk_b,stk_e,stk_a) = true →
+    withinBounds ((URWLX,Directed),stk_b,stk_e,stk_a) = true →
     (a1 + 1)%a = Some a2 →
     (stk_a + 1)%a = Some stk_a' →
-    (isMonotone_word w' = true → (canReadUpTo w' <=? stk_a)%a = true) →
+    (isDirected_word w' = true → (canReadUpTo w' <=? stk_a)%a = true) →
 
       ▷ pushU_r a1 r_stk r
     ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a1)
-    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a)
+    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a)
     ∗ ▷ r ↦ᵣ w'
     ∗ ▷ stk_a ↦ₐ w
     ∗ ▷ (PC ↦ᵣ inr ((p,g),b,e,a2) ∗ pushU_r a1 r_stk r ∗
-            r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a') ∗ r ↦ᵣ w' ∗ stk_a ↦ₐ w'
+            r_stk ↦ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a') ∗ r ↦ᵣ w' ∗ stk_a ↦ₐ w'
             -∗ WP Seq (Instr Executable) {{ φ }})
     ⊢
       WP Seq (Instr Executable) {{ φ }}.
@@ -56,19 +56,19 @@ Section stack_macros.
      the monotone requirements *)
   Lemma pushU_r_or_fail_spec a1 a2 w w' r p g b e stk_b stk_e stk_a stk_a' φ :
     isCorrectPC (inr ((p,g),b,e,a1)) →
-    withinBounds ((URWLX,Monotone),stk_b,stk_e,stk_a) = true →
+    withinBounds ((URWLX,Directed),stk_b,stk_e,stk_a) = true →
     (a1 + 1)%a = Some a2 →
     (stk_a + 1)%a = Some stk_a' →
 
       ▷ pushU_r a1 r_stk r
     ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a1)
-    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a)
+    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a)
     ∗ ▷ r ↦ᵣ w'
     ∗ ▷ stk_a ↦ₐ w
     ∗ ▷ (φ FailedV)
-    ∗ ▷ (⌜isMonotone_word w' = true → (canReadUpTo w' <=? stk_a)%a = true⌝
+    ∗ ▷ (⌜isDirected_word w' = true → (canReadUpTo w' <=? stk_a)%a = true⌝
            ∗ PC ↦ᵣ inr ((p,g),b,e,a2) ∗ pushU_r a1 r_stk r ∗
-            r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a') ∗ r ↦ᵣ w' ∗ stk_a ↦ₐ w'
+            r_stk ↦ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a') ∗ r ↦ᵣ w' ∗ stk_a ↦ₐ w'
             -∗ WP Seq (Instr Executable) {{ φ }})
     ⊢
       WP Seq (Instr Executable) {{ φ }}.
@@ -89,16 +89,16 @@ Section stack_macros.
 
   Lemma pushU_r_spec_same a1 a2 w p g b e stk_b stk_e stk_a stk_a' φ :
     isCorrectPC (inr ((p,g),b,e,a1)) →
-    withinBounds ((URWLX,Monotone),stk_b,stk_e,stk_a) = true →
+    withinBounds ((URWLX,Directed),stk_b,stk_e,stk_a) = true →
     (a1 + 1)%a = Some a2 →
     (stk_a + 1)%a = Some stk_a' →
 
       ▷ pushU_r a1 r_stk r_stk
     ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a1)
-    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a)
+    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a)
     ∗ ▷ stk_a ↦ₐ w
     ∗ ▷ (PC ↦ᵣ inr ((p,g),b,e,a2) ∗ pushU_r a1  r_stk r_stk ∗
-            r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a') ∗ stk_a ↦ₐ inr ((URWLX,Monotone),stk_b,stk_e,stk_a)
+            r_stk ↦ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a') ∗ stk_a ↦ₐ inr ((URWLX,Directed),stk_b,stk_e,stk_a)
             -∗ WP Seq (Instr Executable) {{ φ }})
     ⊢
       WP Seq (Instr Executable) {{ φ }}.
@@ -119,16 +119,16 @@ Section stack_macros.
 
   Lemma pushU_z_spec a1 a2 w z p g b e stk_b stk_e stk_a stk_a' φ :
     isCorrectPC (inr ((p,g),b,e,a1)) →
-    withinBounds ((URWLX,Monotone),stk_b,stk_e,stk_a) = true →
+    withinBounds ((URWLX,Directed),stk_b,stk_e,stk_a) = true →
     (a1 + 1)%a = Some a2 →
     (stk_a + 1)%a = Some stk_a' →
 
       ▷ pushU_z a1 r_stk z
     ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a1)
-    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a)
+    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a)
     ∗ ▷ stk_a ↦ₐ w
     ∗ ▷ (PC ↦ᵣ inr ((p,g),b,e,a2) ∗ pushU_z a1 r_stk z ∗
-            r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a') ∗ stk_a ↦ₐ inl z
+            r_stk ↦ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a') ∗ stk_a ↦ₐ inl z
             -∗ WP Seq (Instr Executable) {{ φ }})
     ⊢
       WP Seq (Instr Executable) {{ φ }}.
@@ -153,7 +153,7 @@ Section stack_macros.
   Lemma popU_spec a1 a2 a3 a4 r w w' wt1 p g b e stk_b stk_e stk_a stk_a' φ :
     isCorrectPC (inr ((p,g),b,e,a1)) ∧ isCorrectPC (inr ((p,g),b,e,a2)) ∧
     isCorrectPC (inr ((p,g),b,e,a3)) →
-    withinBounds ((URWLX,Monotone),stk_b,stk_e,stk_a') = true →
+    withinBounds ((URWLX,Directed),stk_b,stk_e,stk_a') = true →
     r ≠ PC →
     (a1 + 1)%a = Some a2 →
     (a2 + 1)%a = Some a3 →
@@ -162,7 +162,7 @@ Section stack_macros.
 
       ▷ popU a1 a2 a3 r_stk r
     ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a1)
-    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a)
+    ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a)
     ∗ ▷ stk_a' ↦ₐ w
     ∗ ▷ r_t1 ↦ᵣ wt1
     ∗ ▷ r ↦ᵣ w'
@@ -170,7 +170,7 @@ Section stack_macros.
             ∗ popU a1 a2 a3 r_stk r
             ∗ r ↦ᵣ w
             ∗ stk_a' ↦ₐ w
-            ∗ r_stk ↦ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a')
+            ∗ r_stk ↦ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a')
             ∗ r_t1 ↦ᵣ (inl (-1)%Z)
             -∗ WP Seq (Instr Executable) {{ φ }})
     ⊢

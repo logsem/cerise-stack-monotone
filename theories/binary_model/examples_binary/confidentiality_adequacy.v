@@ -38,7 +38,7 @@ Class memory_layout `{MachineParameters} := {
 Definition initial_state_stk `{MachineParameters} (b_stk e_stk: Addr) (stack_init : list Word) (c: machine_component): cfg cap_lang :=
   match c with
   | Lib _ _ _ _ pre_comp => ([Seq (Instr Executable)], (∅, ∅)) (* dummy value *)
-  | Main _ _ _ _ (ms, _, _) c_main => ([Seq (Instr Executable)], (<[r_stk := inr (URWLX, Monotone, b_stk, e_stk, b_stk)]> (<[PC := c_main]> (gset_to_gmap (inl 0%Z) (list_to_set all_registers))), (ms : Mem) ∪ (mkregion b_stk e_stk stack_init)))
+  | Main _ _ _ _ (ms, _, _) c_main => ([Seq (Instr Executable)], (<[r_stk := inr (URWLX, Directed, b_stk, e_stk, b_stk)]> (<[PC := c_main]> (gset_to_gmap (inl 0%Z) (list_to_set all_registers))), (ms : Mem) ∪ (mkregion b_stk e_stk stack_init)))
   end.
 
 Definition comp1 `{memory_layout} : machine_component :=

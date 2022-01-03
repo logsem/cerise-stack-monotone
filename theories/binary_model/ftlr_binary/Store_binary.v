@@ -25,7 +25,7 @@ Section fundamental.
   Implicit Types interp : (D).
 
   Lemma execcPC_implies_interp W p g b e a0:
-    p = RX ∨ p = RWX ∨ p = RWLX ∧ g = Monotone →
+    p = RX ∨ p = RWX ∨ p = RWLX ∧ g = Directed →
     region_conditions W p g b e -∗ ((fixpoint interp1) W) (inr (p, g, b, e, a0),inr (p, g, b, e, a0)).
   Proof.
     iIntros (Hp) "#HR".

@@ -772,7 +772,7 @@ Definition machine_component: Type := component nat _ _ Word.
 Definition initial_state `{MachineParameters} (r_stk: RegName) (b_stk e_stk: Addr) (c: machine_component): cfg cap_lang :=
   match c with
   | Lib _ _ _ _ pre_comp => ([Seq (Instr Executable)], (∅, ∅)) (* dummy value *)
-  | Main _ _ _ _ (ms, _, _) c_main => ([Seq (Instr Executable)], (<[r_stk := inr (URWLX, Monotone, b_stk, e_stk, b_stk)]> (<[PC := c_main]> (gset_to_gmap (inl 0%Z) (list_to_set all_registers))), ms))
+  | Main _ _ _ _ (ms, _, _) c_main => ([Seq (Instr Executable)], (<[r_stk := inr (URWLX, Directed, b_stk, e_stk, b_stk)]> (<[PC := c_main]> (gset_to_gmap (inl 0%Z) (list_to_set all_registers))), ms))
   end.
 
 Definition can_address_only (w: Word) (addrs: gset Addr): Prop :=

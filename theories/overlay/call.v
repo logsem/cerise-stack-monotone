@@ -98,7 +98,7 @@ Section call.
     ++ [ inl (encodeInstr (Mov (R 0 eq_refl) (inr r_stk)))
        ; inl (encodeInstr (PromoteU (R 0 eq_refl)))
        ; inl (encodeInstr (Lea (R 0 eq_refl) (inl (-66)%Z)))
-       ; inl (encodeInstr (Restrict (R 0 eq_refl) (inl (encodePermPair (E, Monotone)))))
+       ; inl (encodeInstr (Restrict (R 0 eq_refl) (inl (encodePermPair (E, Directed)))))
        ]
     (* Prepare new stack capability for callee *)
     ++ [inl (encodeInstr (GetA (R 1 eq_refl) r_stk));

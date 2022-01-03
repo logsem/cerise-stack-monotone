@@ -87,7 +87,7 @@ Section stack_object.
     (a_link + f_a)%a = Some a_entry ->
 
     (* the monotonicity of the PC is not monotone *)
-    isMonotone pc_g = false →
+    isDirected pc_g = false →
 
     (* footprint of the register map *)
     dom (gset RegName) rmap = all_registers_s ∖ {[PC;r_stk;r_adv]} →
@@ -453,7 +453,7 @@ Section stack_object.
 
     set rmap3 := <[PC:=updatePcPerm (inr (g, Global, b, e, a'))]>
                  (<[PC:=inl 0%Z]>
-                  (<[r_stk:=inr (URWLX, Monotone, b_r_adv, estk, frame_end)]>
+                  (<[r_stk:=inr (URWLX, Directed, b_r_adv, estk, frame_end)]>
                    (<[r_adv:=inr (g, Global, b, e, a')]> rmap2))).
     match goal with |- context [ [[af3,b_r_adv]]↦ₐ[[?act]]%I ] =>
                     set actw := act
@@ -534,7 +534,7 @@ Section stack_object.
          rewrite -(region_addrs_single a_param af2)//.  apply region_addrs_disjoint_skip_middle. auto. clear -Hb_r_adv. solve_addr. }
 
     (* we are ready to close the parts of the world that must stay valid: the two stack objects *)
-    iAssert (⌜if pwl l then p = Monotone else True⌝)%I as %Hmono.
+    iAssert (⌜if pwl l then p = Directed else True⌝)%I as %Hmono.
     { destruct (pwl l) eqn:Hpwl. iDestruct (writeLocalAllowed_implies_local with "Hwsecret_valid") as %HH;auto.
       iPureIntro. destruct p;inversion HH;auto. auto. }
     iMod (close_stack_object with "Hsecret_cond Hsec_res Hsts Hr") as "(Hsts & Hr & #Hvalid)";
@@ -642,7 +642,7 @@ Section stack_object.
          where the parameter is not yet monotemporary,
          this is fine in this case since we do not
          care about it anymore *)
-      iSimpl. rewrite (fixpoint_interp1_eq _ (inr (E, Monotone, bstk, b_r_adv, af3))). iModIntro.
+      iSimpl. rewrite (fixpoint_interp1_eq _ (inr (E, Directed, bstk, b_r_adv, af3))). iModIntro.
       iIntros (r' W' Hrelated). iNext.
       iIntros "(#[Hall Hregs_valid] & Hregs & Hr & Hsts & Hown)".
       iSplit;auto. iDestruct "Hall" as %Hr_all. iClear "Hall".

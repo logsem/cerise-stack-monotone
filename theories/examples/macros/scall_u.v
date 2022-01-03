@@ -105,7 +105,7 @@ Section scall.
     withinBounds ((URWLX, Local), b_r, e_r, a_r) = true ->
     withinBounds ((URWLX, Local), b_r, e_r, b_r_adv) = true →
     contiguous_between a a_first a_cont →
-    isMonotone g = false →
+    isDirected g = false →
     r1 ∉ [PC;r_stk;r_t0;r_t1;r_t2;r_t3;r_t4;r_t5;r_t6] → (* the jump destination will not be overwritten/cleared *)
     params ## [PC;r_stk;r_t0;r_t1; r_t2; r_t3; r_t4; r_t5; r_t6] → (* the parameters will not be overwritten/cleared *)
     dom (gset RegName) rmap = all_registers_s ∖ {[ PC; r_stk; r1; r_t0]} ∖ (list_to_set params) →
@@ -116,15 +116,15 @@ Section scall.
 
     (▷ scallU_prologue a r1 params
    ∗ ▷ PC ↦ᵣ inr ((p,g),b,e,a_first)
-   ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Monotone),b_r,e_r,a_r)
+   ∗ ▷ r_stk ↦ᵣ inr ((URWLX,Directed),b_r,e_r,a_r)
    ∗ ▷ (∃ w, r_t0 ↦ᵣ w)
    ∗ ▷ ([∗ map] r_i↦w_i ∈ rmap, r_i ↦ᵣ w_i)
    ∗ ▷ ([[a_r, b_r_adv]]↦ₐ[[ws_own]]) (* local stack - note that the perm here is NOT unitialized,
                                                as the definition of interp1 has a promote_permission in there *)
    (* No ownership of adversarial stack here; no clearing required *)
    ∗ ▷ (PC ↦ᵣ inr (p,g,b,e,a_cont)
-            ∗ r_stk ↦ᵣ inr ((URWLX,Monotone),b_r_adv,e_r,b_r_adv)
-            ∗ r_t0 ↦ᵣ inr ((E,Monotone),b_r,b_r_adv,a_r) (* Note that this capbility does not grant permissions up to the end of the stack anymore *)
+            ∗ r_stk ↦ᵣ inr ((URWLX,Directed),b_r_adv,e_r,b_r_adv)
+            ∗ r_t0 ↦ᵣ inr ((E,Directed),b_r,b_r_adv,a_r) (* Note that this capbility does not grant permissions up to the end of the stack anymore *)
             ∗ (∃ rmap', ⌜dom (gset RegName) rmap = dom (gset RegName) rmap' ∧ ∀ r w, rmap' !! r = Some w → w = inl 0%Z⌝
                                                     ∗ [∗ map] r_i↦w_i ∈ rmap', r_i ↦ᵣ w_i)
             ∗ [[ a_r, b_r_adv ]]↦ₐ[[ [inl w_1;
@@ -133,7 +133,7 @@ Section scall.
                                              inl w_4a;
                                              inl w_4b_U;
                                              inr (p,g,b,e,a_next);
-                                             inr (URWLX,Monotone,b_r,e_r,a_r_adv)] ]] (* local stack *)
+                                             inr (URWLX,Directed,b_r,e_r,a_r_adv)] ]] (* local stack *)
             ∗ scallU_prologue a r1 params -∗
             WP Seq (Instr Executable) {{ φ }})
    ⊢ WP Seq (Instr Executable) {{ φ }})%I.

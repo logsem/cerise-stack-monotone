@@ -89,7 +89,7 @@ Section awkward_example.
     (a_link + f_a)%a = Some a_entry ->
 
     (* the monotonicity of the PC is not monotone *)
-    isMonotone pc_g = false →
+    isDirected pc_g = false →
 
     (* malloc'ed memory assumption *)
     (d + 1)%a = Some d' ->
@@ -516,7 +516,7 @@ Section awkward_example.
     { iNext. iSplit;done. }
 
     (* the adversary stack is valid in W2 *)
-    iAssert (interp W2 (inr (URWLX, Monotone, a_act_end, estk, frame_end))) as "#Hadv_stack_val".
+    iAssert (interp W2 (inr (URWLX, Directed, a_act_end, estk, frame_end))) as "#Hadv_stack_val".
     { iClear "∗". iApply fixpoint_interp1_eq.
       iSimpl.
       assert (addr_reg.min frame_end estk = frame_end) as ->.
@@ -1080,7 +1080,7 @@ Section awkward_example.
     { iNext. iDestruct "Hprog_done" as "($&$&$&$&$&$)". iSplit;done. }
 
     (* the adversary stack is valid in W2 *)
-    iAssert (interp W5 (inr (URWLX, Monotone, a_act_final, estk, a_act_end))) as "#Hadv_stack_val_2".
+    iAssert (interp W5 (inr (URWLX, Directed, a_act_final, estk, a_act_end))) as "#Hadv_stack_val_2".
     { iClear "∗". iApply fixpoint_interp1_eq.
       iSimpl.
       assert (addr_reg.min a_act_end estk = a_act_end) as ->.

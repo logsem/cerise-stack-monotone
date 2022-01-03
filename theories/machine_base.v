@@ -21,7 +21,7 @@ Inductive Perm: Type :=
 Inductive Locality: Type :=
 | Global
 | Local
-| Monotone.
+| Directed.
 
 Definition Cap: Type :=
   (Perm * Locality) * Addr * Addr * Addr.
@@ -64,7 +64,7 @@ Notation Mem := (gmap Addr Word).
 
 Definition isLocal (l: Locality): bool :=
   match l with
-  | Local | Monotone => true
+  | Local | Directed => true
   | _ => false
   end.
 
@@ -194,7 +194,7 @@ Definition canStore (p: Perm) (a: Addr) (w: Word): bool :=
   | inr ((_, g), _, _, _) => match g with
                             | Global => true
                             | Local => pwl p
-                            | Monotone => pwl p && leb_addr (canReadUpTo w) a
+                            | Directed => pwl p && leb_addr (canReadUpTo w) a
                             end
   end.
 
@@ -204,7 +204,7 @@ Definition canStoreU (p: Perm) (a: Addr) (w: Word): bool :=
   | inr ((_, g), _, _, _) => match g with
                             | Global => true
                             | Local => pwlU p
-                            | Monotone => pwlU p && leb_addr (canReadUpTo w) a
+                            | Directed => pwlU p && leb_addr (canReadUpTo w) a
                             end
   end.
 
@@ -237,9 +237,9 @@ Qed.
 
 Definition LocalityFlowsTo (l1 l2: Locality): bool :=
   match l1 with
-  | Monotone => true
+  | Directed => true
   | Local => match l2 with
-            | Monotone => false
+            | Directed => false
             | _ => true
             end
   | Global => match l2 with
@@ -622,12 +622,12 @@ Proof.
   set encode := fun l => match l with
     | Local => 1
     | Global => 2
-    | Monotone => 3
+    | Directed => 3
     end%positive.
   set decode := fun n => match n with
     | 1 => Some Local
     | 2 => Some Global
-    | 3 => Some Monotone
+    | 3 => Some Directed
     | _ => None
     end%positive.
   eapply (Build_Countable _ _ encode decode).

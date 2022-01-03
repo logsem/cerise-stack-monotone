@@ -254,8 +254,7 @@ In the `overlay` folder:
 
 # Differences with the paper
 
-Some definitions have different names from the paper. In particular, _directed
-capabilities_ are called _monotone capabilities_ in the Coq development.
+Some definitions have different names from the paper.  
 
 *name in paper => name in mechanization*
 

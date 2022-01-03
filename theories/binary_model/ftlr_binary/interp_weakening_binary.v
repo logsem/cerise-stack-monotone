@@ -31,14 +31,14 @@ Section fundamental.
                        -∗ sts_full_world a0
                           -∗ na_own logrel_nais ⊤
                              -∗ ⤇ Seq (Instr Executable)
-                                -∗ ⌜a2 = RX ∨ a2 = RWX ∨ a2 = RWLX ∧ a3 = Monotone⌝
+                                -∗ ⌜a2 = RX ∨ a2 = RWX ∨ a2 = RWLX ∧ a3 = Directed⌝
                                    → □ region_conditions a0 a2 a3 a4 a5 -∗ interp_conf a0))%I.
 
   (* TODO: Move in monotone ? *)
   Lemma region_state_nwl_future W W' l l' p a a':
     (a < a')%a →
     LocalityFlowsTo l' l ->
-    (if pwlU p then l = Monotone else True) ->
+    (if pwlU p then l = Directed else True) ->
     (@future_world Σ l' a' W W') -∗
     ⌜if pwlU p then region_state_pwl_mono W a else region_state_nwl W a l⌝ -∗
     ⌜region_state_nwl W' a l'⌝.
@@ -73,7 +73,7 @@ Section fundamental.
     (a < a')%a →
     PermFlowsTo p' p ->
     LocalityFlowsTo l' l ->
-    (if pwlU p then l = Monotone else True) ->
+    (if pwlU p then l = Directed else True) ->
     (@future_world Σ l' a' W W') -∗
     ⌜if pwlU p then region_state_pwl_mono W a else region_state_nwl W a l⌝ -∗
     ⌜if pwlU p' then region_state_pwl_mono W' a else region_state_nwl W' a l'⌝.
@@ -235,7 +235,7 @@ Section fundamental.
               case_eq (pwlU p'); intros.
               * assert (pwlU p = true) as HP by (destruct p, p'; naive_solver).
                 rewrite HP in H1. iPureIntro. auto.
-              * iApply (region_state_nwl_future W W Global Monotone _ _ (min a' e')); eauto.
+              * iApply (region_state_nwl_future W W Global Directed _ _ (min a' e')); eauto.
                 assert (x ∈ region_addrs b' (min a' e')) as [_ Hin]%elem_of_region_addrs;
                   [apply elem_of_list_lookup;eauto|];auto.
                 destruct (pwlU p);inversion H0;auto.
@@ -274,7 +274,7 @@ Section fundamental.
               case_eq (pwlU p'); intros.
               * assert (pwlU p = true) as HP by (destruct p, p'; naive_solver).
                 rewrite HP in H1. iPureIntro. auto.
-              * iApply (region_state_nwl_future W W Local Monotone _ _ (min a' e')); eauto.
+              * iApply (region_state_nwl_future W W Local Directed _ _ (min a' e')); eauto.
                 assert (x ∈ region_addrs b' (min a' e')) as [_ Hin]%elem_of_region_addrs;
                   [apply elem_of_list_lookup;eauto|];auto.
                 destruct (pwlU p);inversion H0;auto.
@@ -295,7 +295,7 @@ Section fundamental.
               case_eq (pwlU p'); intros.
               * assert (pwlU p = true) as HP by (destruct p, p'; naive_solver).
                 rewrite HP in H1. iPureIntro. auto.
-              * iApply (region_state_nwl_future W W Monotone Monotone _ _ (min a' e')); eauto.
+              * iApply (region_state_nwl_future W W Directed Directed _ _ (min a' e')); eauto.
                 assert (x ∈ region_addrs b' (min a' e')) as [_ Hin]%elem_of_region_addrs;
                   [apply elem_of_list_lookup;eauto|];auto.
                 destruct (pwlU p);inversion H0;auto.
@@ -353,7 +353,7 @@ Section fundamental.
               case_eq (pwlU p'); intros.
               * assert (pwlU p = true) as HP by (destruct p, p'; naive_solver).
                 rewrite HP in H1. iPureIntro. auto.
-              * iApply (region_state_nwl_future W W l Monotone _ _ (min a' e')); eauto.
+              * iApply (region_state_nwl_future W W l Directed _ _ (min a' e')); eauto.
                 assert (x ∈ region_addrs b' (min a' e')) as [_ Hin]%elem_of_region_addrs;
                   [apply elem_of_list_lookup;eauto|];auto.
                 destruct (pwlU p);auto. destruct l;auto;inversion H0.

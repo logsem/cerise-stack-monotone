@@ -300,7 +300,7 @@ Section monotone.
         iSpecialize ("Hw" $! r W'' with "Hrelated").
         iApply "Hw".
       + iIntros (Hrelated').
-        iAssert (future_world Monotone a0 W W'')%I as "Hrelated".
+        iAssert (future_world Directed a0 W W'')%I as "Hrelated".
         { iPureIntro. apply related_sts_pub_a_trans_world with W'; auto. }
         iSpecialize ("Hw" $! r W'' with "Hrelated").
         iApply "Hw".
@@ -349,7 +349,7 @@ Section monotone.
           iDestruct "Hw" as "#[Hrw Hst ]".
           iSplit;eauto. iFrame "#".
           iDestruct "Hst" as %Hstd.
-          iPureIntro. eapply (region_state_nwl_monotone W W' _ Monotone); auto.
+          iPureIntro. eapply (region_state_nwl_monotone W W' _ Directed); auto.
         * iApply (big_sepL_mono with "Hw2").
           iIntros (n y Hsome) "Hw".
           iDestruct "Hw" as "#[Hrw Hst ]".
@@ -405,7 +405,7 @@ Section monotone.
           iDestruct "Hw" as "#[Hrw Hst ]".
           iSplit;eauto. iFrame "#".
           iDestruct "Hst" as %Hstd.
-          iPureIntro. eapply (region_state_nwl_monotone W W' _ Monotone); auto.
+          iPureIntro. eapply (region_state_nwl_monotone W W' _ Directed); auto.
         * iApply (big_sepL_mono with "Hw2").
           iIntros (n y Hsome) "Hw".
           iDestruct "Hw" as "#[Hrw Hst ]".
@@ -501,7 +501,7 @@ Section monotone.
         iSpecialize ("Hw" $! r W'' with "Hrelated").
         iApply "Hw".
       + iIntros (Hrelated').
-        iAssert (future_world Monotone a0 W W'')%I as "Hrelated".
+        iAssert (future_world Directed a0 W W'')%I as "Hrelated".
         { iPureIntro. apply related_sts_a_trans_world with W';auto. }
         iSpecialize ("Hw" $! r W'' with "Hrelated").
         iApply "Hw".
@@ -552,7 +552,7 @@ Section monotone.
           iDestruct "Hw" as "#[Hrw Hst ]".
           iSplit;eauto. iFrame "#".
           iDestruct "Hst" as %Hstd.
-          iPureIntro. eapply (region_state_nwl_monotone_a W W' _ (addr_reg.min a a0) Monotone); auto.
+          iPureIntro. eapply (region_state_nwl_monotone_a W W' _ (addr_reg.min a a0) Directed); auto.
           eapply region_addrs_lookup_le;eauto.  apply related_sts_a_weak_world with a;auto. solve_addr.
         * iApply (big_sepL_mono with "Hw2").
           iIntros (n y Hsome) "Hw".
@@ -615,7 +615,7 @@ Section monotone.
           iDestruct "Hw" as "#[Hrw Hst ]".
           iSplit;eauto. iFrame "#".
           iDestruct "Hst" as %Hstd.
-          iPureIntro. eapply (region_state_nwl_monotone_a W W' _ (addr_reg.min a a0)  Monotone); auto.
+          iPureIntro. eapply (region_state_nwl_monotone_a W W' _ (addr_reg.min a a0)  Directed); auto.
           eapply region_addrs_lookup_le;eauto. apply related_sts_a_weak_world with a;auto. solve_addr.
          * iApply (big_sepL_mono with "Hw2").
           iIntros (n y Hsome) "Hw".
@@ -645,14 +645,14 @@ Section monotone.
         iPureIntro. apply region_state_U_pwl_monotone_mono_a with W a;auto. }
   Qed.
 
-  Definition isMonotoneWord (w : Word) :=
+  Definition isDirectedWord (w : Word) :=
     match w with
     | inl _ => false
-    | inr (_,l,_,_,_) => isMonotone l
+    | inr (_,l,_,_,_) => isDirected l
     end.
 
   Lemma interp_monotone_nm W W' w :
-    ⌜related_sts_priv_world W W'⌝ -∗ ⌜isMonotoneWord w.1 = false⌝ -∗
+    ⌜related_sts_priv_world W W'⌝ -∗ ⌜isDirectedWord w.1 = false⌝ -∗
     interp W w -∗ interp W' w.
   Proof.
     iIntros (Hrelated Hnl) "#Hw".

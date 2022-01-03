@@ -385,7 +385,7 @@ Section stack_object.
                                  (<s[b_r_adv:=Monotemporary]s>W1)))) W' b_r_adv →
 
 
-    interp W (inr (URWLX, Monotone, bstk, estk, astk)) -∗
+    interp W (inr (URWLX, Directed, bstk, estk, astk)) -∗
 
     □ ([∗ map] a16↦w7 ∈ m, □ ∃ (φ0 : WORLD * Word → iPropI Σ),
         ⌜∀ Wv : WORLD * Word, Persistent (φ0 Wv)⌝
@@ -635,7 +635,7 @@ Section stack_object.
   Qed.
 
   Lemma close_stack_object W E m la1 la2 ρ wps l p bsec esec asec :
-    (if pwl l then p = Monotone else True) →
+    (if pwl l then p = Directed else True) →
     readAllowed l →
     length (region_addrs bsec esec) = length wps →
     Forall (λ w : (Z + Cap), ∃ z : Z, w = inl z) wps →

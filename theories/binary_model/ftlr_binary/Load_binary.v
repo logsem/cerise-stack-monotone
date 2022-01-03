@@ -382,7 +382,7 @@ Section fundamental.
         - destruct o as [HRX | [HRWX | HRWLX] ]; auto.
           subst; simplify_map_eq.
           iDestruct (writeLocalAllowed_implies_local _ RWLX with "[HLVInterp]") as "%"; auto.
-          destruct x0; unfold isMonotone in *. all: inversion H4.
+          destruct x0; unfold isDirected in *. all: inversion H4.
           iPureIntro; do 2 right; auto.
         - simplify_map_eq. iPureIntro. naive_solver.
       }

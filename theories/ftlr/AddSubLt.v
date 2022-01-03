@@ -24,7 +24,7 @@ Section fundamental.
 
   Lemma add_sub_lt_case (W : WORLD) (r : leibnizO Reg) (p : Perm)
         (g : Locality) (b e a : Addr) (w : Word) (ρ : region_type) (dst : RegName) (r1 r2: Z + RegName) (P:D):
-      p = RX ∨ p = RWX ∨ (p = RWLX /\ g = Monotone)
+      p = RX ∨ p = RWX ∨ (p = RWLX /\ g = Directed)
     → (∀ x : RegName, is_Some (r !! x))
     → isCorrectPC (inr (p, g, b, e, a))
     → (b <= a)%a ∧ (a < e)%a
@@ -44,7 +44,7 @@ Section fundamental.
                     -∗ region a0
                        -∗ sts_full_world a0
                           -∗ na_own logrel_nais ⊤
-                             -∗ ⌜a2 = RX ∨ a2 = RWX ∨ a2 = RWLX ∧ a3 = Monotone⌝
+                             -∗ ⌜a2 = RX ∨ a2 = RWX ∨ a2 = RWLX ∧ a3 = Directed⌝
                                 → □ region_conditions a0 a2 a3 a4 a5 -∗ interp_conf a0)
     -∗ region_conditions W p g b e
     -∗ (∀ r1 : RegName, ⌜r1 ≠ PC⌝ → ((fixpoint interp1) W) (r !r! r1))

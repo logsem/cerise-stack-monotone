@@ -106,7 +106,7 @@ Section instr_encodings.
   (* encodings of enter capability permission pair *)
   Definition global_e := encodePermPair (E, Global).
   (* encodings of enter capability permission pair *)
-  Definition monotone_e := encodePermPair (E, Monotone).
+  Definition monotone_e := encodePermPair (E, Directed).
 End instr_encodings.
 
 Lemma all_registers_NoDup :

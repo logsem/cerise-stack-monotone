@@ -31,7 +31,7 @@ Section macros.
 
   Lemma pushU_z_spec E a1 a2 w z p g b e stk_b stk_e stk_a stk_a' :
     isCorrectPC (inr ((p,g),b,e,a1)) →
-    withinBounds ((URWLX,Monotone),stk_b,stk_e,stk_a) = true →
+    withinBounds ((URWLX,Directed),stk_b,stk_e,stk_a) = true →
     (a1 + 1)%a = Some a2 →
     (stk_a + 1)%a = Some stk_a' →
     nclose specN ⊆ E →
@@ -40,11 +40,11 @@ Section macros.
     ∗ ⤇ Seq (Instr Executable)
     ∗ ▷ pushU_z_s a1 r_stk z
     ∗ ▷ PC ↣ᵣ inr ((p,g),b,e,a1)
-    ∗ ▷ r_stk ↣ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a)
+    ∗ ▷ r_stk ↣ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a)
     ∗ ▷ stk_a ↣ₐ w
     ={E}=∗ ⤇ Seq (Instr Executable)
          ∗ PC ↣ᵣ inr ((p,g),b,e,a2) ∗ pushU_z_s a1 r_stk z ∗
-         r_stk ↣ᵣ inr ((URWLX,Monotone),stk_b,stk_e,stk_a') ∗ stk_a ↣ₐ inl z.
+         r_stk ↣ᵣ inr ((URWLX,Directed),stk_b,stk_e,stk_a') ∗ stk_a ↣ₐ inl z.
   Proof.
     iIntros (Hvpc1 Hwb Hsuc Hstk Hnclose)
             "(#Hspec & Hj & Ha1 & HPC & Hr_stk & Hstk_a')".

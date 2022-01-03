@@ -54,7 +54,7 @@ Section fundamental.
   Proof. intros. case_decide;apply _. Qed.
 
   Theorem fundamental W r p g b e (a : Addr) :
-    ⊢ ((⌜p = RX⌝ ∨ ⌜p = RWX⌝ ∨ ⌜p = RWLX ∧ g = Monotone⌝) →
+    ⊢ ((⌜p = RX⌝ ∨ ⌜p = RWX⌝ ∨ ⌜p = RWLX ∧ g = Directed⌝) →
       region_conditions W p g b e →
       interp_expression r W (inr ((p,g),b,e,a))).
   Proof.
@@ -202,7 +202,7 @@ Section fundamental.
   Qed.
 
   Lemma fundamental_from_interp_correctPC W p g b e a r :
-    p = RX ∨ p = RWX ∨ (p = RWLX ∧ g = Monotone) →
+    p = RX ∨ p = RWX ∨ (p = RWLX ∧ g = Directed) →
     ⊢ interp W (inr (p, g, b, e, a)) →
       interp_expression r W (inr (p,g,b,e,a)).
   Proof.
@@ -234,7 +234,7 @@ Section fundamental.
     iIntros "Hinterp".
     destruct (decide (isCorrectPC (inr (p,g,b,e,a)))).
     - assert (p = RX ∨ p = RWX ∨ p = RWLX) as Hp;[inversion i;auto|].
-      iAssert (⌜p = RWLX → g = Monotone⌝)%I as %Hmono.
+      iAssert (⌜p = RWLX → g = Directed⌝)%I as %Hmono.
       { iIntros (->). iDestruct (writeLocalAllowed_implies_local with "Hinterp") as %Hmono;[auto|destruct g;auto]. }
       iApply (fundamental_from_interp_correctPC with "Hinterp").
       destruct Hp as [-> | [-> | ->] ];auto.

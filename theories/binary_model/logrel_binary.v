@@ -120,7 +120,7 @@ Section logrel.
     (match g with
     (* | Local => ⌜related_sts_pub_plus_world W W'⌝ *)
     | Local | Global => ⌜related_sts_priv_world W W'⌝
-    | Monotone => ⌜related_sts_a_world W W' l⌝
+    | Directed => ⌜related_sts_a_world W W' l⌝
      end)%I.
 
   Global Instance future_world_persistent g l W W': Persistent (future_world g l W W').
@@ -158,7 +158,7 @@ Section logrel.
       |          |         nwl           |          pwl           |
       |          | - < a    |    a ≤ -   |  - < a    |    a ≤ -   |
       -------------------------------------------------------------
-      | Monotone | {M,P}    | {M,P,U}    |    {M}    |    {M,U}   |
+      | Directed | {M,P}    | {M,P,U}    |    {M}    |    {M,U}   |
       |-----------------------------------------------------------|
       | Local    |       {P}             |           N/A          |
       |-----------------------------------------------------------|
@@ -177,7 +177,7 @@ Section logrel.
     match l with
      | Local => (std W) !! a = Some Permanent
      | Global => (std W) !! a = Some Permanent
-     | Monotone => (std W) !! a = Some Monotemporary
+     | Directed => (std W) !! a = Some Monotemporary
                   ∨ (std W) !! a = Some Permanent
     end.
 
@@ -223,7 +223,7 @@ Section logrel.
 
   Program Definition interp_cap_RWL (interp : D) : D :=
     λne W w, (match w with
-              | (inr ((RWL,Monotone),b,e,a), inr (RWL,Monotone,b',e',a')) =>
+              | (inr ((RWL,Directed),b,e,a), inr (RWL,Directed,b',e',a')) =>
                 ⌜b = b' ∧ e = e' ∧ a = a'⌝ ∗
                 [∗ list] a ∈ (region_addrs b e), (read_write_cond a interp) ∧ ⌜region_state_pwl_mono W a⌝
               (* | inr ((RWL,Local),b,e,a) => *)
@@ -261,7 +261,7 @@ Section logrel.
 
   Program Definition interp_cap_RWLX (interp : D) : D :=
     λne W w, (match w with
-              | (inr ((RWLX,Monotone),b,e,a),inr (RWLX,Monotone,b',e',a')) =>
+              | (inr ((RWLX,Directed),b,e,a),inr (RWLX,Directed,b',e',a')) =>
                 ⌜b = b' ∧ e = e' ∧ a = a'⌝ ∗
                 ([∗ list] a ∈ (region_addrs b e), (read_write_cond a interp)
                                                   ∧ ⌜region_state_pwl_mono W a⌝)
@@ -273,10 +273,10 @@ Section logrel.
 
   Program Definition interp_cap_URW (interp : D) : D :=
     λne W w, (match w with
-              | (inr ((URW,Monotone),b,e,a), inr (URW,Monotone,b',e',a')) =>
+              | (inr ((URW,Directed),b,e,a), inr (URW,Directed,b',e',a')) =>
                 ⌜b = b' ∧ e = e' ∧ a = a'⌝ ∗
                 ([∗ list] a' ∈ (region_addrs b (addr_reg.min a e)), (read_write_cond a' interp)
-                                                                    ∧ ⌜region_state_nwl W a' Monotone⌝) ∗
+                                                                    ∧ ⌜region_state_nwl W a' Directed⌝) ∗
                                              ([∗ list] a' ∈ (region_addrs (addr_reg.max b a) e),                                                                    (read_write_cond a' interp) ∧ ⌜region_state_U_mono W a'⌝)
               | (inr ((URW,Local),b,e,a), inr (URW,Local,b',e',a')) =>
                 ⌜b = b' ∧ e = e' ∧ a = a'⌝ ∗
@@ -292,7 +292,7 @@ Section logrel.
 
   Program Definition interp_cap_URWL (interp : D) : D :=
     λne W w, (match w with
-              | (inr ((URWL,Monotone),b,e,a), inr (URWL,Monotone,b',e',a')) =>
+              | (inr ((URWL,Directed),b,e,a), inr (URWL,Directed,b',e',a')) =>
                 ⌜b = b' ∧ e = e' ∧ a = a'⌝ ∗
                 ([∗ list] a' ∈ (region_addrs b (addr_reg.min a e)), (read_write_cond a' interp)
                                                                  ∧ ⌜region_state_pwl_mono W a'⌝) ∗
@@ -309,10 +309,10 @@ Section logrel.
 
   Program Definition interp_cap_URWX (interp : D) : D :=
     λne W w, (match w with
-              | (inr ((URWX,Monotone),b,e,a), inr (URWX,Monotone,b',e',a')) =>
+              | (inr ((URWX,Directed),b,e,a), inr (URWX,Directed,b',e',a')) =>
                 ⌜b = b' ∧ e = e' ∧ a = a'⌝ ∗
                 ([∗ list] a' ∈ (region_addrs b (addr_reg.min a e)), (read_write_cond a' interp)
-                                                                 ∧ ⌜region_state_nwl W a' Monotone⌝)
+                                                                 ∧ ⌜region_state_nwl W a' Directed⌝)
                ∗ ([∗ list] a' ∈ (region_addrs (addr_reg.max b a) e), (read_write_cond a' interp)
                                                                    ∧ ⌜region_state_U_mono W a'⌝)
               | (inr ((URWX,Local),b,e,a), inr (URWX,Local,b',e',a')) =>
@@ -330,7 +330,7 @@ Section logrel.
 
   Program Definition interp_cap_URWLX (interp : D) : D :=
     λne W w, (match w with
-              | (inr ((URWLX,Monotone),b,e,a), inr (URWLX,Monotone,b',e',a')) =>
+              | (inr ((URWLX,Directed),b,e,a), inr (URWLX,Directed,b',e',a')) =>
                 ⌜b = b' ∧ e = e' ∧ a = a'⌝ ∗
                 ([∗ list] a' ∈ (region_addrs b (addr_reg.min a e)), (read_write_cond a' interp)
                                                                  ∧ ⌜region_state_pwl_mono W a'⌝)
@@ -658,15 +658,15 @@ Section logrel.
      [|eauto];solve_addr]).
   Qed.
 
-  Definition isMonotone l :=
+  Definition isDirected l :=
     match l with
-    | Monotone => true
+    | Directed => true
     | _ => false
     end.
 
   Lemma writeLocalAllowed_implies_local W (p : Perm) (l : Locality) (b e a : Addr) (w : Word):
     machine_base.pwl p = true ->
-    interp W (inr ((p, l), b, e, a),w) -∗ ⌜isMonotone l = true⌝.
+    interp W (inr ((p, l), b, e, a),w) -∗ ⌜isDirected l = true⌝.
   Proof.
     intros. iIntros "Hvalid".
     unfold interp; rewrite fixpoint_interp1_eq /=.
@@ -677,7 +677,7 @@ Section logrel.
 
   Lemma writeLocalAllowedU_implies_local W p l b e a (w : Word):
     pwlU p = true ->
-    interp W (inr (p, l, b, e, a),w) -∗ ⌜isMonotone l = true⌝.
+    interp W (inr (p, l, b, e, a),w) -∗ ⌜isDirected l = true⌝.
   Proof.
     intros. iIntros "Hvalid".
     unfold interp; rewrite fixpoint_interp1_eq /=.
@@ -952,7 +952,7 @@ Section logrel.
   Proof.
     intros Hp Hb. iIntros "Hvalid".
     iDestruct (interp_eq with "Hvalid") as %<-.
-    iAssert (⌜isMonotone l = true⌝)%I as "%". by iApply writeLocalAllowed_implies_local.
+    iAssert (⌜isDirected l = true⌝)%I as "%". by iApply writeLocalAllowed_implies_local.
     eapply withinBounds_le_addr in Hb.
     unfold interp; rewrite fixpoint_interp1_eq /=.
     destruct p; simpl in Hp; try congruence; destruct l;try done.
@@ -968,7 +968,7 @@ Section logrel.
   Proof.
     intros Hp Hb. iIntros "Hvalid".
     iDestruct (interp_eq with "Hvalid") as %<-.
-    iAssert (⌜isMonotone l = true⌝)%I as "%". by iApply writeLocalAllowedU_implies_local.
+    iAssert (⌜isDirected l = true⌝)%I as "%". by iApply writeLocalAllowedU_implies_local.
     eapply withinBounds_le_addr in Hb.
     unfold interp; rewrite fixpoint_interp1_eq /=.
     destruct p; simpl in Hp; try congruence; destruct l;try done;
@@ -991,7 +991,7 @@ Section logrel.
            ⌜std W !! a' = Some Monotemporary⌝.
   Proof.
     intros Hp Hlt Hb. iIntros "Hvalid".
-    iAssert (⌜isMonotone l = true⌝)%I as "%". by iApply writeLocalAllowedU_implies_local.
+    iAssert (⌜isDirected l = true⌝)%I as "%". by iApply writeLocalAllowedU_implies_local.
     eapply withinBounds_le_addr in Hlt.
     iDestruct (interp_eq with "Hvalid") as %<-.
     unfold interp; rewrite fixpoint_interp1_eq /=.
@@ -1013,13 +1013,13 @@ Section logrel.
                ([∗ list] a ∈ region_addrs b (if isU p && isLocal l then (addr_reg.min a e) else e),
                 (if writeAllowed p || readAllowedU p then read_write_cond a interp else (∃ (P:D), ⌜(∀ Wv, Persistent (P Wv.1 Wv.2))⌝ ∧ read_cond a P interp)) ∧
                       ⌜if pwlU p then region_state_pwl_mono W a else region_state_nwl W a l⌝) ∗
-                (⌜if pwlU p then isMonotone l else True⌝) ∗
+                (⌜if pwlU p then isDirected l else True⌝) ∗
                 (if isU p && isLocal l then [∗ list] a ∈ region_addrs (addr_reg.max b a) e,
                                             read_write_cond a interp ∧
                                                   ⌜if pwlU p
                                                    then region_state_U_pwl_mono W a
                                                    else (match l with
-                                                         | Monotone => region_state_U_mono W a
+                                                         | Directed => region_state_U_mono W a
                                                          | _ => region_state_U W a
                                                          end)⌝ else emp%I))%I).
   Proof.

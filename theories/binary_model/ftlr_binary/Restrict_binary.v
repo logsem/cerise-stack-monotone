@@ -113,7 +113,7 @@ Section fundamental.
         rewrite H5 in H3. iDestruct (region_close with "[$Hstate $Hr $Ha $Ha' $Hmono Hw]") as "Hr"; eauto.
         { destruct ρ;auto;[|specialize (Hnotmonostatic g)|specialize (Hnotuninitialized p)];contradiction. }
         destruct (PermFlowsTo RX p'') eqn:Hpft.
-        { assert (Hpg: p'' = RX ∨ p'' = RWX ∨ p'' = RWLX ∧ g'' = Monotone).
+        { assert (Hpg: p'' = RX ∨ p'' = RWX ∨ p'' = RWLX ∧ g'' = Directed).
           { destruct p''; simpl in Hpft; eauto; try discriminate.
             destruct (andb_true_eq _ _ ltac:(naive_solver)).
             simpl in H3, H4. destruct p0; simpl in H3; try discriminate.
