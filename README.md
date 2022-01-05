@@ -148,9 +148,8 @@ The organization of the `theories/` folder is as follows.
 
 - `monotone.v`: Proof of the monotonicity of the value relation with regards to
   public future worlds, and private future worlds for non local words.
-  Contains *Lemma 4.1* and *Lemma 4.3*.
 
-- `fundamental.v`: Contains *Theorem 4.4: fundamental theorem of logical
+- `fundamental.v`: Contains *Theorem 4.1: fundamental theorem of logical
   relations*. Each case (one for each instruction) is proved in a separate file
   (located in the `ftlr/` folder), which are all imported and applied in this
   file.
@@ -164,7 +163,7 @@ The correspondance between the lemmas and the Coq statements is as follows.
 | Lemma A.1 (address relative monotonicity)               | monotone.v                        | `interp_monotone_a`                                           |
 | Lemma A.2 (address relative weakening)                  | sts.v                             | `related_sts_a_weak_world`                                    |
 | Lemma A.3 (private monotonicity)                        | monotone.v                        | `interp_monotone_nm`                                          |
-| Theorem 4.1  (FTLR)                                     | fundamental.v                     | `fundamental_from_interp`                                     |
+| Theorem 4.1 (FTLR)                                      | fundamental.v                     | `fundamental_from_interp`                                     |
 
 ## Binary Model (Appendix C)
 
@@ -174,13 +173,13 @@ The binary model uses the same program logic as in the unary model, and a simila
 family of rules for the specification part of the refinement.
 These rules are all in the `binary_model/rules_binary` folder. In particular, 
 the `binary_model/rules_binary/rules_binary_base.v` file contains the resource 
-algegra used for the specification part of the refinement.
+algebra used for the specification part of the refinement.
 
 - `region_invariants{_XX}_binary.v`: Binary version of the *sharedResources*.
 
-- `logrel_binary.v`: Binary logical relation.
+- `logrel_binary.v`: Binary logical relation (Fig. 11).
 
-- `fundamental_binary.v`: Binary fundamental theorem of logical relations.
+- `fundamental_binary.v`: Binary fundamental theorem of logical relations (Theorem C.1).
   Each case is proved in a separate file located in `binary_model/ftlr_binary/`.
 
 ## Case studies: Integrity
@@ -190,7 +189,7 @@ In the `examples` folder:
 - `macros/*` : Specifications for some useful macros
 
 - `macros/scall_u.v`: Specification of a safe calling convention for
-  a URWLX Monotone stack. The specification is split up into two parts:
+  a URWLX Directed stack. The specification is split up into two parts:
   the prologue is the specification for the code before the jump, the epilogue
   is the specification for the activation record.
 
@@ -200,12 +199,12 @@ In the `examples` folder:
 - `downwards_lse{_preamble}{_adequacy}.v`: The assembly definition and proof of 
   *Listing 7*. The `preamble` file creates the closure, and the `adequacy` file
   applies the adequacy of Iris weakest preconditions to prove the final theorem,
-  *Theorem 4.6*.
+  *Theorem 4.2*.
 
 - `stack_object{_preamble}{_adequacy}.v`: The assembly definition and proof of 
   *Listing 9*. The `preamble` file creates the closure, and the `adequacy` file
   applies the adequacy of Iris weakest preconditions to prove the final theorem,
-  *Theorem 4.8*.
+  *Theorem 4.3*.
 
 - `awkward_example{_u}{_preamble}{_adequacy}.v`: The assembly definition and proof of 
   *Listing 5*. The `preamble` file creates the closure, and the `adequacy` file
@@ -226,14 +225,14 @@ In the `binary_model/examples_binary` folder:
 ## Linking
 
 - `linking.v`: Defines the general theory of components, well-formed components,
-  linking and contexts as presented in Appendix A.
+  linking and contexts as presented in Appendix B.
 
 ## Overlay semantics
 
 In the `overlay` folder:
 
 - `lang.v`: Defines the overlay semantics. Note that we use a more restrictive
-  definition of *safe* words as explained in Appendix C due to some Coq
+  definition of *safe* words as explained in Appendix D due to some Coq
   engineering issues.
 
 - `call.v`: Defines the implementation on the base machine of the call instruction.
